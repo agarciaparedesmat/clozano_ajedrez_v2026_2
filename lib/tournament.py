@@ -74,23 +74,69 @@ def parse_bye_points(res_str, default_points=1.0):
     return float(default_points)
 
 def apply_results(players, df_pairs, bye_points=1.0):
+    """
+    Aplica resultados a la estructura interna de jugadores.
+    - Registra oponentes y colores para todas las mesas (si hay IDs válidas).
+    - Actualiza _score y **_round_results** SOLO cuando hay un resultado válido.
+    - BYE: no añade color, añade _round_results con (0, puntos).
+    """
     id2p = {p["id"]: p for p in players}
     if df_pairs is None or df_pairs.empty: return players
+
+    def push_round_result(pid, opp_id, pts):
+        pl = id2p.get(pid)
+        if pl is None: return
+        pl.setdefault("_round_results", []).append((int(opp_id) if isinstance(opp_id,int) else opp_id, float(pts)))
+
     for _, row in df_pairs.iterrows():
-        w = row.get("blancas_id",""); b = row.get("negras_id",""); res = str(row.get("resultado","")).strip().upper()
+        w = row.get("blancas_id","")
+        b = row.get("negras_id","")
+        res = str(row.get("resultado","")).strip().upper()
+
+        # BYE
         if str(b).upper() == "BYE":
-            try: pid = int(w); bp = parse_bye_points(res, default_points=bye_points); id2p[pid]["_score"] += bp; id2p[pid].setdefault("_round_results", []).append((0, bp)); id2p[pid]["_had_bye"] = True
-            except: pass
+            try:
+                pid = int(w)
+            except:
+                continue
+            bp = parse_bye_points(res, default_points=bye_points)
+            if pid in id2p:
+                id2p[pid]["_score"] += bp
+                id2p[pid]["_had_bye"] = True
+                push_round_result(pid, 0, bp)  # oponente 0 = BYE
             continue
-        try: w = int(w); b = int(b)
-        except: continue
+
+        # Mesa normal
+        try:
+            w = int(w); b = int(b)
+        except:
+            continue
+        if w not in id2p or b not in id2p:  # ids no válidos
+            continue
+
+        # Registrar oponentes y colores (independiente del resultado)
         id2p[w]["_opponents"].append(b); id2p[b]["_opponents"].append(w)
-        id2p[w]["_colors"].append("W"); id2p[b]["_colors"].append("B")
-        if res in ("1-0","1–0"): id2p[w]["_score"] += WIN; id2p[b]["_score"] += LOSS
-        elif res in ("0-1","0–1"): id2p[w]["_score"] += LOSS; id2p[b]["_score"] += WIN
-        elif res in ("1/2-1/2","½-½","0.5-0.5","0,5-0,5"): id2p[w]["_score"] += DRAW; id2p[b]["_score"] += DRAW
-        elif res in ("+/−","+/-"): id2p[w]["_score"] += WIN; id2p[b]["_score"] += LOSS
-        elif res in ("−/+","-/+"): id2p[w]["_score"] += LOSS; id2p[b]["_score"] += WIN
+        id2p[w]["_colors"].append("W");   id2p[b]["_colors"].append("B")
+
+        # Mapear resultado a puntos
+        w_pts = b_pts = None
+        if res in ("1-0","1–0","+/-","+/−"):
+            w_pts, b_pts = WIN, LOSS
+        elif res in ("0-1","0–1","-/+","−/+"):
+            w_pts, b_pts = LOSS, WIN
+        elif res in ("1/2-1/2","½-½","0.5-0.5","0,5-0,5"):
+            w_pts, b_pts = DRAW, DRAW
+        elif res in ("BYE1.0","BYE0.5","BYE"):  # por si alguien dejó BYE en mesa normal: ignora
+            continue
+
+        # Si no hay resultado reconocido, no sumar ni registrar _round_results
+        if w_pts is None or b_pts is None:
+            continue
+
+        # Actualizar puntuación y _round_results
+        id2p[w]["_score"] += float(w_pts); id2p[b]["_score"] += float(b_pts)
+        push_round_result(w, b, w_pts);    push_round_result(b, w, b_pts)
+
     return players
 
 # ---------- Colors ----------

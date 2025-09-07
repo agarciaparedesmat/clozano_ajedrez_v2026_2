@@ -1,0 +1,6 @@
+
+# Patch snippet: ensure _round_results records for normal games
+# (Integrate this in your lib/tournament.py apply_results function)
+# After determining w,b and parsing result, add:
+# id2p[w].setdefault("_round_results", []).append((b, 1.0/0.5/0.0))
+# id2p[b].setdefault("_round_results", []).append((w, 1.0/0.5/0.0))
