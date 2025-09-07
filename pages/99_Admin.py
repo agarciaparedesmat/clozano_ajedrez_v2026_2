@@ -26,6 +26,10 @@ jug_up = st.file_uploader("Subir/actualizar jugadores.csv", type=["csv"], key="j
 if jug_up is not None:
     with open(jug_path, "wb") as f: f.write(jug_up.read())
     st.success("jugadores.csv actualizado.")
+    dfprev = read_csv_safe(jug_path)
+    if dfprev is not None and not dfprev.empty:
+        st.caption(f"Jugadores cargados: {len(dfprev)}")
+        st.dataframe(dfprev.head(10), use_container_width=True, hide_index=True)
 
 completed = 0
 for i in range(1, n+1):
@@ -79,9 +83,22 @@ else:
                 dfp = read_csv_safe(os.path.join(DATA_DIR, f"pairings_R{rno}.csv"))
                 players = apply_results(players, dfp, bye_points=1.0)
 
-            df_pairs = swiss_pair_round(players, next_round, forced_bye_id=forced_bye_id)
-            st.success(f"Ronda {next_round} — Vista previa (editable)")
-            edited = st.data_editor(
+            
+df_pairs = swiss_pair_round(players, next_round, forced_bye_id=forced_bye_id)
+# --- AUTO-GUARDAR INMEDIATO ---
+outp = os.path.join(DATA_DIR, f"pairings_R{next_round}.csv")
+df_pairs.astype(str).to_csv(outp, index=False, encoding="utf-8")
+if next_round == 1 and seed_used is not None:
+    set_published(1, published=False, seed=seed_used)
+add_log("auto_save_pairings_on_generate", next_round, actor, f"Guardado inicial en {outp}")
+st.success(f"Ronda {next_round} generada y guardada en {outp}")
+
+st.caption(f"Archivo actual: {outp}")
+st.caption(f"Registra cambios editando la tabla y pulsando 'Guardar'.")
+
+st.success(f"Ronda {next_round} — Vista previa (editable)")
+edited = st.data_editor(
+
                 df_pairs, use_container_width=True, hide_index=True,
                 column_config={"resultado": st.column_config.SelectboxColumn("resultado", options=["", "BYE1.0", "BYE0.5"], required=False)},
                 num_rows="dynamic"
@@ -174,3 +191,25 @@ if del_rounds:
             st.error(f"No se pudo eliminar: {e}")
 else:
     st.info("No hay rondas para eliminar.")
+
+
+st.divider()
+st.markdown("### Archivos en data/ (inspector rápido)")
+try:
+    files = os.listdir(DATA_DIR)
+    if files:
+        import pandas as pd
+        rows = []
+        for f in sorted(files):
+            p = os.path.join(DATA_DIR, f)
+            try:
+                sz = os.path.getsize(p)
+                mt = last_modified(p)
+            except Exception:
+                sz = 0; mt = "—"
+            rows.append({"archivo": f, "tamaño_bytes": sz, "modificado": mt})
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    else:
+        st.info("data/ está vacío.")
+except Exception as e:
+    st.warning(f"No se pudo listar data/: {e}")
