@@ -1,0 +1,25 @@
+{
+  "titulo": "Torneo Suizo — IES (v7 Cloud‑fix)",
+  "subtitulo": "Multipágina + auto-guardado",
+  "anio": "2025",
+  "nivel": "1º ESO",
+  "cabecera_pdf": "",
+  "rondas": 5,
+  "auto_refresh_seconds": 0,
+  "genially_url": "",
+  "nivel_urls": {
+    "1ESO": "",
+    "2-3ESO": "",
+    "4ESO-BACH": ""
+  },
+  "pdf_theme": {
+    "top_band": "%23dff0d8",
+    "middle_band": "%23f6d6c6",
+    "level_band": "%23cfe3ff",
+    "title_color": "%23000000"
+  },
+  "logo_left": "",
+  "logo_right": "",
+  "pdf_presets": {},
+  "pdf_watermark": ""
+}
