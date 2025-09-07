@@ -14,6 +14,7 @@ from lib.tournament import (
 
 st.header("Panel de Administración")
 
+# Autenticación
 pwd = st.text_input("Contraseña", type="password")
 if not pwd or pwd != st.secrets.get("ADMIN_PASS", ""):
     st.stop()
@@ -26,6 +27,9 @@ cfg = load_config()
 n = int(cfg.get("rondas", 5))
 jug_path = os.path.join(DATA_DIR, "jugadores.csv")
 
+# ----------------------------------
+# Carga de jugadores
+# ----------------------------------
 st.markdown("### Emparejar (sistema suizo)")
 st.caption("Formato: id,nombre,apellido1,apellido2,curso,grupo,estado")
 jug_up = st.file_uploader("Subir/actualizar jugadores.csv", type=["csv"], key="jug_csv")
@@ -38,6 +42,9 @@ if jug_up is not None:
         st.caption(f"Jugadores cargados: {len(dfprev)}")
         st.dataframe(dfprev.head(10), use_container_width=True, hide_index=True)
 
+# ----------------------------------
+# Determinar siguiente ronda
+# ----------------------------------
 completed = 0
 for i in range(1, n + 1):
     p = os.path.join(DATA_DIR, f"pairings_R{i}.csv")
@@ -48,16 +55,21 @@ for i in range(1, n + 1):
         completed = i
     else:
         break
+
 next_round = completed + 1
 st.write(f"Rondas cerradas: **{completed}** / {n}")
 st.write(f"Siguiente ronda: **Ronda {next_round}**")
 st.caption(f"Semilla usada en R1: `{r1_seed() or '—'}`")
 
+# ----------------------------------
+# Forzar BYE (opcional)
+# ----------------------------------
 forced_bye_id = None
 jug_df = read_csv_safe(jug_path)
 options = ["— Ninguno —"]
 idmap = {}
 players_preview = []
+
 if jug_df is not None and not jug_df.empty:
     players_preview = read_players_from_csv(jug_path)
     for rno in range(1, next_round):
@@ -70,14 +82,21 @@ if jug_df is not None and not jug_df.empty:
         label = f"{p['id']} — {formatted_name_from_parts(p['nombre'], p['apellido1'], p['apellido2'])}{tag}"
         options.append(label)
         idmap[label] = p['id']
+
 sel = st.selectbox("Forzar BYE (opcional)", options, index=0)
 if sel in idmap:
     forced_bye_id = int(idmap[sel])
 
+# ----------------------------------
+# Semilla R1
+# ----------------------------------
 seed_input = ""
 if next_round == 1:
     seed_input = st.text_input("Semilla de aleatoriedad (opcional)", value="")
 
+# ----------------------------------
+# Generar ronda (auto-guardar)
+# ----------------------------------
 if is_published(next_round):
     st.warning(f"La Ronda {next_round} está **PUBLICADA**. Elimínala abajo para rehacerla.")
 else:
@@ -123,7 +142,7 @@ else:
                 key=f"preview_R{next_round}"
             )
 
-            c1, c2, c3 = st.columns(3)
+            c1, c2 = st.columns(2)
             with c1:
                 if st.button(f"Guardar pairings_R{next_round}.csv"):
                     edited.astype(str).to_csv(outp, index=False, encoding="utf-8")
@@ -132,16 +151,45 @@ else:
             with c2:
                 csv_bytes = edited.to_csv(index=False).encode("utf-8")
                 st.download_button("Descargar CSV (previo)", csv_bytes, file_name=f"pairings_R{next_round}.csv", mime="text/csv")
-            with c3:
-                if os.path.exists(outp):
-                    if st.button(f"Publicar Ronda {next_round}"):
-                        set_published(next_round, published=True, seed=(r1_seed() if next_round == 1 else None))
-                        add_log("publish_round", next_round, actor, "Ronda publicada")
-                        st.success("Ronda publicada. Ahora puedes introducir resultados.")
+
+# ----------------------------------
+# Publicación persistente (fuera del bloque de generar)
+# ----------------------------------
+st.divider()
+st.markdown("### Publicar / Despublicar rondas")
+existing_rounds = [i for i in range(1, n + 1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv"))]
+if existing_rounds:
+    status_rows = []
+    for i in existing_rounds:
+        status_rows.append({"ronda": i, "publicada": bool(is_published(i))})
+    st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
+
+    to_publish = [i for i in existing_rounds if not is_published(i)]
+    if to_publish:
+        sel_pub = st.selectbox("Ronda a publicar", to_publish, index=len(to_publish) - 1, key="pub_sel")
+        if st.button("Publicar ronda seleccionada"):
+            set_published(sel_pub, True, seed=(r1_seed() if sel_pub == 1 else None))
+            add_log("publish_round", sel_pub, actor, "Publicada desde sección Publicar")
+            st.success(f"Ronda {sel_pub} publicada.")
+    else:
+        st.info("No hay rondas pendientes de publicar.")
+
+    to_unpub = [i for i in existing_rounds if is_published(i)]
+    if to_unpub:
+        sel_unpub = st.selectbox("Ronda a despublicar", to_unpub, index=len(to_unpub) - 1, key="unpub_sel")
+        if st.button("Despublicar ronda seleccionada"):
+            set_published(sel_unpub, False)
+            add_log("unpublish_round", sel_unpub, actor, "Despublicada")
+            st.success(f"Ronda {sel_unpub} despublicada.")
+else:
+    st.info("Aún no hay rondas generadas.")
 
 st.divider()
-st.markdown("### Resultados y clasificación")
 
+# ----------------------------------
+# Resultados y clasificación
+# ----------------------------------
+st.markdown("### Resultados y clasificación")
 rounds_available = [i for i in range(1, n + 1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv"))]
 published_rounds = [i for i in rounds_available if is_published(i)] if rounds_available else []
 
@@ -176,7 +224,6 @@ st.markdown("#### Calcular clasificación")
 bye_pts = st.number_input("Puntos por BYE (por defecto si 'BYE')", min_value=0.0, max_value=1.0, value=1.0, step=0.5)
 max_round = max([i for i in range(1, n + 1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv"))] + [0])
 
-# --- Slider seguro (evita rango [1,1]) ---
 if max_round < 1:
     st.info("Aún no hay ninguna ronda generada/publicada. Genera y publica una ronda antes de calcular la clasificación.")
     upto = 1
@@ -201,6 +248,10 @@ if st.button("Calcular clasificación y guardar"):
         st.dataframe(df_st, use_container_width=True, hide_index=True)
 
 st.divider()
+
+# ----------------------------------
+# Eliminar ronda
+# ----------------------------------
 st.markdown("### Eliminar ronda")
 del_rounds = [i for i in range(1, n + 1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv"))]
 if del_rounds:
@@ -222,6 +273,10 @@ else:
     st.info("No hay rondas para eliminar.")
 
 st.divider()
+
+# ----------------------------------
+# Inspector de data/
+# ----------------------------------
 st.markdown("### Archivos en data/ (inspector rápido)")
 try:
     files = os.listdir(DATA_DIR)
