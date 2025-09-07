@@ -1,7 +1,9 @@
 # lib/tournament.py
 # -*- coding: utf-8 -*-
 from __future__ import annotations
+
 import os
+import re
 import json
 import random
 from datetime import datetime
@@ -9,13 +11,13 @@ from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 
-# -------------------------
+# ============================================================
 # Rutas y utilidades básicas
-# -------------------------
+# ============================================================
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
-def _ensure_data_dir():
+def _ensure_data_dir() -> None:
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
     except Exception:
@@ -23,9 +25,9 @@ def _ensure_data_dir():
 
 _ensure_data_dir()
 
-# -------------------------
-# Config / Meta
-# -------------------------
+# ============================================================
+# Config / Meta / Log
+# ============================================================
 CFG_PATH  = os.path.join(DATA_DIR, "config.json")
 META_PATH = os.path.join(DATA_DIR, "meta.json")
 LOG_PATH  = os.path.join(DATA_DIR, "admin_log.csv")
@@ -41,7 +43,7 @@ def load_config() -> dict:
         return {"rondas": 5}
 
 def load_meta() -> dict:
-    """Lee meta.json."""
+    """Lee meta.json (o dict vacío si no existe / error)."""
     if not os.path.exists(META_PATH):
         return {}
     try:
@@ -51,7 +53,7 @@ def load_meta() -> dict:
         return {}
 
 def save_meta(meta: dict) -> None:
-    """Guarda meta.json."""
+    """Guarda meta.json (ignora errores silenciosamente)."""
     try:
         with open(META_PATH, "w", encoding="utf-8") as f:
             json.dump(meta, f, ensure_ascii=False, indent=2)
@@ -63,29 +65,56 @@ def r1_seed() -> Optional[str]:
     m = load_meta()
     return m.get("rounds", {}).get("1", {}).get("seed")
 
-# -------------------------
-# Lectura/Escritura segura CSV
-# -------------------------
+def add_log(action: str, round_no: Optional[int], actor: str, message: str) -> None:
+    """Anexa una línea al log administrativo en data/admin_log.csv."""
+    try:
+        cols = ["ts", "accion", "ronda", "actor", "mensaje"]
+        row = {
+            "ts": datetime.now().isoformat(timespec="seconds"),
+            "accion": action,
+            "ronda": round_no if round_no is not None else "",
+            "actor": actor or "",
+            "mensaje": message or "",
+        }
+        exists = os.path.exists(LOG_PATH)
+        df = pd.DataFrame([row], columns=cols)
+        if not exists:
+            df.to_csv(LOG_PATH, index=False, encoding="utf-8")
+        else:
+            df.to_csv(LOG_PATH, index=False, mode="a", header=False, encoding="utf-8")
+    except Exception:
+        pass
+
+# ============================================================
+# Lectura/Escritura CSV segura
+# ============================================================
 def read_csv_safe(path: str) -> Optional[pd.DataFrame]:
+    """Lee un CSV en UTF-8 devolviendo DataFrame o None si no existe / error."""
     try:
         if not os.path.exists(path):
             return None
-        df = pd.read_csv(path, dtype=str, encoding="utf-8", keep_default_na=False, na_values=[""])
-        # normaliza columnas esperadas si procede
+        df = pd.read_csv(
+            path,
+            dtype=str,
+            encoding="utf-8",
+            keep_default_na=False,
+            na_values=[""]
+        )
         return df
     except Exception:
         return None
 
 def last_modified(path: str) -> str:
+    """Fecha-hora de última modificación (ISO) o '—' si falla."""
     try:
         ts = os.path.getmtime(path)
         return datetime.fromtimestamp(ts).isoformat(sep=" ", timespec="seconds")
     except Exception:
         return "—"
 
-# -------------------------
+# ============================================================
 # Publicación robusta (meta + flag-file)
-# -------------------------
+# ============================================================
 def _pub_flag_path(i: int) -> str:
     """Ruta del flag-file para la ronda i."""
     return os.path.join(DATA_DIR, f"published_R{i}.flag")
@@ -137,37 +166,37 @@ def set_published(i: int, value: bool, seed: Optional[str] = None) -> None:
             if os.path.exists(flag):
                 os.remove(flag)
     except Exception:
-        # opcional: se podría registrar en log
+        # opcionalmente podríamos add_log del error
         pass
 
-# -------------------------
-# Registro de cambios
-# -------------------------
-def add_log(action: str, round_no: Optional[int], actor: str, message: str) -> None:
+# ============================================================
+# Helpers de rondas (rutas y listado)
+# ============================================================
+def round_file(i: int) -> str:
+    """Ruta al CSV de emparejamientos de la ronda i."""
+    return os.path.join(DATA_DIR, f"pairings_R{i}.csv")
+
+def list_round_files(max_rounds: int | None = None) -> List[int]:
     """
-    Anexa una línea al log administrativo en data/admin_log.csv
+    Devuelve la lista de números de ronda para los que existe 'data/pairings_R<i>.csv',
+    ordenada ascendentemente. Si max_rounds está definido, filtra hasta ese número.
     """
+    rounds = set()
     try:
-        cols = ["ts", "accion", "ronda", "actor", "mensaje"]
-        row = {
-            "ts": datetime.now().isoformat(timespec="seconds"),
-            "accion": action,
-            "ronda": round_no if round_no is not None else "",
-            "actor": actor or "",
-            "mensaje": message or "",
-        }
-        exists = os.path.exists(LOG_PATH)
-        df = pd.DataFrame([row], columns=cols)
-        if not exists:
-            df.to_csv(LOG_PATH, index=False, encoding="utf-8")
-        else:
-            df.to_csv(LOG_PATH, index=False, mode="a", header=False, encoding="utf-8")
+        for fname in os.listdir(DATA_DIR):
+            m = re.fullmatch(r"pairings_R(\d+)\.csv", fname)
+            if m:
+                rounds.add(int(m.group(1)))
     except Exception:
-        pass
+        return []
+    out = sorted(rounds)
+    if max_rounds is not None:
+        out = [r for r in out if r <= max_rounds]
+    return out
 
-# -------------------------
+# ============================================================
 # Nombres y jugadores
-# -------------------------
+# ============================================================
 def formatted_name_from_parts(nombre: str, apellido1: str, apellido2: str) -> str:
     """
     Formato para listados: 'Nombre Apellido1 A.' (inicial de apellido2 si existe).
@@ -210,26 +239,26 @@ def read_players_from_csv(path: str) -> Dict[str, dict]:
             # acumuladores
             "points": 0.0,
             "opponents": [],      # lista de ids
-            "colors": [],         # "W"/"B" por ronda jugada
+            "colors": [],         # "W"/"B" por partida jugada
             "had_bye": False,     # recibió BYE alguna vez
         }
     return players
 
-# -------------------------
+# ============================================================
 # Aplicar resultados y clasificación
-# -------------------------
+# ============================================================
 def _award_points_for_result(res: str, bye_default: float = 1.0) -> Tuple[float, float, Optional[float]]:
     """
     Devuelve (pts_white, pts_black, bye_points_si_hay).
-    - '1-0'  -> (1.0, 0.0, None)
-    - '0-1'  -> (0.0, 1.0, None)
-    - '1/2-1/2' -> (0.5, 0.5, None)
-    - '+/-'  -> (1.0, 0.0, None) (incomparecencia negras)
-    - '-/+'  -> (0.0, 1.0, None) (incomparecencia blancas)
-    - 'BYE1.0' -> (1.0, 0.0, 1.0)   (negras es BYE)
-    - 'BYE0.5' -> (0.5, 0.0, 0.5)
-    - 'BYE'    -> (bye_default, 0.0, bye_default)
-    - ''/None -> (0.0, 0.0, None)
+    - '1-0'      -> (1.0, 0.0, None)
+    - '0-1'      -> (0.0, 1.0, None)
+    - '1/2-1/2'  -> (0.5, 0.5, None)
+    - '+/-'      -> (1.0, 0.0, None) (incomparecencia negras)
+    - '-/+'      -> (0.0, 1.0, None) (incomparecencia blancas)
+    - 'BYE1.0'   -> (1.0, 0.0, 1.0)   (negras es BYE)
+    - 'BYE0.5'   -> (0.5, 0.0, 0.5)
+    - 'BYE'      -> (bye_default, 0.0, bye_default)
+    - ''/None    -> (0.0, 0.0, None)
     """
     if not res:
         return 0.0, 0.0, None
@@ -251,7 +280,8 @@ def apply_results(players: Dict[str, dict], df_pairs: Optional[pd.DataFrame], by
     """
     if df_pairs is None or df_pairs.empty:
         return players
-    # Asegurar columnas
+
+    # Asegurar columnas mínimas
     cols = ["blancas_id", "negras_id", "resultado"]
     for c in cols:
         if c not in df_pairs.columns:
@@ -268,8 +298,8 @@ def apply_results(players: Dict[str, dict], df_pairs: Optional[pd.DataFrame], by
                 wpts, _, bye_pts = _award_points_for_result(res or "BYE", bye_default=bye_points)
                 players[wid]["points"] += float(bye_pts if bye_pts is not None else bye_points)
                 players[wid]["had_bye"] = True
-                # Color: no suma color real, pero añadimos "W" para evitar 3 seguidas?
-                players[wid]["colors"].append("W")  # opcional; puedes quitar si no deseas que cuente para color run
+                # Color: puedes decidir si cuenta para racha de colores; aquí añadimos "W"
+                players[wid]["colors"].append("W")
             continue
 
         if wid not in players or bid not in players:
@@ -280,13 +310,13 @@ def apply_results(players: Dict[str, dict], df_pairs: Optional[pd.DataFrame], by
         players[wid]["points"] += float(w_add)
         players[bid]["points"] += float(b_add)
 
-        # Oponentes (aunque el resultado esté vacío, si prefieres no contarlos, condiciona a res != "")
+        # Oponentes (si deseas añadir solo con resultado, condiciona a res != "")
         if wid not in players[bid]["opponents"]:
             players[bid]["opponents"].append(wid)
         if bid not in players[wid]["opponents"]:
             players[wid]["opponents"].append(bid)
 
-        # Historial de colores (si hay negras==BYE no cuenta)
+        # Historial de colores
         players[wid]["colors"].append("W")
         players[bid]["colors"].append("B")
 
@@ -295,14 +325,13 @@ def apply_results(players: Dict[str, dict], df_pairs: Optional[pd.DataFrame], by
 def compute_standings(players: Dict[str, dict]) -> pd.DataFrame:
     """
     Devuelve un DataFrame de clasificación con:
-      id, nombre_formateado, curso, grupo, puntos, buchholz, pj
+      pos, id, nombre, curso, grupo, puntos, buchholz, pj
     Orden: puntos desc, buchholz desc, nombre asc
     """
     if not players:
-        return pd.DataFrame(columns=["id","nombre","curso","grupo","puntos","buchholz","pj"])
+        return pd.DataFrame(columns=["pos","id","nombre","curso","grupo","puntos","buchholz","pj"])
 
-    # Calcular Buchholz (suma de puntos de oponentes)
-    # Primero construimos un mapa de puntos finales por id:
+    # Mapa de puntos finales por id:
     pts_map = {pid: float(info.get("points", 0.0)) for pid, info in players.items()}
 
     rows = []
@@ -323,14 +352,14 @@ def compute_standings(players: Dict[str, dict]) -> pd.DataFrame:
 
     df = pd.DataFrame(rows)
     df = df.sort_values(by=["puntos","buchholz","nombre"], ascending=[False, False, True]).reset_index(drop=True)
-    # ranking (1..n)
-    df.insert(0, "pos", df.index + 1)
+    df.insert(0, "pos", df.index + 1)  # ranking 1..n
     return df
 
-# -------------------------
-# Emparejador Suizo (simplificado + reglas)
-# -------------------------
+# ============================================================
+# Emparejador Suizo (reglas pragmáticas + “no 3 colores seguidos”)
+# ============================================================
 def _eligible_players(players: Dict[str, dict]) -> List[str]:
+    """Jugadores en estado distinto de 'retirado'."""
     ids = []
     for pid, p in players.items():
         if str(p.get("estado", "activo")).lower() != "retirado":
@@ -344,16 +373,24 @@ def _has_three_in_a_row(colors: List[str], next_color: str) -> bool:
     return colors[-1] == next_color and colors[-2] == next_color
 
 def _choose_bye(candidates: List[str], players: Dict[str, dict]) -> Optional[str]:
-    """Elige quién recibe BYE: que no lo haya recibido aún, con menos puntos y alfabético."""
+    """
+    Elige quién recibe BYE:
+      - Prioriza quien no lo haya tenido aún
+      - Menos puntos
+      - Desempate por nombre formateado (estable)
+    """
     if not candidates:
         return None
-    # primero, sin bye
     no_bye = [pid for pid in candidates if not players[pid].get("had_bye", False)]
     pool = no_bye if no_bye else candidates
-    # menos puntos
-    pool = sorted(pool, key=lambda pid: (players[pid].get("points", 0.0), formatted_name_from_parts(
-        players[pid].get("nombre",""), players[pid].get("apellido1",""), players[pid].get("apellido2","")
-    )))
+    pool = sorted(pool, key=lambda pid: (
+        players[pid].get("points", 0.0),
+        formatted_name_from_parts(
+            players[pid].get("nombre",""),
+            players[pid].get("apellido1",""),
+            players[pid].get("apellido2",""),
+        )
+    ))
     return pool[0]
 
 def _name_of(players: Dict[str, dict], pid: str) -> str:
@@ -362,35 +399,39 @@ def _name_of(players: Dict[str, dict], pid: str) -> str:
 
 def swiss_pair_round(players: Dict[str, dict], round_no: int, forced_bye_id: Optional[str] = None) -> pd.DataFrame:
     """
-    Genera emparejamientos Suizos de la ronda `round_no`.
-    Regresa DataFrame con: mesa,blancas_id,blancas_nombre,negras_id,negras_nombre,resultado
+    Genera emparejamientos de la ronda `round_no` (sistema suizo, heurístico).
+    Devuelve DataFrame con: mesa,blancas_id,blancas_nombre,negras_id,negras_nombre,resultado
+
     Reglas:
-      - Empareja por grupos de puntos (desc).
-      - Evita repetir oponente si es posible.
-      - Evita 3 colores seguidos por jugador si es posible.
+      - Orden base por puntos desc y nombre estable.
+      - Empareja dentro de grupos de puntos (barajando levemente para variedad).
+      - Evita repetir oponente, si es posible.
+      - Evita 3 colores seguidos por jugador, si es posible.
       - BYE si impar (preferencia: quien no haya tenido BYE y menos puntos).
-    Nota: es un emparejador razonable y pragmático, no un solver perfecto.
+    Nota: es un emparejador pragmático, no un solver perfecto de suizo.
     """
-    # Construir lista de activos
+    # Jugadores activos
     active_ids = _eligible_players(players)
+
     # Orden base por puntos desc y nombre
-    active_ids.sort(key=lambda pid: (-players[pid].get("points",0.0), _name_of(players, pid)))
+    active_ids.sort(key=lambda pid: (-players[pid].get("points", 0.0), _name_of(players, pid)))
 
     # Agrupar por puntos
     def pts(pid): return players[pid].get("points", 0.0)
     score_groups: Dict[float, List[str]] = {}
     for pid in active_ids:
         score_groups.setdefault(pts(pid), []).append(pid)
-    # barajar ligeramente dentro del grupo para no emparejar siempre lo mismo (semilla ya la controla Admin antes)
+
+    # Barajar dentro del grupo (semilla la controla Admin antes)
     for g in score_groups.values():
         random.shuffle(g)
 
-    # Flatten por grupos de mayor a menor
-    grouped = []
+    # Aplanar grupos (de mayor a menor puntuación)
+    grouped: List[str] = []
     for s in sorted(score_groups.keys(), reverse=True):
         grouped.extend(score_groups[s])
 
-    # Si impar -> reservar candidato a BYE
+    # Si impar -> reservar BYE
     bye_id = None
     if len(grouped) % 2 == 1:
         if forced_bye_id and forced_bye_id in grouped:
@@ -410,70 +451,62 @@ def swiss_pair_round(players: Dict[str, dict], round_no: int, forced_bye_id: Opt
             i += 1
             continue
 
-        # buscar rival más compatible
         best_j = None
-        for j in range(i+1, len(grouped)):
+        # 1) intentamos alguien que no haya jugado antes con 'a'
+        for j in range(i + 1, len(grouped)):
             b = grouped[j]
             if b in used:
                 continue
-            # evitar repetición si es posible
-            opps_a = set(players[a].get("opponents", []))
-            if b in opps_a:
-                continue
-            best_j = j
-            break
+            if b not in set(players[a].get("opponents", [])):
+                best_j = j
+                break
 
-        # si no encontramos que no repita, cogemos el siguiente posible
+        # 2) si no hay, el primer libre que encontremos
         if best_j is None:
-            for j in range(i+1, len(grouped)):
+            for j in range(i + 1, len(grouped)):
                 b = grouped[j]
                 if b not in used:
                     best_j = j
                     break
 
         if best_j is None:
-            # no hay pareja libre, empareja con el siguiente aún si ya usado (muy raro)
             i += 1
             continue
 
         b = grouped[best_j]
 
-        # Decidir colores intentando evitar 3 seguidas
-        # preferimos que el que tenga W o B acumuladas no haga 3ª seguida
+        # Decidir colores evitando 3 seguidas
         aW_bad = _has_three_in_a_row(players[a].get("colors", []), "W")
         aB_bad = _has_three_in_a_row(players[a].get("colors", []), "B")
         bW_bad = _has_three_in_a_row(players[b].get("colors", []), "W")
         bB_bad = _has_three_in_a_row(players[b].get("colors", []), "B")
 
-        # heurística simple:
-        choice = ("W", "B")  # a con blancas
+        choice = ("W", "B")  # por defecto: a con blancas
         if aW_bad and not aB_bad:
             choice = ("B", "W")
-        if not aW_bad and aB_bad:
+        elif not aW_bad and aB_bad:
             choice = ("W", "B")
-        if aW_bad and aB_bad:
-            # cualquiera, priorizamos que b no haga 3 seguidas
+        elif aW_bad and aB_bad:
+            # si ambos malos, priorizamos evitar conflicto en b
             if bW_bad and not bB_bad:
-                choice = ("W", "B")  # aW, bB
+                choice = ("W", "B")  # b negras
             elif not bW_bad and bB_bad:
                 choice = ("B", "W")
         else:
-            # si b tiene conflicto fuerte, ajustamos
+            # ajustar si b tiene conflicto fuerte
             if bW_bad and not bB_bad:
-                choice = ("W", "B")  # b con negras
+                choice = ("W", "B")
             elif not bW_bad and bB_bad:
                 choice = ("B", "W")
 
-        if choice == ("W","B"):
+        if choice == ("W", "B"):
             pairings.append((a, b))
         else:
             pairings.append((b, a))
 
-        used.add(a); used.add(b)
+        used.add(a)
+        used.add(b)
         i += 1
-        # compactar para evitar huecos
-        if best_j is not None and best_j != i:
-            pass
 
     # Construir DataFrame salida
     rows = []
@@ -485,7 +518,7 @@ def swiss_pair_round(players: Dict[str, dict], round_no: int, forced_bye_id: Opt
             "blancas_nombre": _name_of(players, bye_id),
             "negras_id": "BYE",
             "negras_nombre": "BYE",
-            "resultado": ""  # se podrá marcar BYE1.0 / BYE0.5 / BYE
+            "resultado": ""  # luego se podrá marcar BYE1.0 / BYE0.5 / BYE
         })
         mesa += 1
 
@@ -500,5 +533,6 @@ def swiss_pair_round(players: Dict[str, dict], round_no: int, forced_bye_id: Opt
         })
         mesa += 1
 
-    df = pd.DataFrame(rows, columns=["mesa","blancas_id","blancas_nombre","negras_id","negras_nombre","resultado"])
+    df = pd.DataFrame(rows, columns=["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"])
     return df
+
