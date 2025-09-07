@@ -98,7 +98,7 @@ if next_round == 1:
 # Generar ronda (auto-guardar)
 # ----------------------------------
 if is_published(next_round):
-    st.warning(f"La Ronda {next_round} está **PUBLICADA**. Elimínala abajo para rehacerla.")
+    st.warning(f"La Ronda {next_round} está **PUBLICADA**. Elimínala abajo para rehacerla, o despublícala en la sección inferior.")
 else:
     if st.button(f"Generar Ronda {next_round}"):
         if next_round == 1:
@@ -153,7 +153,7 @@ else:
                 st.download_button("Descargar CSV (previo)", csv_bytes, file_name=f"pairings_R{next_round}.csv", mime="text/csv")
 
 # ----------------------------------
-# Publicación persistente (fuera del bloque de generar)
+# Publicación persistente con re-run inmediato
 # ----------------------------------
 st.divider()
 st.markdown("### Publicar / Despublicar rondas")
@@ -171,6 +171,7 @@ if existing_rounds:
             set_published(sel_pub, True, seed=(r1_seed() if sel_pub == 1 else None))
             add_log("publish_round", sel_pub, actor, "Publicada desde sección Publicar")
             st.success(f"Ronda {sel_pub} publicada.")
+            st.rerun()
     else:
         st.info("No hay rondas pendientes de publicar.")
 
@@ -181,6 +182,7 @@ if existing_rounds:
             set_published(sel_unpub, False)
             add_log("unpublish_round", sel_unpub, actor, "Despublicada")
             st.success(f"Ronda {sel_unpub} despublicada.")
+            st.rerun()
 else:
     st.info("Aún no hay rondas generadas.")
 
@@ -267,6 +269,7 @@ if del_rounds:
                 save_meta(meta)
             add_log("delete_round", dsel, actor, f"pairings_R{dsel}.csv eliminado")
             st.success(f"Ronda R{dsel} eliminada.")
+            st.rerun()
         except Exception as e:
             st.error(f"No se pudo eliminar: {e}")
 else:
