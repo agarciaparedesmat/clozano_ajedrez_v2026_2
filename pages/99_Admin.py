@@ -189,7 +189,7 @@ else:
 st.divider()
 
 # ----------------------------------
-# Resultados y clasificación
+# Resultados y clasificación (SOLO rondas PUBLICADAS)
 # ----------------------------------
 st.markdown("### Resultados y clasificación")
 rounds_available = [i for i in range(1, n + 1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv"))]
@@ -222,27 +222,36 @@ if published_rounds:
 else:
     st.info("No hay rondas publicadas todavía.")
 
-st.markdown("#### Calcular clasificación")
+st.markdown("#### Calcular clasificación (solo PUBLICADAS)")
+st.caption("Se tendrán en cuenta **exclusivamente** las rondas marcadas como PUBLICADAS.")
 bye_pts = st.number_input("Puntos por BYE (por defecto si 'BYE')", min_value=0.0, max_value=1.0, value=1.0, step=0.5)
-max_round = max([i for i in range(1, n + 1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv"))] + [0])
 
-if max_round < 1:
-    st.info("Aún no hay ninguna ronda generada/publicada. Genera y publica una ronda antes de calcular la clasificación.")
+eligible_rounds = [i for i in range(1, n + 1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv")) and is_published(i)]
+eligible_rounds = sorted(eligible_rounds)
+
+if not eligible_rounds:
+    st.info("Aún no hay rondas PUBLICADAS para calcular clasificación.")
     upto = 1
-elif max_round == 1:
-    st.caption("Hay una sola ronda disponible. Se calculará la clasificación hasta la **Ronda 1**.")
-    upto = 1
+elif len(eligible_rounds) == 1:
+    only_r = eligible_rounds[0]
+    st.caption(f"Solo está publicada la **Ronda {only_r}**. Se calculará hasta esa ronda.")
+    upto = only_r
 else:
-    upto = st.slider("Calcular hasta la ronda", min_value=1, max_value=int(max_round), value=int(max_round), key="upto_slider")
+    min_pub = eligible_rounds[0]
+    max_pub = eligible_rounds[-1]
+    st.caption(f"Rondas publicadas: {', '.join(map(str, eligible_rounds))}")
+    upto = st.slider("Calcular hasta la ronda publicada", min_value=min_pub, max_value=max_pub, value=max_pub, key="upto_pub_slider")
 
 if st.button("Calcular clasificación y guardar"):
     players = read_players_from_csv(jug_path)
     if not players:
         st.error("No se pudo leer jugadores.csv")
     else:
-        for rno in range(1, upto + 1):
-            dfp = read_csv_safe(os.path.join(DATA_DIR, f"pairings_R{rno}.csv"))
-            players = apply_results(players, dfp, bye_points=float(bye_pts))
+        # Aplicar solo rondas publicadas hasta 'upto'
+        for rno in eligible_rounds:
+            if rno <= upto:
+                dfp = read_csv_safe(os.path.join(DATA_DIR, f"pairings_R{rno}.csv"))
+                players = apply_results(players, dfp, bye_points=float(bye_pts))
         df_st = compute_standings(players)
         outp = os.path.join(DATA_DIR, "standings.csv")
         df_st.to_csv(outp, index=False, encoding="utf-8")
