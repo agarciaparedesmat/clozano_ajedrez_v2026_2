@@ -70,7 +70,6 @@ if jug_up is not None:
 
 # ---------- Diagnóstico de rondas ----------
 states = [round_status(i) for i in range(1, n+1)]
-gen_rounds = [s["i"] for s in states if s["exists"]]
 closed_rounds = [s["i"] for s in states if s["closed"]]
 first_missing = next((i for i in range(1, n+1) if not states[i-1]["exists"]), None)
 
@@ -196,97 +195,21 @@ if pubs:
     if dfp is not None:
         st.caption("Valores: 1-0, 0-1, 1/2-1/2, +/- , -/+, BYE1.0, BYE0.5, BYE")
 
-        # --- Buffer por ronda para edición y selección ---
+        # --- Buffer por ronda + editor primero (para capturar selección) ---
         buf_key = f"res_buf_R{sel_r}"
         if buf_key not in st.session_state:
-            st.session_state[buf_key] = dfp.copy()
-            if "seleccionar" not in st.session_state[buf_key].columns:
-                st.session_state[buf_key]["seleccionar"] = False
+            base_df = dfp.copy()
+            if "seleccionar" not in base_df.columns:
+                base_df["seleccionar"] = False
+            st.session_state[buf_key] = base_df
         else:
             for col in ["mesa","blancas_id","blancas_nombre","negras_id","negras_nombre","resultado"]:
                 if col not in st.session_state[buf_key].columns:
                     st.session_state[buf_key][col] = dfp.get(col, "")
-
             if "seleccionar" not in st.session_state[buf_key].columns:
                 st.session_state[buf_key]["seleccionar"] = False
 
-        dfbuf = st.session_state[buf_key]
-
-        csel1, csel2, csel3 = st.columns(3)
-        with csel1:
-            if st.button("Seleccionar todo"):
-                dfbuf["seleccionar"] = True
-                st.session_state[buf_key] = dfbuf
-                st.rerun()
-        with csel2:
-            if st.button("Quitar selección"):
-                dfbuf["seleccionar"] = False
-                st.session_state[buf_key] = dfbuf
-                st.rerun()
-        with csel3:
-            solo_vacios = st.checkbox("Solo vacíos", value=True, key=f"solo_vacios_R{sel_r}")
-
-        # Botones masivos basados en SELECCIÓN
-        cta1, cta2, cta3, cta4 = st.columns(4)
-        with cta1:
-            if st.button("Completar con tablas (½-½)"):
-                df = dfbuf.copy()
-                sel = df["seleccionar"] == True
-                elig = df["negras_id"].astype(str).str.upper() != "BYE"
-                if solo_vacios:
-                    elig = elig & (df["resultado"].fillna("").astype(str).str.strip() == "")
-                idxs = df.index[sel & elig].tolist()
-                if not idxs:
-                    st.warning("No hay filas seleccionadas (y elegibles) para completar con tablas.")
-                else:
-                    df.loc[idxs, "resultado"] = "1/2-1/2"
-                    st.session_state[buf_key] = df
-                    st.rerun()
-        with cta2:
-            if st.button("Alternar 1-0 / 0-1"):
-                df = dfbuf.copy()
-                sel = df["seleccionar"] == True
-                elig = df["negras_id"].astype(str).str.upper() != "BYE"
-                if solo_vacios:
-                    elig = elig & (df["resultado"].fillna("").astype(str).str.strip() == "")
-                idxs = df.index[sel & elig].tolist()
-                if not idxs:
-                    st.warning("No hay filas seleccionadas (y elegibles) para alternar 1-0/0-1.")
-                else:
-                    flag = True
-                    for idx in idxs:
-                        df.at[idx, "resultado"] = "1-0" if flag else "0-1"
-                        flag = not flag
-                    st.session_state[buf_key] = df
-                    st.rerun()
-        with cta3:
-            if st.button("Completar BYEs"):
-                df = dfbuf.copy()
-                sel = df["seleccionar"] == True
-                elig = df["negras_id"].astype(str).str.upper() == "BYE"
-                if solo_vacios:
-                    elig = elig & (df["resultado"].fillna("").astype(str).str.strip() == "")
-                idxs = df.index[sel & elig].tolist()
-                if not idxs:
-                    st.warning("No hay filas seleccionadas (y elegibles) para completar BYEs.")
-                else:
-                    df.loc[idxs, "resultado"] = "BYE1.0"
-                    st.session_state[buf_key] = df
-                    st.rerun()
-        with cta4:
-            if st.button("Vaciar resultados"):
-                df = dfbuf.copy()
-                sel = df["seleccionar"] == True
-                idxs = df.index[sel].tolist()
-                if not idxs:
-                    st.warning("No hay filas seleccionadas para vaciar resultados.")
-                else:
-                    df.loc[idxs, "resultado"] = ""
-                    st.session_state[buf_key] = df
-                    st.rerun()
-
-        # Editor basado en buffer (incluye columna 'seleccionar')
-        edited_res = st.data_editor(
+        edited_now = st.data_editor(
             st.session_state[buf_key],
             use_container_width=True,
             hide_index=True,
@@ -299,15 +222,87 @@ if pubs:
                 )
             },
             num_rows="fixed",
-            key=f"results_R{sel_r}"
+            key=f"editor_results_R{sel_r}"
         )
+        st.session_state[buf_key] = edited_now.copy()
 
-        # Guardar
+        csel1, csel2, csel3 = st.columns(3)
+        with csel1:
+            if st.button("Seleccionar todo"):
+                df = st.session_state[buf_key].copy()
+                df["seleccionar"] = True
+                st.session_state[buf_key] = df
+                st.rerun()
+        with csel2:
+            if st.button("Quitar selección"):
+                df = st.session_state[buf_key].copy()
+                df["seleccionar"] = False
+                st.session_state[buf_key] = df
+                st.rerun()
+        with csel3:
+            solo_vacios = st.checkbox("Solo vacíos", value=True, key=f"solo_vacios_R{sel_r}")
+
+        def _sel(df):
+            s = df.get("seleccionar", False)
+            if hasattr(s, "astype"):
+                try:
+                    s = s.fillna(False).astype(bool)
+                except Exception:
+                    s = s == True
+            return s == True
+        def _is_bye_series(df): return df["negras_id"].astype(str).str.upper() == "BYE"
+        def _is_empty_res(df): return df["resultado"].fillna("").astype(str).str.strip() == ""
+
+        a1, a2, a3, a4, a5 = st.columns(5)
+        with a1:
+            if st.button("Completar con tablas (½-½)"):
+                df = st.session_state[buf_key].copy()
+                sel = _sel(df); elig = ~_is_bye_series(df)
+                if solo_vacios: elig = elig & _is_empty_res(df)
+                idxs = df.index[sel & elig].tolist()
+                if not idxs: st.warning("No hay filas seleccionadas (y elegibles) para completar con tablas.")
+                else:
+                    df.loc[idxs, "resultado"] = "1/2-1/2"; st.session_state[buf_key] = df; st.rerun()
+        with a2:
+            if st.button("Ganan BLANCAS (1-0)"):
+                df = st.session_state[buf_key].copy()
+                sel = _sel(df); elig = ~_is_bye_series(df)
+                if solo_vacios: elig = elig & _is_empty_res(df)
+                idxs = df.index[sel & elig].tolist()
+                if not idxs: st.warning("No hay filas seleccionadas (y elegibles) para poner 1-0.")
+                else:
+                    df.loc[idxs, "resultado"] = "1-0"; st.session_state[buf_key] = df; st.rerun()
+        with a3:
+            if st.button("Ganan NEGRAS (0-1)"):
+                df = st.session_state[buf_key].copy()
+                sel = _sel(df); elig = ~_is_bye_series(df)
+                if solo_vacios: elig = elig & _is_empty_res(df)
+                idxs = df.index[sel & elig].tolist()
+                if not idxs: st.warning("No hay filas seleccionadas (y elegibles) para poner 0-1.")
+                else:
+                    df.loc[idxs, "resultado"] = "0-1"; st.session_state[buf_key] = df; st.rerun()
+        with a4:
+            if st.button("Completar BYEs"):
+                df = st.session_state[buf_key].copy()
+                sel = _sel(df); elig = _is_bye_series(df)
+                if solo_vacios: elig = elig & _is_empty_res(df)
+                idxs = df.index[sel & elig].tolist()
+                if not idxs: st.warning("No hay filas seleccionadas (y elegibles) para completar BYEs.")
+                else:
+                    df.loc[idxs, "resultado"] = "BYE1.0"; st.session_state[buf_key] = df; st.rerun()
+        with a5:
+            if st.button("Vaciar resultados"):
+                df = st.session_state[buf_key].copy()
+                sel = _sel(df); idxs = df.index[sel].tolist()
+                if not idxs: st.warning("No hay filas seleccionadas para vaciar resultados.")
+                else:
+                    df.loc[idxs, "resultado"] = ""; st.session_state[buf_key] = df; st.rerun()
+
         if st.button("Guardar resultados de la ronda"):
             outp = round_file(sel_r)
-            edited_res.astype(str).to_csv(outp, index=False, encoding="utf-8")
+            df_to_save = st.session_state[buf_key].copy()
+            df_to_save.astype(str).to_csv(outp, index=False, encoding="utf-8")
             add_log("save_results", sel_r, actor, "Resultados actualizados")
-            st.session_state[buf_key] = edited_res.copy()
             ok, path = recalc_and_save_standings(bye_points=1.0)
             if ok: st.success(f"Resultados guardados. Clasificación recalculada y guardada en {path}")
             else: st.warning("Resultados guardados, pero no se pudo recalcular la clasificación.")
