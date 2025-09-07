@@ -28,17 +28,29 @@ jug_path = os.path.join(DATA_DIR, "jugadores.csv")
 
 # ---------- Helpers ----------
 def round_file(i): return os.path.join(DATA_DIR, f"pairings_R{i}.csv")
+
 def results_empty_count(df):
     if df is None or df.empty or "resultado" not in df.columns: return None
     return int((df["resultado"].fillna("").astype(str).str.strip() == "").sum())
+
 def round_status(i):
     p = round_file(i)
     df = read_csv_safe(p)
     exists = df is not None and not df.empty
     empties = results_empty_count(df) if exists else None
     pub = is_published(i) if exists else False
-    closed = exists and (empties == 0)
+    # Cerrada <=> existe & publicada & sin vacíos
+    closed = exists and pub and (empties == 0)
     return {"i": i, "exists": exists, "published": pub, "empties": empties, "closed": closed, "path": p}
+
+def status_label(s):
+    if not s["exists"]:
+        return "—"
+    if s["published"]:
+        if s["empties"] == 0:
+            return "✅ Cerrada"
+        return "📣 Publicada"
+    return "📝 Borrador"
 
 def published_rounds_list():
     return sorted([i for i in range(1, n+1) if os.path.exists(round_file(i)) and is_published(i)])
@@ -76,10 +88,11 @@ first_missing = next((i for i in range(1, n+1) if not states[i-1]["exists"]), No
 st.markdown("#### Estado de rondas")
 diag = pd.DataFrame([
     {"Ronda": s["i"],
+     "Estado": status_label(s),
      "Generada": "Sí" if s["exists"] else "No",
      "Publicada": "Sí" if s["published"] else "No",
      "Resultados vacíos": ("—" if s["empties"] is None else s["empties"]),
-     "Cerrada (sin vacíos)": "Sí" if s["closed"] else "No",
+     "Cerrada (pub+sin vacíos)": "Sí" if s["closed"] else "No",
      "Archivo": os.path.basename(s["path"])}
     for s in states
 ])
@@ -99,10 +112,16 @@ else:
         prev_state = states[prev-1]
         if not prev_state["closed"]:
             allow_generate = False
-            st.warning(
-                f"No se puede generar la Ronda {next_round} porque la Ronda {prev} no está cerrada. "
-                f"Faltan **{prev_state['empties']}** resultados en `pairings_R{prev}.csv`."
-            )
+            if not prev_state["published"]:
+                st.warning(
+                    f"No se puede generar la Ronda {next_round} porque la Ronda {prev} **no está publicada**. "
+                    f"Primero **publícala** y después completa los resultados."
+                )
+            else:
+                st.warning(
+                    f"No se puede generar la Ronda {next_round} porque la Ronda {prev} **tiene resultados pendientes**. "
+                    f"Faltan **{prev_state['empties']}** resultados en `pairings_R{prev}.csv`."
+                )
             force_key = f"force_gen_R{next_round}"
             force = st.checkbox("⚠️ Forzar generación de la siguiente ronda (solo esta vez)", value=False, key=force_key)
             if force:
