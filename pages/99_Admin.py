@@ -25,6 +25,38 @@ cfg = load_config()
 n = int(cfg.get("rondas", 5))
 jug_path = os.path.join(DATA_DIR, "jugadores.csv")
 
+# ---------- Publicación robusta (meta + flag-file) ----------
+def _pub_flag_path(i: int):
+    return os.path.join(DATA_DIR, f"published_R{i}.flag")
+
+def is_pub(i: int) -> bool:
+    # Preferimos meta; si falla o no está, usamos flag-file
+    try:
+        if is_published(i):
+            return True
+    except Exception:
+        pass
+    return os.path.exists(_pub_flag_path(i))
+
+def set_pub(i: int, val: bool, seed=None):
+    # Intentamos persistir en meta y también en flag-file
+    try:
+        set_published(i, val, seed=seed)
+    except Exception:
+        pass
+    fp = _pub_flag_path(i)
+    if val:
+        try:
+            open(fp, "w").close()
+        except Exception:
+            pass
+    else:
+        try:
+            if os.path.exists(fp):
+                os.remove(fp)
+        except Exception:
+            pass
+
 # ---------- Helpers ----------
 def round_file(i): return os.path.join(DATA_DIR, f"pairings_R{i}.csv")
 
@@ -37,7 +69,7 @@ def round_status(i):
     df = read_csv_safe(p)
     exists = df is not None and not df.empty
     empties = results_empty_count(df) if exists else None
-    pub = is_published(i) if exists else False
+    pub = is_pub(i) if exists else False
     # Cerrada <=> existe & publicada & sin vacíos
     closed = exists and pub and (empties == 0)
     return {"i": i, "exists": exists, "published": pub, "empties": empties, "closed": closed, "path": p}
@@ -52,7 +84,7 @@ def status_label(s):
     return "📝 Borrador"
 
 def published_rounds_list():
-    return sorted([i for i in range(1, n+1) if os.path.exists(round_file(i)) and is_published(i)])
+    return sorted([i for i in range(1, n+1) if os.path.exists(round_file(i)) and is_pub(i)])
 
 def recalc_and_save_standings(bye_points=1.0):
     players = read_players_from_csv(jug_path)
@@ -132,7 +164,7 @@ else:
     st.write(f"Siguiente ronda candidata: **Ronda {next_round if next_round else '—'}**")
 
     if allow_generate and next_round is not None:
-        if is_published(next_round):
+        if is_pub(next_round):
             st.warning(f"La Ronda {next_round} ya está **PUBLICADA**. Despublícala para rehacerla.")
         else:
             if st.button(f"Generar Ronda {next_round}"):
@@ -169,14 +201,14 @@ st.divider()
 st.markdown("### Publicar / Despublicar rondas")
 existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
 if existing_rounds:
-    status_rows = [{"ronda": i, "publicada": bool(is_published(i))} for i in existing_rounds]
+    status_rows = [{"ronda": i, "publicada": bool(is_pub(i))} for i in existing_rounds]
     st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
 
-    to_publish = [i for i in existing_rounds if not is_published(i)]
+    to_publish = [i for i in existing_rounds if not is_pub(i)]
     if to_publish:
         sel_pub = st.selectbox("Ronda a publicar", to_publish, index=len(to_publish) - 1, key="pub_sel")
         if st.button("Publicar ronda seleccionada"):
-            set_published(sel_pub, True, seed=(r1_seed() if sel_pub == 1 else None))
+            set_pub(sel_pub, True, seed=(r1_seed() if sel_pub == 1 else None))
             add_log("publish_round", sel_pub, actor, "Publicada desde sección Publicar")
             ok, path = recalc_and_save_standings(bye_points=1.0)
             if ok: st.success(f"Ronda {sel_pub} publicada. Clasificación recalculada y guardada en {path}")
@@ -191,7 +223,7 @@ if existing_rounds:
         st.caption(f"Solo se puede **despublicar** la **última ronda publicada**, actualmente **Ronda {last_pub}**.")
         sel_unpub = last_pub
         if st.button(f"Despublicar Ronda {last_pub}"):
-            set_published(sel_unpub, False)
+            set_pub(sel_unpub, False)
             add_log("unpublish_round", sel_unpub, actor, "Despublicada (última publicada)")
             ok, path = recalc_and_save_standings(bye_points=1.0)
             if ok: st.success(f"Ronda {sel_unpub} despublicada. Clasificación recalculada y guardada en {path}")
@@ -316,7 +348,7 @@ if pubs:
                 else:
                     df.loc[idxs, "resultado"] = ""; st.session_state[buf_key] = df; st.rerun()
 
-        # Guardar (sin columna 'seleccionar' en el CSV) y deseleccionar tras guardar
+        # Guardar (sin columna 'seleccionar' en CSV) y desmarcar tras guardar
         if st.button("Guardar resultados de la ronda"):
             outp = round_file(sel_r)
             df_to_save = st.session_state[buf_key].copy()
@@ -386,4 +418,5 @@ try:
         st.info("data/ está vacío.")
 except Exception as e:
     st.warning(f"No se pudo listar data/: {e}")
+
 
