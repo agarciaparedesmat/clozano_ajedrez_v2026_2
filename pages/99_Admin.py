@@ -1,4 +1,3 @@
-
 import streamlit as st
 import os
 import pandas as pd
@@ -317,11 +316,20 @@ if pubs:
                 else:
                     df.loc[idxs, "resultado"] = ""; st.session_state[buf_key] = df; st.rerun()
 
+        # Guardar (sin columna 'seleccionar' en el CSV) y deseleccionar tras guardar
         if st.button("Guardar resultados de la ronda"):
             outp = round_file(sel_r)
             df_to_save = st.session_state[buf_key].copy()
+            if "seleccionar" in df_to_save.columns:
+                df_to_save = df_to_save.drop(columns=["seleccionar"])
             df_to_save.astype(str).to_csv(outp, index=False, encoding="utf-8")
             add_log("save_results", sel_r, actor, "Resultados actualizados")
+            # Reset de selección en el buffer tras guardar
+            df_after = read_csv_safe(outp)
+            if df_after is None:
+                df_after = df_to_save.copy()
+            df_after["seleccionar"] = False
+            st.session_state[buf_key] = df_after
             ok, path = recalc_and_save_standings(bye_points=1.0)
             if ok: st.success(f"Resultados guardados. Clasificación recalculada y guardada en {path}")
             else: st.warning("Resultados guardados, pero no se pudo recalcular la clasificación.")
@@ -378,3 +386,4 @@ try:
         st.info("data/ está vacío.")
 except Exception as e:
     st.warning(f"No se pudo listar data/: {e}")
+
