@@ -1,4 +1,9 @@
+
 import streamlit as st
-st.set_page_config(page_title='Torneo v7 Cloud-fix', layout='wide')
-st.title('Torneo Suizo — IES (Cloud-fix)')
-st.caption('Usa el menú lateral para navegar')
+from lib.tournament import load_config
+
+st.set_page_config(page_title="Torneo Suizo Escolar v7 Baseline", page_icon="♟️", layout="wide")
+cfg = load_config()
+st.title(cfg.get("titulo","Torneo Suizo — IES"))
+st.caption(cfg.get("subtitulo",""))
+st.info("Usa el menú lateral (Pages): Portada, Rondas, Clasificación y Admin.")

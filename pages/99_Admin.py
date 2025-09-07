@@ -4,7 +4,7 @@ from lib.tournament import (
     load_config, save_config, load_meta, save_meta, read_csv_safe, write_csv, last_modified,
     read_players_from_csv, apply_results, swiss_pair_round, formatted_name_from_parts,
     list_round_files, is_published, set_published, r1_seed, add_log, parse_bye_points,
-    compute_standings, export_pdf_players, DATA_DIR
+    compute_standings, DATA_DIR
 )
 
 st.header("Panel de Administración")
@@ -17,15 +17,16 @@ actor = st.text_input("Tu nombre (registro de cambios)", value=st.session_state.
 st.session_state["actor_name"] = actor
 
 cfg = load_config()
+n = int(cfg.get("rondas", 5))
 jug_path = os.path.join(DATA_DIR, "jugadores.csv")
 
 st.markdown("### Emparejar (sistema suizo)")
+st.caption("Formato: id,nombre,apellido1,apellido2,curso,grupo,estado")
 jug_up = st.file_uploader("Subir/actualizar jugadores.csv", type=["csv"], key="jug_csv")
 if jug_up is not None:
     with open(jug_path, "wb") as f: f.write(jug_up.read())
     st.success("jugadores.csv actualizado.")
 
-n = int(cfg.get("rondas", 5))
 completed = 0
 for i in range(1, n+1):
     p = os.path.join(DATA_DIR, f"pairings_R{i}.csv")
@@ -69,14 +70,22 @@ else:
             random.seed(seed_used)
         else:
             seed_used = None
+
         players = read_players_from_csv(jug_path)
-        if not players: st.error("No se pudo leer `data/jugadores.csv`.")
+        if not players:
+            st.error("No se pudo leer `data/jugadores.csv`.")
         else:
             for rno in range(1, next_round):
                 dfp = read_csv_safe(os.path.join(DATA_DIR, f"pairings_R{rno}.csv"))
                 players = apply_results(players, dfp, bye_points=1.0)
+
             df_pairs = swiss_pair_round(players, next_round, forced_bye_id=forced_bye_id)
-            edited = st.data_editor(df_pairs, use_container_width=True, hide_index=True, key=f"preview_R{next_round}", num_rows="dynamic")
+            st.success(f"Ronda {next_round} — Vista previa (editable)")
+            edited = st.data_editor(
+                df_pairs, use_container_width=True, hide_index=True,
+                column_config={"resultado": st.column_config.SelectboxColumn("resultado", options=["", "BYE1.0", "BYE0.5"], required=False)},
+                num_rows="dynamic"
+            )
             c1,c2,c3 = st.columns(3)
             with c1:
                 if st.button(f"Guardar pairings_R{next_round}.csv"):
@@ -84,36 +93,62 @@ else:
                     edited.astype(str).to_csv(outp, index=False, encoding="utf-8")
                     if next_round == 1 and seed_used is not None:
                         set_published(1, published=False, seed=seed_used)
-                    add_log("save_pairings", next_round, actor, "Guardado manual")
+                    add_log("save_pairings", next_round, actor, "Guardado desde vista previa")
                     st.success(f"Guardado en {outp}")
             with c2:
                 csv_bytes = edited.to_csv(index=False).encode("utf-8")
                 st.download_button("Descargar CSV (previo)", csv_bytes, file_name=f"pairings_R{next_round}.csv", mime="text/csv")
             with c3:
-                outp = os.path.join(DATA_DIR, f"pairings_R{next_round}.csv")
-                if os.path.exists(outp):
+                if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{next_round}.csv")):
                     if st.button(f"Publicar Ronda {next_round}"):
                         set_published(next_round, published=True, seed=(r1_seed() if next_round==1 else None))
                         add_log("publish_round", next_round, actor, "Ronda publicada")
                         st.success("Ronda publicada. Ahora puedes introducir resultados.")
 
 st.divider()
+st.markdown("### Resultados y clasificación")
+rounds_available = [i for i in range(1, n+1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv"))]
+if rounds_available:
+    published_rounds = [i for i in rounds_available if is_published(i)]
+else:
+    published_rounds = []
+if published_rounds:
+    sel = st.selectbox("Ronda publicada a editar", published_rounds, index=len(published_rounds)-1, key="res_round")
+    dfp = read_csv_safe(os.path.join(DATA_DIR, f"pairings_R{sel}.csv"))
+    if dfp is not None:
+        st.caption("Valores: 1-0, 0-1, 1/2-1/2, +/- , -/+, BYE1.0, BYE0.5, BYE")
+        options = ["", "1-0", "0-1", "1/2-1/2", "+/-", "-/+", "BYE1.0", "BYE0.5", "BYE"]
+        for col in ["mesa","blancas_id","blancas_nombre","negras_id","negras_nombre","resultado"]:
+            if col not in dfp.columns: dfp[col] = ""
+        edited = st.data_editor(
+            dfp, use_container_width=True, hide_index=True,
+            column_config={"resultado": st.column_config.SelectboxColumn("resultado", options=options, required=False)},
+            num_rows="fixed"
+        )
+        if st.button("Guardar resultados de la ronda"):
+            outp = os.path.join(DATA_DIR, f"pairings_R{sel}.csv")
+            edited.astype(str).to_csv(outp, index=False, encoding="utf-8")
+            add_log("save_results", sel, actor, "Resultados actualizados")
+            st.success(f"Resultados guardados en {outp}")
+else:
+    st.info("No hay rondas publicadas todavía.")
+
 st.markdown("#### Calcular clasificación")
 bye_pts = st.number_input("Puntos por BYE (por defecto si 'BYE')", min_value=0.0, max_value=1.0, value=1.0, step=0.5)
 max_round = max([i for i in range(1, n+1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv"))] + [0])
 if max_round < 1:
-    st.info("Aún no hay ninguna ronda generada/publicada. Genera y publica una ronda antes de calcular la clasificación.")
+    st.info("Aún no hay ninguna ronda generada/publicada.")
     upto = 1
 else:
     upto = st.slider("Calcular hasta la ronda", min_value=1, max_value=max_round, value=max_round, key="upto_slider")
-if st.button("Calcular y guardar clasificación"):
+if st.button("Calcular clasificación y guardar"):
     players = read_players_from_csv(jug_path)
-    if not players: st.error("No se pudo leer jugadores.csv")
+    if not players:
+        st.error("No se pudo leer jugadores.csv")
     else:
         for rno in range(1, upto+1):
             dfp = read_csv_safe(os.path.join(DATA_DIR, f"pairings_R{rno}.csv"))
             players = apply_results(players, dfp, bye_points=float(bye_pts))
-        from lib.tournament import compute_standings
         df_st = compute_standings(players)
         outp = os.path.join(DATA_DIR, "standings.csv")
         df_st.to_csv(outp, index=False, encoding="utf-8")
@@ -121,13 +156,21 @@ if st.button("Calcular y guardar clasificación"):
         st.dataframe(df_st, use_container_width=True, hide_index=True)
 
 st.divider()
-st.markdown("### Listado de jugadores (PDF)")
-from lib.tournament import export_pdf_players, load_config, read_csv_safe
-cfg = load_config()
-jug_df = read_csv_safe(os.path.join(DATA_DIR,"jugadores.csv"))
-if jug_df is None or jug_df.empty:
-    st.info("Sube `jugadores.csv` primero.")
+st.markdown("### Eliminar ronda")
+del_rounds = [i for i in range(1, n+1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv"))]
+if del_rounds:
+    dsel = st.selectbox("Ronda a eliminar", del_rounds, index=len(del_rounds)-1)
+    warn = st.text_input(f'Escribe "ELIMINAR R{dsel}" para confirmar', "")
+    if st.button("Eliminar definitivamente") and warn.strip().upper() == f"ELIMINAR R{dsel}":
+        path = os.path.join(DATA_DIR, f"pairings_R{dsel}.csv")
+        try:
+            os.remove(path)
+            meta = load_meta()
+            if str(dsel) in meta.get("rounds", {}):
+                meta["rounds"].pop(str(dsel), None); save_meta(meta)
+            add_log("delete_round", dsel, actor, f"pairings_R{dsel}.csv eliminado")
+            st.success(f"Ronda R{dsel} eliminada.")
+        except Exception as e:
+            st.error(f"No se pudo eliminar: {e}")
 else:
-    if st.button("Exportar listado (PDF)"):
-        buff = export_pdf_players(jug_df, cfg)
-        st.download_button("Descargar listado", buff, file_name="listado_jugadores.pdf", mime="application/pdf")
+    st.info("No hay rondas para eliminar.")

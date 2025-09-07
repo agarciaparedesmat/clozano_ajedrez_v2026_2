@@ -1,6 +1,6 @@
 
 import streamlit as st, os, pandas as pd
-from lib.tournament import load_config, read_csv_safe, last_modified, export_pdf_standings, DATA_DIR
+from lib.tournament import read_csv_safe, last_modified, DATA_DIR
 
 st.header("Clasificación")
 st_path = os.path.join(DATA_DIR, "standings.csv")
@@ -14,7 +14,3 @@ else:
             except: pass
     st.dataframe(df, use_container_width=True, hide_index=True)
     st.caption(f"Última actualización: {last_modified(st_path)}")
-    if st.button("Exportar clasificación (PDF)"):
-        cfg = load_config()
-        buff = export_pdf_standings(df, cfg)
-        st.download_button("Descargar PDF", buff, file_name="clasificacion.pdf", mime="application/pdf")

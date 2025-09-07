@@ -1,6 +1,6 @@
 {
-  "titulo": "Torneo Suizo — IES (v7 Cloud‑fix)",
-  "subtitulo": "Multipágina + auto-guardado",
+  "titulo": "Torneo Suizo — IES (v7 Baseline Seguro)",
+  "subtitulo": "Emparejamientos y clasificación por nivel",
   "anio": "2025",
   "nivel": "1º ESO",
   "cabecera_pdf": "",
@@ -11,15 +11,5 @@
     "1ESO": "",
     "2-3ESO": "",
     "4ESO-BACH": ""
-  },
-  "pdf_theme": {
-    "top_band": "%23dff0d8",
-    "middle_band": "%23f6d6c6",
-    "level_band": "%23cfe3ff",
-    "title_color": "%23000000"
-  },
-  "logo_left": "",
-  "logo_right": "",
-  "pdf_presets": {},
-  "pdf_watermark": ""
+  }
 }
