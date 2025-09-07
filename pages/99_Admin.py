@@ -3,18 +3,17 @@ import streamlit as st
 import os
 import pandas as pd
 import random
-import hashlib
 
 from lib.tournament import (
-    load_config, save_config, load_meta, save_meta, read_csv_safe, write_csv, last_modified,
+    load_config, load_meta, save_meta, read_csv_safe, write_csv, last_modified,
     read_players_from_csv, apply_results, swiss_pair_round, formatted_name_from_parts,
-    list_round_files, is_published, set_published, r1_seed, add_log, parse_bye_points,
+    list_round_files, is_published, set_published, r1_seed, add_log,
     compute_standings, DATA_DIR
 )
 
 st.header("Panel de Administración")
 
-# Autenticación
+# ---------- Auth ----------
 pwd = st.text_input("Contraseña", type="password")
 if not pwd or pwd != st.secrets.get("ADMIN_PASS", ""):
     st.stop()
@@ -27,9 +26,25 @@ cfg = load_config()
 n = int(cfg.get("rondas", 5))
 jug_path = os.path.join(DATA_DIR, "jugadores.csv")
 
-# ----------------------------------
-# Carga de jugadores
-# ----------------------------------
+# ---------- Helpers ----------
+def published_rounds(n):
+    return sorted([i for i in range(1, n+1)
+                   if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv")) and is_published(i)])
+
+def recalc_and_save_standings(bye_points=1.0):
+    players = read_players_from_csv(jug_path)
+    if not players:
+        return False, "No se pudo leer jugadores.csv"
+    pubs = published_rounds(n)
+    for rno in pubs:
+        dfp = read_csv_safe(os.path.join(DATA_DIR, f"pairings_R{rno}.csv"))
+        players = apply_results(players, dfp, bye_points=float(bye_points))
+    df_st = compute_standings(players)
+    outp = os.path.join(DATA_DIR, "standings.csv")
+    df_st.to_csv(outp, index=False, encoding="utf-8")
+    return True, outp
+
+# ---------- Carga de jugadores ----------
 st.markdown("### Emparejar (sistema suizo)")
 st.caption("Formato: id,nombre,apellido1,apellido2,curso,grupo,estado")
 jug_up = st.file_uploader("Subir/actualizar jugadores.csv", type=["csv"], key="jug_csv")
@@ -42,9 +57,7 @@ if jug_up is not None:
         st.caption(f"Jugadores cargados: {len(dfprev)}")
         st.dataframe(dfprev.head(10), use_container_width=True, hide_index=True)
 
-# ----------------------------------
-# Determinar siguiente ronda
-# ----------------------------------
+# ---------- Siguiente ronda ----------
 completed = 0
 for i in range(1, n + 1):
     p = os.path.join(DATA_DIR, f"pairings_R{i}.csv")
@@ -61,9 +74,7 @@ st.write(f"Rondas cerradas: **{completed}** / {n}")
 st.write(f"Siguiente ronda: **Ronda {next_round}**")
 st.caption(f"Semilla usada en R1: `{r1_seed() or '—'}`")
 
-# ----------------------------------
-# Forzar BYE (opcional)
-# ----------------------------------
+# ---------- Forzar BYE ----------
 forced_bye_id = None
 jug_df = read_csv_safe(jug_path)
 options = ["— Ninguno —"]
@@ -87,16 +98,12 @@ sel = st.selectbox("Forzar BYE (opcional)", options, index=0)
 if sel in idmap:
     forced_bye_id = int(idmap[sel])
 
-# ----------------------------------
-# Semilla R1
-# ----------------------------------
+# ---------- Semilla R1 ----------
 seed_input = ""
 if next_round == 1:
     seed_input = st.text_input("Semilla de aleatoriedad (opcional)", value="")
 
-# ----------------------------------
-# Generar ronda (auto-guardar)
-# ----------------------------------
+# ---------- Generar ronda ----------
 if is_published(next_round):
     st.warning(f"La Ronda {next_round} está **PUBLICADA**. Elimínala abajo para rehacerla, o despublícala en la sección inferior.")
 else:
@@ -152,16 +159,12 @@ else:
                 csv_bytes = edited.to_csv(index=False).encode("utf-8")
                 st.download_button("Descargar CSV (previo)", csv_bytes, file_name=f"pairings_R{next_round}.csv", mime="text/csv")
 
-# ----------------------------------
-# Publicación persistente con re-run inmediato
-# ----------------------------------
+# ---------- Publicar / Despublicar ----------
 st.divider()
 st.markdown("### Publicar / Despublicar rondas")
 existing_rounds = [i for i in range(1, n + 1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv"))]
 if existing_rounds:
-    status_rows = []
-    for i in existing_rounds:
-        status_rows.append({"ronda": i, "publicada": bool(is_published(i))})
+    status_rows = [{"ronda": i, "publicada": bool(is_published(i))} for i in existing_rounds]
     st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
 
     to_publish = [i for i in existing_rounds if not is_published(i)]
@@ -170,7 +173,11 @@ if existing_rounds:
         if st.button("Publicar ronda seleccionada"):
             set_published(sel_pub, True, seed=(r1_seed() if sel_pub == 1 else None))
             add_log("publish_round", sel_pub, actor, "Publicada desde sección Publicar")
-            st.success(f"Ronda {sel_pub} publicada.")
+            ok, path = recalc_and_save_standings(bye_points=1.0)
+            if ok:
+                st.success(f"Ronda {sel_pub} publicada. Clasificación recalculada y guardada en {path}")
+            else:
+                st.warning("Ronda publicada, pero no se pudo recalcular la clasificación.")
             st.rerun()
     else:
         st.info("No hay rondas pendientes de publicar.")
@@ -181,22 +188,22 @@ if existing_rounds:
         if st.button("Despublicar ronda seleccionada"):
             set_published(sel_unpub, False)
             add_log("unpublish_round", sel_unpub, actor, "Despublicada")
-            st.success(f"Ronda {sel_unpub} despublicada.")
+            ok, path = recalc_and_save_standings(bye_points=1.0)
+            if ok:
+                st.success(f"Ronda {sel_unpub} despublicada. Clasificación recalculada y guardada en {path}")
+            else:
+                st.warning("Ronda despublicada, pero no se pudo recalcular la clasificación.")
             st.rerun()
 else:
     st.info("Aún no hay rondas generadas.")
 
 st.divider()
 
-# ----------------------------------
-# Resultados y clasificación (SOLO rondas PUBLICADAS)
-# ----------------------------------
-st.markdown("### Resultados y clasificación")
-rounds_available = [i for i in range(1, n + 1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv"))]
-published_rounds = [i for i in rounds_available if is_published(i)] if rounds_available else []
-
-if published_rounds:
-    sel_r = st.selectbox("Ronda publicada a editar", published_rounds, index=len(published_rounds) - 1, key="res_round")
+# ---------- Resultados y clasificación ----------
+st.markdown("### Resultados y clasificación (solo PUBLICADAS)")
+pubs = published_rounds(n)
+if pubs:
+    sel_r = st.selectbox("Ronda publicada a editar", pubs, index=len(pubs) - 1, key="res_round")
     dfp = read_csv_safe(os.path.join(DATA_DIR, f"pairings_R{sel_r}.csv"))
     if dfp is not None:
         st.caption("Valores: 1-0, 0-1, 1/2-1/2, +/- , -/+, BYE1.0, BYE0.5, BYE")
@@ -218,51 +225,19 @@ if published_rounds:
             outp = os.path.join(DATA_DIR, f"pairings_R{sel_r}.csv")
             edited_res.astype(str).to_csv(outp, index=False, encoding="utf-8")
             add_log("save_results", sel_r, actor, "Resultados actualizados")
-            st.success(f"Resultados guardados en {outp}")
+            # Auto-recalc standings when saving results of a PUBLISHED round
+            ok, path = recalc_and_save_standings(bye_points=1.0)
+            if ok:
+                st.success(f"Resultados guardados. Clasificación recalculada y guardada en {path}")
+            else:
+                st.warning("Resultados guardados, pero no se pudo recalcular la clasificación.")
+            st.rerun()
 else:
     st.info("No hay rondas publicadas todavía.")
 
-st.markdown("#### Calcular clasificación (solo PUBLICADAS)")
-st.caption("Se tendrán en cuenta **exclusivamente** las rondas marcadas como PUBLICADAS.")
-bye_pts = st.number_input("Puntos por BYE (por defecto si 'BYE')", min_value=0.0, max_value=1.0, value=1.0, step=0.5)
-
-eligible_rounds = [i for i in range(1, n + 1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv")) and is_published(i)]
-eligible_rounds = sorted(eligible_rounds)
-
-if not eligible_rounds:
-    st.info("Aún no hay rondas PUBLICADAS para calcular clasificación.")
-    upto = 1
-elif len(eligible_rounds) == 1:
-    only_r = eligible_rounds[0]
-    st.caption(f"Solo está publicada la **Ronda {only_r}**. Se calculará hasta esa ronda.")
-    upto = only_r
-else:
-    min_pub = eligible_rounds[0]
-    max_pub = eligible_rounds[-1]
-    st.caption(f"Rondas publicadas: {', '.join(map(str, eligible_rounds))}")
-    upto = st.slider("Calcular hasta la ronda publicada", min_value=min_pub, max_value=max_pub, value=max_pub, key="upto_pub_slider")
-
-if st.button("Calcular clasificación y guardar"):
-    players = read_players_from_csv(jug_path)
-    if not players:
-        st.error("No se pudo leer jugadores.csv")
-    else:
-        # Aplicar solo rondas publicadas hasta 'upto'
-        for rno in eligible_rounds:
-            if rno <= upto:
-                dfp = read_csv_safe(os.path.join(DATA_DIR, f"pairings_R{rno}.csv"))
-                players = apply_results(players, dfp, bye_points=float(bye_pts))
-        df_st = compute_standings(players)
-        outp = os.path.join(DATA_DIR, "standings.csv")
-        df_st.to_csv(outp, index=False, encoding="utf-8")
-        st.success(f"Clasificación guardada en {outp}")
-        st.dataframe(df_st, use_container_width=True, hide_index=True)
-
 st.divider()
 
-# ----------------------------------
-# Eliminar ronda
-# ----------------------------------
+# ---------- Eliminar ronda ----------
 st.markdown("### Eliminar ronda")
 del_rounds = [i for i in range(1, n + 1) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{i}.csv"))]
 if del_rounds:
@@ -277,7 +252,12 @@ if del_rounds:
                 meta["rounds"].pop(str(dsel), None)
                 save_meta(meta)
             add_log("delete_round", dsel, actor, f"pairings_R{dsel}.csv eliminado")
-            st.success(f"Ronda R{dsel} eliminada.")
+            # After deleting a round, recalc standings (BYE=1.0) based on remaining published rounds
+            ok, path = recalc_and_save_standings(bye_points=1.0)
+            if ok:
+                st.success(f"Ronda R{dsel} eliminada. Clasificación recalculada y guardada en {path}")
+            else:
+                st.info("Ronda eliminada. No hay jugadores o no se pudo recalcular la clasificación.")
             st.rerun()
         except Exception as e:
             st.error(f"No se pudo eliminar: {e}")
@@ -286,9 +266,7 @@ else:
 
 st.divider()
 
-# ----------------------------------
-# Inspector de data/
-# ----------------------------------
+# ---------- Inspector de data/ ----------
 st.markdown("### Archivos en data/ (inspector rápido)")
 try:
     files = os.listdir(DATA_DIR)
