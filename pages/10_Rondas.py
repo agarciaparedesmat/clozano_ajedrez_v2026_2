@@ -29,6 +29,8 @@ round_nums = sorted(round_nums)
 # Detectar publicadas y ronda actual
 publicadas = [i for i in round_nums if is_published(i)]
 ronda_actual = max(publicadas) if publicadas else None
+generadas = len(round_nums)
+total_plan = n
 
 # -------------------------------------------------------
 # Chips de estado + enlace a Clasificación
@@ -40,7 +42,7 @@ with c1:
     else:
         st.warning("Sin rondas publicadas.")
 with c2:
-    st.info(f"📣 Publicadas: **{len(publicadas)} / {len(round_nums)}**")
+    st.info(f"📣 Publicadas: **{len(publicadas)} / {total_plan}**  ·  🗂️ Generadas: **{generadas}**")
 with c3:
     try:
         st.page_link("pages/20_Clasificacion.py", label="Abrir Clasificación", icon="🏆")
@@ -92,12 +94,19 @@ goto_round = st.session_state.get("goto_round")
 # -------------------------------------------------------
 # Helpers
 # -------------------------------------------------------
+def _normalize_result_series(s: pd.Series) -> pd.Series:
+    """Convierte None/nan/'None'/'nan'/'N/A' en '' y recorta espacios."""
+    return (
+        s.astype(str)
+         .str.strip()
+         .replace({"None": "", "none": "", "NaN": "", "nan": "", "N/A": "", "n/a": ""})
+    )
+
 def _results_empty_count(df: pd.DataFrame) -> int:
-    if df is None or df.empty:
+    if df is None or df.empty or "resultado" not in df.columns:
         return 0
-    if "resultado" not in df.columns:
-        return 0
-    return int((df["resultado"].fillna("").astype(str).str.strip() == "").sum())
+    res = _normalize_result_series(df["resultado"])
+    return int((res == "").sum())
 
 def render_round(i: int, etiqueta_extra: str = ""):
     path = round_file(i)
@@ -146,9 +155,9 @@ def render_round(i: int, etiqueta_extra: str = ""):
         pass
     safe_df = safe_df.sort_values(by=["mesa"], na_position="last")
 
-    # Resultado vacío -> "—" (solo visual)
+    # --- NORMALIZAR resultado para la vista ---
+    safe_df["resultado"] = _normalize_result_series(safe_df["resultado"])
     show_df = safe_df.copy()
-    show_df["resultado"] = show_df["resultado"].astype(str).str.strip()
     show_df.loc[show_df["resultado"] == "", "resultado"] = "—"
 
     # Columnas finales a mostrar

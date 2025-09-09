@@ -245,6 +245,24 @@ def read_players_from_csv(path: str) -> Dict[str, dict]:
     return players
 
 # ============================================================
+# Normalización de valores de resultado
+# ============================================================
+def _normalize_result_str(val: Optional[str]) -> str:
+    """
+    Convierte None/nan/'None'/'nan'/'N/A' en '' y recorta espacios.
+    No transforma resultados válidos (1-0, 0-1, 1/2-1/2, +/- , -/+, BYE1.0, BYE0.5, BYE).
+    """
+    if val is None:
+        return ""
+    s = str(val).strip()
+    if s in {"", "NaN"}:
+        return ""
+    sl = s.lower()
+    if sl in {"none", "nan", "n/a"}:
+        return ""
+    return s
+
+# ============================================================
 # Aplicar resultados y clasificación
 # ============================================================
 def _award_points_for_result(res: str, bye_default: float = 1.0) -> Tuple[float, float, Optional[float]]:
@@ -290,15 +308,17 @@ def apply_results(players: Dict[str, dict], df_pairs: Optional[pd.DataFrame], by
     for _, row in df_pairs.iterrows():
         wid = str(row["blancas_id"]).strip()
         bid = str(row["negras_id"]).strip()
-        res = str(row.get("resultado", "")).strip()
+        # --- NORMALIZAR resultado ---
+        res = _normalize_result_str(row.get("resultado", ""))
 
         # BYE: negras_id == 'BYE'
         if bid.upper() == "BYE":
             if wid in players:
-                wpts, _, bye_pts = _award_points_for_result(res or "BYE", bye_default=bye_points)
+                # Si res está vacío, trátalo como 'BYE' con el bye_default indicado
+                wpts, _, bye_pts = _award_points_for_result(res if res else "BYE", bye_default=bye_points)
                 players[wid]["points"] += float(bye_pts if bye_pts is not None else bye_points)
                 players[wid]["had_bye"] = True
-                # Color: puedes decidir si cuenta para racha de colores; aquí añadimos "W"
+                # (opcional) contar BYE como 'W' para el control de rachas de color
                 players[wid]["colors"].append("W")
             continue
 
@@ -310,7 +330,7 @@ def apply_results(players: Dict[str, dict], df_pairs: Optional[pd.DataFrame], by
         players[wid]["points"] += float(w_add)
         players[bid]["points"] += float(b_add)
 
-        # Oponentes (si deseas añadir solo con resultado, condiciona a res != "")
+        # Oponentes (si prefieres solo cuando haya resultado, condiciona a res != "")
         if wid not in players[bid]["opponents"]:
             players[bid]["opponents"].append(wid)
         if bid not in players[wid]["opponents"]:
@@ -535,4 +555,3 @@ def swiss_pair_round(players: Dict[str, dict], round_no: int, forced_bye_id: Opt
 
     df = pd.DataFrame(rows, columns=["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"])
     return df
-

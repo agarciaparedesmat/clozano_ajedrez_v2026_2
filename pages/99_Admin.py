@@ -60,9 +60,19 @@ def set_pub(i: int, val: bool, seed=None):
 # ---------- Helpers ----------
 def round_file(i): return os.path.join(DATA_DIR, f"pairings_R{i}.csv")
 
+def _normalize_result_series(s: pd.Series) -> pd.Series:
+    """Convierte None/nan/'None'/'nan'/'N/A' en '' y recorta espacios."""
+    return (
+        s.astype(str)
+         .str.strip()
+         .replace({"None": "", "none": "", "NaN": "", "nan": "", "N/A": "", "n/a": ""})
+    )
+
 def results_empty_count(df):
-    if df is None or df.empty or "resultado" not in df.columns: return None
-    return int((df["resultado"].fillna("").astype(str).str.strip() == "").sum())
+    if df is None or df.empty or "resultado" not in df.columns:
+        return None
+    res = _normalize_result_series(df["resultado"])
+    return int((res == "").sum())
 
 def round_status(i):
     p = round_file(i)
@@ -128,6 +138,11 @@ diag = pd.DataFrame([
     for s in states
 ])
 st.dataframe(diag, use_container_width=True, hide_index=True)
+
+# Chips de contadores (opción A)
+existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
+published_cnt = len([i for i in existing_rounds if is_pub(i)])
+st.info(f"📣 Publicadas: **{published_cnt} / {n}**  ·  🗂️ Generadas: **{len(existing_rounds)}**")
 st.write(f"Rondas cerradas: **{len(closed_rounds)}** / {n}")
 
 # ---------- Determinar siguiente ronda a generar ----------
@@ -301,7 +316,10 @@ if pubs:
                     s = s == True
             return s == True
         def _is_bye_series(df): return df["negras_id"].astype(str).str.upper() == "BYE"
-        def _is_empty_res(df): return df["resultado"].fillna("").astype(str).str.strip() == ""
+        def _is_empty_res(df):
+            if "resultado" not in df.columns: return True
+            res = _normalize_result_series(df["resultado"])
+            return res == ""
 
         a1, a2, a3, a4, a5 = st.columns(5)
         with a1:
@@ -352,9 +370,15 @@ if pubs:
         if st.button("Guardar resultados de la ronda"):
             outp = round_file(sel_r)
             df_to_save = st.session_state[buf_key].copy()
+            # No guardar columna interna
             if "seleccionar" in df_to_save.columns:
                 df_to_save = df_to_save.drop(columns=["seleccionar"])
-            df_to_save.astype(str).to_csv(outp, index=False, encoding="utf-8")
+            # --- NORMALIZAR resultado ---
+            if "resultado" not in df_to_save.columns:
+                df_to_save["resultado"] = ""
+            df_to_save["resultado"] = _normalize_result_series(df_to_save["resultado"])
+            df_to_save.to_csv(outp, index=False, encoding="utf-8")
+
             add_log("save_results", sel_r, actor, "Resultados actualizados")
             # Reset de selección en el buffer tras guardar
             df_after = read_csv_safe(outp)
@@ -418,6 +442,4 @@ try:
         st.info("data/ está vacío.")
 except Exception as e:
     st.warning(f"No se pudo listar data/: {e}")
-    
-
 

@@ -41,6 +41,8 @@ if not round_nums:
 
 publicadas = [i for i in round_nums if is_published(i)]
 ronda_actual = max(publicadas) if publicadas else None
+generadas = len(round_nums)
+total_plan = n
 
 # -------------------------------------------------------
 # Chips de estado + navegación a Rondas
@@ -52,16 +54,14 @@ with c1:
     else:
         st.warning("Sin rondas publicadas.")
 with c2:
-    st.info(f"📣 Publicadas: **{len(publicadas)} / {len(round_nums)}**")
+    st.info(f"📣 Publicadas: **{len(publicadas)} / {total_plan}**  ·  🗂️ Generadas: **{generadas}**")
 with c3:
-    # Botón que intenta cambiar de página (fallback si no está disponible)
     if st.button("🔗 Ir a Rondas", use_container_width=True):
         try:
-            st.switch_page("pages/10_Rondas.py")  # disponible en versiones recientes de Streamlit
+            st.switch_page("pages/10_Rondas.py")
         except Exception:
             st.session_state["goto_round"] = ronda_actual
             st.warning("Abre la pestaña **Rondas** desde la barra lateral.")
-    # Enlace (si está soportado)
     try:
         st.page_link("pages/10_Rondas.py", label="Abrir Rondas", icon="📄")
     except Exception:
@@ -130,7 +130,6 @@ with cols[0]:
     )
 with cols[1]:
     st.caption("Atajos:")
-    row = st.container()
     btn_cols = st.columns(min(len(publicadas), 10))
     for idx, i in enumerate(publicadas):
         if idx % 10 == 0 and idx > 0:
@@ -147,6 +146,16 @@ except Exception:
     pass
 
 show_i = st.session_state.get("show_round_in_standings", ronda_actual or publicadas[-1])
+
+# -------------------------------------------------------
+# Helpers
+# -------------------------------------------------------
+def _normalize_result_series(s: pd.Series) -> pd.Series:
+    return (
+        s.astype(str)
+         .str.strip()
+         .replace({"None": "", "none": "", "NaN": "", "nan": "", "N/A": "", "n/a": ""})
+    )
 
 # -------------------------------------------------------
 # Render de resultados de la ronda seleccionada
@@ -186,9 +195,9 @@ def render_round_results(i: int):
         pass
     safe_df = safe_df.sort_values(by=["mesa"], na_position="last")
 
-    # Resultado vacío -> "—"
+    # --- NORMALIZAR resultado para la vista ---
+    safe_df["resultado"] = _normalize_result_series(safe_df["resultado"])
     show_df = safe_df.copy()
-    show_df["resultado"] = show_df["resultado"].astype(str).str.strip()
     show_df.loc[show_df["resultado"] == "", "resultado"] = "—"
 
     show_df = show_df[["mesa", "blancas_nombre", "negras_nombre", "resultado", "BYE"]]
@@ -207,4 +216,3 @@ def render_round_results(i: int):
     )
 
 render_round_results(show_i)
-
