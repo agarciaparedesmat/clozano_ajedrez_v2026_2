@@ -1,5 +1,7 @@
 # pages/10_Rondas.py
 # -*- coding: utf-8 -*-
+import io
+import re
 import streamlit as st
 import pandas as pd
 
@@ -16,9 +18,17 @@ from lib.tournament import (
     format_with_cfg,
 )
 
+# --- helper para nombres de archivo ---
+def _slugify(s: str) -> str:
+    s = re.sub(r"\s+", "_", str(s or "").strip())
+    return re.sub(r"[^A-Za-z0-9_\-]+", "", s) or "torneo"
+
 # Cabecera con nivel/año
 cfg = load_config()
-page_header(format_with_cfg("Rondas — {nivel}", cfg), format_with_cfg("Curso {anio} · Emparejamientos y resultados", cfg))
+page_header(
+    format_with_cfg("Rondas — {nivel}", cfg),
+    format_with_cfg("Curso {anio} · Emparejamientos y resultados", cfg)
+)
 
 # Nº de rondas planificado (auto o fijo)
 JUG_PATH = f"{DATA_DIR}/jugadores.csv"
@@ -77,7 +87,7 @@ if goto != "(ninguna)":
         pass
 goto_round = st.session_state.get("goto_round")
 
-# Helpers de normalización (como ya tenías)
+# Helpers de normalización
 def _normalize_result_series(s: pd.Series) -> pd.Series:
     return (
         s.astype(str).str.strip()
@@ -100,7 +110,8 @@ def render_round(i: int, etiqueta_extra: str = ""):
     if "seleccionar" in safe_df.columns:
         safe_df = safe_df.drop(columns=["seleccionar"])
 
-    for col in ["mesa", "blancas_nombre", "negras_nombre", "resultado", "negras_id"]:
+    # Asegurar columnas visibles y de exportación
+    for col in ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]:
         if col not in safe_df.columns:
             safe_df[col] = ""
 
@@ -113,23 +124,27 @@ def render_round(i: int, etiqueta_extra: str = ""):
     st.markdown(titulo)
     st.caption(f"Archivo: `{path}` · Última modificación: {lm} · Resultados vacíos: {empties}")
 
-    bye_mask = (safe_df["negras_id"].astype(str).str.upper().eq("BYE")
-                | safe_df["negras_nombre"].astype(str).str.upper().eq("BYE"))
+    # Badge BYE (solo para vista)
+    bye_mask = (
+        safe_df["negras_id"].astype(str).str.upper().eq("BYE")
+        | safe_df["negras_nombre"].astype(str).str.upper().eq("BYE")
+    )
     safe_df["BYE"] = bye_mask.map({True: "🟨 BYE", False: ""})
 
+    # Orden por mesa
     try:
         safe_df["mesa"] = pd.to_numeric(safe_df["mesa"], errors="coerce")
     except Exception:
         pass
     safe_df = safe_df.sort_values(by=["mesa"], na_position="last")
 
+    # Vista normalizada
     safe_df["resultado"] = _normalize_result_series(safe_df["resultado"])
     show_df = safe_df.copy()
     show_df.loc[show_df["resultado"] == "", "resultado"] = "—"
-    show_df = show_df[["mesa", "blancas_nombre", "negras_nombre", "resultado", "BYE"]]
-
     st.dataframe(
-        show_df, use_container_width=True, hide_index=True,
+        show_df[["mesa", "blancas_nombre", "negras_nombre", "resultado", "BYE"]],
+        use_container_width=True, hide_index=True,
         column_config={
             "mesa": st.column_config.NumberColumn("Mesa", help="Número de mesa"),
             "blancas_nombre": st.column_config.TextColumn("Blancas"),
@@ -137,6 +152,29 @@ def render_round(i: int, etiqueta_extra: str = ""):
             "resultado": st.column_config.TextColumn("Resultado"),
             "BYE": st.column_config.TextColumn(""),
         },
+    )
+
+    # --- Botón de descarga del CSV de la ronda (sin columnas internas/visuales) ---
+    export_cols = ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]
+    df_export = safe_df.copy()
+    for c in export_cols:
+        if c not in df_export.columns:
+            df_export[c] = ""
+    df_export = df_export[export_cols]
+
+    nivel_slug = _slugify(cfg.get("nivel", ""))
+    anio_slug  = _slugify(cfg.get("anio", ""))
+    file_name  = f"ronda_{i}_{nivel_slug}_{anio_slug}.csv" if (nivel_slug or anio_slug) else f"ronda_{i}.csv"
+
+    buf = io.StringIO()
+    df_export.to_csv(buf, index=False, encoding="utf-8")
+    st.download_button(
+        label=f"⬇️ Descargar CSV · Ronda {i}",
+        data=buf.getvalue().encode("utf-8"),
+        file_name=file_name,
+        mime="text/csv",
+        use_container_width=True,
+        key=f"dl_ronda_{i}"
     )
 
 def filtro_permite(i: int) -> bool:

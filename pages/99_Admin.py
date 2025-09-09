@@ -12,13 +12,11 @@ from lib.tournament import (
     read_players_from_csv, apply_results, compute_standings,
     swiss_pair_round, formatted_name_from_parts,
     is_published, set_published, r1_seed, add_log,
+    planned_rounds, format_with_cfg,
 )
 
-st.set_page_config(page_title="Admin", page_icon="🛠️", layout="wide")
 from lib.ui import page_header
 page_header("🛠️ Panel de Administración", "Gestión de rondas, publicación y resultados")
-
-#st.header("🛠️ Panel de Administración")
 
 # =========================
 # Acceso (simple)
@@ -31,15 +29,18 @@ st.success("Acceso concedido ✅")
 actor = st.text_input("Tu nombre (registro de cambios)", value=st.session_state.get("actor_name", "Admin"))
 st.session_state["actor_name"] = actor
 
-
+# Config general + rutas
 cfg = load_config()
-from lib.tournament import planned_rounds, format_with_cfg
+JUG_PATH = os.path.join(DATA_DIR, "jugadores.csv")
 N_ROUNDS = planned_rounds(cfg, JUG_PATH)
 st.caption(format_with_cfg("Configuración: {nivel} · {anio}", cfg))
 
-JUG_PATH = os.path.join(DATA_DIR, "jugadores.csv")
 def round_file(i: int) -> str:
     return os.path.join(DATA_DIR, f"pairings_R{i}.csv")
+
+# Prefijo de contexto para el log
+def _log_msg(msg: str) -> str:
+    return format_with_cfg(f"[{{nivel}}][{{anio}}] {msg}", cfg)
 
 # =========================
 # Publicación robusta (meta + flag) - alias internos
@@ -93,8 +94,7 @@ def round_status(i: int) -> dict:
     exists = df is not None and not df.empty
     empties = results_empty_count(df) if exists else None
     pub = is_pub(i) if exists else False
-    # Cerrada <=> existe & publicada & sin vacíos
-    closed = exists and pub and (empties == 0)
+    closed = exists and pub and (empties == 0)  # Cerrada <=> existe & publicada & sin vacíos
     return {"i": i, "exists": exists, "published": pub, "empties": empties, "closed": closed, "path": p}
 
 def status_label(s: dict) -> str:
@@ -198,7 +198,6 @@ with col_b:
         elif later_exist:
             st.error("No se puede regenerar R1 porque existen rondas posteriores generadas. Elimina R2.. antes.")
         else:
-            # Semilla a usar
             seed_used = new_seed.strip() or f"seed-{random.randint(100000, 999999)}"
             random.seed(seed_used)
 
@@ -217,7 +216,7 @@ with col_b:
                 meta.setdefault("rounds", {}).setdefault("1", {})["seed"] = seed_used
                 save_meta(meta)
 
-                add_log("regen_round1", 1, actor, f"R1 regenerada con seed={seed_used}")
+                add_log("regen_round1", 1, actor, _log_msg(f"R1 regenerada con seed={seed_used}"))
                 st.success(f"✅ Ronda 1 regenerada con semilla `{seed_used}`.")
                 st.rerun()
 
@@ -228,7 +227,6 @@ with col_b:
             st.info("Existen rondas posteriores generadas. Borra R2.. antes de regenerar R1.")
 
 st.divider()
-
 
 # =========================
 # Generar ronda siguiente (Suizo)
@@ -301,7 +299,7 @@ else:
                         meta.setdefault("rounds", {}).setdefault("1", {})["seed"] = seed_used
                         save_meta(meta)
 
-                    add_log("generate_round", next_round, actor, f"pairings guardado en {outp}")
+                    add_log("generate_round", next_round, actor, _log_msg(f"pairings guardado en {outp}"))
 
                     # Reset del “solo esta vez”
                     try:
@@ -329,7 +327,7 @@ if existing_rounds:
         sel_pub = st.selectbox("Ronda a publicar", to_publish, index=len(to_publish) - 1, key="pub_sel")
         if st.button("Publicar ronda seleccionada", use_container_width=True):
             set_pub(sel_pub, True, seed=(r1_seed() if sel_pub == 1 else None))
-            add_log("publish_round", sel_pub, actor, "Publicada desde Admin")
+            add_log("publish_round", sel_pub, actor, _log_msg("Publicada desde Admin"))
             ok, path = recalc_and_save_standings(bye_points=1.0)
             if ok:
                 st.success(f"Ronda {sel_pub} publicada. Clasificación recalculada en `{path}`.")
@@ -346,7 +344,7 @@ if existing_rounds:
         st.caption(f"Solo se puede **despublicar** la **última ronda publicada**: **Ronda {last_pub}**.")
         if st.button(f"Despublicar Ronda {last_pub}", use_container_width=True):
             set_pub(last_pub, False)
-            add_log("unpublish_round", last_pub, actor, "Despublicada (última publicada)")
+            add_log("unpublish_round", last_pub, actor, _log_msg("Despublicada (última publicada)"))
             ok, path = recalc_and_save_standings(bye_points=1.0)
             if ok:
                 st.success(f"Ronda {last_pub} despublicada. Clasificación recalculada en `{path}`.")
@@ -518,7 +516,7 @@ if pubs:
 
             # Guardar CSV
             df_to_save.to_csv(outp, index=False, encoding="utf-8")
-            add_log("save_results", sel_r, actor, "Resultados actualizados")
+            add_log("save_results", sel_r, actor, _log_msg("Resultados actualizados"))
 
             # Reset de selección en el buffer tras guardar
             df_after = read_csv_safe(outp)
@@ -556,7 +554,7 @@ if existing_rounds:
             if str(last_exist) in meta.get("rounds", {}):
                 meta["rounds"].pop(str(last_exist), None)
                 save_meta(meta)
-            add_log("delete_round", last_exist, actor, f"{os.path.basename(path)} eliminado")
+            add_log("delete_round", last_exist, actor, _log_msg(f"{os.path.basename(path)} eliminado"))
 
             ok, path2 = recalc_and_save_standings(bye_points=1.0)
             if ok:
