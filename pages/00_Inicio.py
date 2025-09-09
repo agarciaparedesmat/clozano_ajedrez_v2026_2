@@ -12,7 +12,7 @@ from lib.tournament import (
     last_modified,
 )
 
-st.set_page_config(page_title="Inicio", page_icon="🏠", layout="wide")
+st.set_page_config(page_title="Inicio", page_icon="♟️", layout="wide")
 inject_base_style()
 
 # Cabecera + hero
