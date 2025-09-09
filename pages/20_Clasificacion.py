@@ -151,6 +151,7 @@ show_i = st.session_state.get("show_round_in_standings", ronda_actual or publica
 # Helpers
 # -------------------------------------------------------
 def _normalize_result_series(s: pd.Series) -> pd.Series:
+    """Convierte None/nan/'None'/'nan'/'N/A' en '' y recorta espacios."""
     return (
         s.astype(str)
          .str.strip()
