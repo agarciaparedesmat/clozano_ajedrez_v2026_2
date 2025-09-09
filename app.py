@@ -6,19 +6,22 @@ st.set_page_config(page_title="Ajedrez en los recreos — IESCL", page_icon="♟
 
 cfg = load_config()
 titulo     = cfg.get("titulo", "")
-anio       = cfg.get("anio", "")
-subtitulo  = cfg.get("subtitulo", "")
-version  = cfg.get("version2", "")
+
 
 st.title(titulo)
-
+titulo     = cfg.get("nivel", "")
+st.title(titulo)
 # si quieres mostrar el curso debajo del título principal:
+anio       = cfg.get("anio", "")
+
 if anio:
     st.subheader(f"Curso {anio}")
 
 # y luego el subtítulo y version como texto auxiliar
+subtitulo  = cfg.get("subtitulo", "")
 st.caption(subtitulo)
 
+version  = cfg.get("version", "")
 st.caption(version)
 
 # Ruta de la imagen en tu sistema
