@@ -1,8 +1,9 @@
 {
   "titulo": "Ajedrez en los recreos — IESCL",
-  "subtitulo": "Torneo de Ajedrez. Emparejamientos y clasificación por nivel",
+  "subtitulo": "Torneo de Ajedrez. Emparejamientos y clasificación",
   "anio": "2025-2026",
   "nivel": "1º ESO",
+  "version": "Versión 9/Sept/2025",
   "rondas": "auto",
   "min_rondas": 5,
   "max_rondas": 7,
@@ -13,6 +14,5 @@
     "1ESO": "",
     "2-3ESO": "",
     "4ESO-BACH": ""
-  },
-  "version": "Versión 9/Sept/2025"  
+  }
 }
