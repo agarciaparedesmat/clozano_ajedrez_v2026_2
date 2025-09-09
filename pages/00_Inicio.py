@@ -58,9 +58,7 @@ TABLE_CSS = """
   background: rgba(115,192,238,0.12);
   font-weight: 700;
 }
-.state-table tbody td {
-  background: #fff;
-}
+.state-table tbody td { background: #fff; }
 </style>
 """
 st.markdown(TABLE_CSS, unsafe_allow_html=True)
@@ -96,78 +94,66 @@ st.markdown(
 st.divider()
 
 # -------------------------------
-# Tarjetas de navegación (misma pestaña)
-# Usamos st.page_link y lo estilizamos como "card" (clickable de bloque).
+# Tarjetas de navegación (misma pestaña, sin solaparse)
 # -------------------------------
 CARD_CSS = """
 <style>
-/* Que las page_link parezcan tarjetas y ocupen todo el bloque */
-.stLinkButton > a {
-  display:block !important;
-  text-decoration:none !important;
-  color:inherit !important;
+.app-card {
   background: var(--panel);
   border:1px solid rgba(36,32,36,0.08);
   border-radius: 14px;
   padding: 1rem 1.1rem;
   transition: transform .08s ease, box-shadow .2s ease;
-  white-space: pre-line; /* respeta saltos de línea en label */
-  font-weight: 800;
-  font-size: 1.05rem;
 }
-.stLinkButton > a:hover {
+.app-card:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 22px rgba(36,32,36,0.10);
 }
-.stLinkButton > a small {
-  display:block; font-weight: 500; color: var(--muted); font-size: .95rem; margin-top:.15rem;
+/* Título clicable (page_link) */
+.app-card .stLinkButton > a {
+  display:block !important;
+  width:100% !important;
+  text-decoration:none !important;
+  color:inherit !important;
+  white-space: normal !important;  /* rompe línea correctamente */
+  font-weight: 800;
+  font-size: 1.05rem;
+  padding: .2rem 0;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+/* Descripción bajo el título */
+.app-card .desc {
+  color: var(--muted);
+  font-size: .95rem;
+  margin-top: .25rem;
 }
 </style>
 """
 st.markdown(CARD_CSS, unsafe_allow_html=True)
 
-# Tres columnas con page_link (abre en la misma pestaña automáticamente)
+def card_page(title_emoji: str, title: str, desc: str, target_py: str, key: str):
+    with st.container():
+        st.markdown("<div class='app-card'>", unsafe_allow_html=True)
+        # Título clicable (misma pestaña) con page_link
+        try:
+            st.page_link(target_py, label=f"{title_emoji} {title}", key=f"plink_{key}")
+        except Exception:
+            # Fallback si tu versión no soporta page_link
+            if st.button(f"{title_emoji} {title}", key=f"btn_{key}", use_container_width=True):
+                try:
+                    st.switch_page(target_py)
+                except Exception:
+                    st.warning("No se pudo cambiar de página automáticamente. Usa la barra lateral, por favor.")
+        # Descripción (no clicable)
+        st.markdown(f"<div class='desc'>{desc}</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
 c1, c2, c3 = st.columns(3)
-
 with c1:
-    try:
-        st.page_link(
-            "pages/10_Rondas.py",
-            label="🧩 Rondas\n"
-                  "Emparejamientos y resultados, con BYEs y estado por ronda.",
-        )
-    except Exception:
-        # Fallback mínimo si tu versión no tiene page_link
-        if st.button("🧩 Rondas — Abrir"):
-            try:
-                st.switch_page("pages/10_Rondas.py")
-            except Exception:
-                st.warning("Ve a Rondas desde la barra lateral, por favor.")
-
+    card_page("🧩", "Rondas", "Emparejamientos y resultados, con BYEs y estado por ronda.", "pages/10_Rondas.py", "rondas")
 with c2:
-    try:
-        st.page_link(
-            "pages/20_Clasificacion.py",
-            label="🏆 Clasificación\n"
-                  "Tabla en vivo (solo rondas publicadas), con Buchholz.",
-        )
-    except Exception:
-        if st.button("🏆 Clasificación — Abrir"):
-            try:
-                st.switch_page("pages/20_Clasificacion.py")
-            except Exception:
-                st.warning("Ve a Clasificación desde la barra lateral, por favor.")
-
+    card_page("🏆", "Clasificación", "Tabla en vivo (solo rondas publicadas), con Buchholz.", "pages/20_Clasificacion.py", "clas")
 with c3:
-    try:
-        st.page_link(
-            "pages/99_Admin.py",
-            label="🛠️ Administración\n"
-                  "Publicar, despublicar, editar resultados y generar rondas.",
-        )
-    except Exception:
-        if st.button("🛠️ Administración — Abrir"):
-            try:
-                st.switch_page("pages/99_Admin.py")
-            except Exception:
-                st.warning("Ve a Administración desde la barra lateral, por favor.")
+    card_page("🛠️", "Administración", "Publicar, despublicar, editar resultados y generar rondas.", "pages/99_Admin.py", "admin")
