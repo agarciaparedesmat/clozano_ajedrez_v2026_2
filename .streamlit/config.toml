@@ -1,0 +1,7 @@
+[theme]
+# Paleta "Azul colegio" (neutra y legible). Si prefieres, luego te doy variantes.
+primaryColor = "#1e40af"            # azul indigo-800
+backgroundColor = "#ffffff"         # fondo principal
+secondaryBackgroundColor = "#f3f4f6" # gris-100 para paneles/containers
+textColor = "#0f172a"               # slate-900
+font = "sans serif"                 # opciones: "sans serif", "serif", "monospace"
