@@ -5,10 +5,10 @@ from lib.tournament import load_config
 st.set_page_config(page_title="Ajedrez en los recreos — IESCL", page_icon="♟️", layout="wide")
 
 cfg = load_config()
-titulo     = cfg.get("titulo", "Ajedrez en los recreos — IESCL")
+titulo     = cfg.get("titulo", "")
 anio       = cfg.get("anio", "")
 subtitulo  = cfg.get("subtitulo", "")
-version  = cfg.get("version", "")
+version  = cfg.get("version2", "")
 
 st.title(titulo)
 
