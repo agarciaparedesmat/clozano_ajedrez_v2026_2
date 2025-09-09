@@ -3,10 +3,21 @@ import streamlit as st
 from lib.tournament import load_config
 
 st.set_page_config(page_title="Ajedrez en los recreos — IESCL", page_icon="♟️", layout="wide")
+
 cfg = load_config()
-st.title(cfg.get("titulo","Ajedrez en los recreos — IESCL"))
-st.title(cfg.get("titulo","Curso 2025-2026"))
-st.caption(cfg.get("subtitulo","Versión 9/Sept/2025"))
+titulo     = cfg.get("titulo", "Ajedrez en los recreos — IESCL")
+anio       = cfg.get("anio", "")
+subtitulo  = cfg.get("subtitulo", "Versión 9/Sept/2025")
+
+st.title(titulo)
+
+# si quieres mostrar el curso debajo del título principal:
+if anio:
+    st.subheader(f"Curso {anio}")
+
+# y luego el subtítulo como texto auxiliar
+st.caption(subtitulo)
+
 
 # Ruta de la imagen en tu sistema
 #ruta_imagen = "portada.png"
