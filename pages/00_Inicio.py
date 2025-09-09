@@ -94,73 +94,54 @@ st.markdown(
 st.divider()
 
 # -------------------------------
-# Tarjetas de navegación (misma pestaña, sin solaparse)
-# -------------------------------
-# -------------------------------
-# Tarjetas de navegación (misma pestaña, altura uniforme)
+# Tarjetas de navegación (misma pestaña, sin superposición)
 # -------------------------------
 CARD_CSS = """
 <style>
-.app-card {
-  background: var(--panel);
-  border:1px solid rgba(36,32,36,0.08);
-  border-radius: 14px;
-  padding: 1rem 1.1rem;
+/* Hacemos que el propio contenedor del page_link parezca una tarjeta */
+.stLinkButton { width: 100% !important; }
+.stLinkButton > a {
+  display: block !important;
+  width: 100% !important;
+  text-decoration: none !important;
+  color: inherit !important;
+  white-space: normal !important;          /* rompe líneas correctamente */
+  background: var(--panel) !important;      /* gris crema */
+  border: 1px solid rgba(36,32,36,0.08) !important;
+  border-radius: 14px !important;
+  padding: 1rem 1.1rem !important;
+  font-weight: 800 !important;
+  font-size: 1.05rem !important;
+  box-shadow: none !important;
   transition: transform .08s ease, box-shadow .2s ease;
-  /* Igualar altura entre tarjetas */
-  display: flex;
-  flex-direction: column;
-  min-height: 160px;        /* ⇠ ajusta aquí si quieres más/menos altura */
+  min-height: 72px; display:flex; align-items:center;
 }
-.app-card:hover {
+.stLinkButton > a:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 22px rgba(36,32,36,0.10);
 }
-/* Título clicable (page_link) */
-.app-card .stLinkButton > a {
-  display:block !important;
-  width:100% !important;
-  text-decoration:none !important;
-  color:inherit !important;
-  white-space: normal !important;  /* rompe línea correctamente */
-  font-weight: 800;
-  font-size: 1.05rem;
-  padding: .2rem 0;
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-/* Descripción al final del bloque (si hay mucha altura) */
-.app-card .desc {
+.card-desc  {
   color: var(--muted);
   font-size: .95rem;
-  margin-top: .45rem;
-}
-@media (max-width: 900px){
-  /* En móvil no forzamos altura mínima */
-  .app-card { min-height: auto; }
+  margin-top: .35rem;
 }
 </style>
 """
 st.markdown(CARD_CSS, unsafe_allow_html=True)
 
-
 def card_page(title_emoji: str, title: str, desc: str, target_py: str, key: str):
-    with st.container():
-        st.markdown("<div class='app-card'>", unsafe_allow_html=True)
-        # Título clicable (misma pestaña) con page_link
-        try:
-            st.page_link(target_py, label=f"{title_emoji} {title}", key=f"plink_{key}")
-        except Exception:
-            # Fallback si tu versión no soporta page_link
-            if st.button(f"{title_emoji} {title}", key=f"btn_{key}", use_container_width=True):
-                try:
-                    st.switch_page(target_py)
-                except Exception:
-                    st.warning("No se pudo cambiar de página automáticamente. Usa la barra lateral, por favor.")
-        # Descripción (no clicable)
-        st.markdown(f"<div class='desc'>{desc}</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Título clicable (tarjeta completa) — abre en la misma pestaña
+    try:
+        st.page_link(target_py, label=f"{title_emoji} {title}", key=f"plink_{key}")
+    except Exception:
+        # Fallback si tu versión no soporta page_link
+        if st.button(f"{title_emoji} {title}", key=f"btn_{key}", use_container_width=True):
+            try:
+                st.switch_page(target_py)
+            except Exception:
+                st.warning("No se pudo cambiar de página automáticamente. Usa la barra lateral, por favor.")
+    # Descripción bajo la tarjeta
+    st.markdown(f"<div class='card-desc'>{desc}</div>", unsafe_allow_html=True)
 
 c1, c2, c3 = st.columns(3)
 with c1:
