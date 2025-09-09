@@ -19,6 +19,7 @@ inject_base_style()
 
 # Config y contexto
 cfg = load_config()
+titulo = cfg.get("titulo", "")
 nivel = cfg.get("nivel", "Todos")
 anio = cfg.get("anio", "")
 JUG_PATH = f"{DATA_DIR}/jugadores.csv"
