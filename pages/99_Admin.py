@@ -34,6 +34,8 @@ cfg = load_config()
 JUG_PATH = os.path.join(DATA_DIR, "jugadores.csv")
 N_ROUNDS = planned_rounds(cfg, JUG_PATH)
 st.caption(format_with_cfg("Configuración: {nivel} · {anio}", cfg))
+from lib.tournament import config_path
+st.caption(f"Fuente de configuración: {config_path() or 'config.json no encontrado'}")
 
 # =========================
 # 🧾 Configuración (solo lectura)

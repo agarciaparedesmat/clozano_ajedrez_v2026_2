@@ -32,15 +32,35 @@ CFG_PATH  = os.path.join(DATA_DIR, "config.json")
 META_PATH = os.path.join(DATA_DIR, "meta.json")
 LOG_PATH  = os.path.join(DATA_DIR, "admin_log.csv")
 
+
+# --- NUEVO: localizar config.json en data/ o en raíz ---
+def _config_candidates() -> list[str]:
+    return [
+        os.path.join(DATA_DIR, "config.json"),                # preferencia: data/config.json
+        os.path.join(BASE_DIR, "config.json"),                # alternativa: ./config.json (raíz del proyecto)
+    ]
+
+def find_config_file() -> str | None:
+    for p in _config_candidates():
+        if os.path.isfile(p):
+            return p
+    return None
+
 def load_config() -> dict:
-    """Lee config.json o devuelve valores por defecto."""
-    if not os.path.exists(CFG_PATH):
-        return {"rondas": 5}
+    """Carga config.json desde data/ o, si no existe, desde la raíz del proyecto."""
+    path = find_config_file()
+    if not path:
+        return {}
     try:
-        with open(CFG_PATH, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
-        return {"rondas": 5}
+        return {}
+
+def config_path() -> str:
+    """Devuelve la ruta efectiva usada para cargar config.json (o '' si no hay)."""
+    return find_config_file() or ""
+
 
 def load_meta() -> dict:
     """Lee meta.json (o dict vacío si no existe / error)."""
