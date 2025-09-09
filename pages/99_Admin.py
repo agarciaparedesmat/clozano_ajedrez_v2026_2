@@ -31,8 +31,11 @@ st.success("Acceso concedido ✅")
 actor = st.text_input("Tu nombre (registro de cambios)", value=st.session_state.get("actor_name", "Admin"))
 st.session_state["actor_name"] = actor
 
+
 cfg = load_config()
-N_ROUNDS = int(cfg.get("rondas", 5))
+from lib.tournament import planned_rounds, format_with_cfg
+N_ROUNDS = planned_rounds(cfg, JUG_PATH)
+st.caption(format_with_cfg("Configuración: {nivel} · {anio}", cfg))
 
 JUG_PATH = os.path.join(DATA_DIR, "jugadores.csv")
 def round_file(i: int) -> str:
@@ -158,7 +161,7 @@ existing_rounds = [i for i in range(1, N_ROUNDS + 1) if os.path.exists(round_fil
 published_cnt = len([i for i in existing_rounds if is_pub(i)])
 closed_rounds = [s["i"] for s in states if s["closed"]]
 
-st.info(f"📣 Publicadas: **{published_cnt} / {N_ROUNDS}**  ·  🗂️ Generadas: **{len(existing_rounds)}**")
+st.info(f"📣 Publicadas: **{published_cnt} / {N_ROUNDS}**  ·  🗂️ Generadas: **{len(existing_rounds)}**  ·  🧭 Plan: **{N_ROUNDS}**")
 st.write(f"🔒 Rondas cerradas (publicadas y sin vacíos): **{len(closed_rounds)}** / {N_ROUNDS}")
 
 st.divider()

@@ -113,6 +113,61 @@ def last_modified(path: str) -> str:
         return "—"
 
 # ============================================================
+# Planificación de rondas (auto por log2(N) o fijo desde config)
+# ============================================================
+import math
+
+def active_players_count(path: str) -> int:
+    """Cuenta jugadores 'activos' en jugadores.csv (estado != 'retirado')."""
+    df = read_csv_safe(path)
+    if df is None or df.empty:
+        return 0
+    if "estado" not in df.columns:
+        return len(df)
+    return int((df["estado"].astype(str).str.lower() != "retirado").sum())
+
+def recommended_rounds(n_players: int) -> int:
+    """
+    Recomendación típica para suizo sin rating: ceil(log2(N)).
+    Ajustes suaves:
+      - si N <= 2 -> 1
+      - mínimo 3 por defecto (torneo escolar)
+    """
+    if n_players <= 2:
+        return 1
+    base = math.ceil(math.log2(max(2, n_players)))
+    return max(3, int(base))
+
+def planned_rounds(cfg: dict, players_csv_path: str) -> int:
+    """
+    Devuelve el nº de rondas planificadas:
+      - Si cfg['rondas'] es int > 0 -> usa ese valor.
+      - Si cfg['rondas'] es 'auto' o falta -> ceil(log2(N activos)),
+        acotado por cfg[min_rondas], cfg[max_rondas] si existen.
+    """
+    r = cfg.get("rondas", "auto")
+    if isinstance(r, int) and r > 0:
+        return int(r)
+
+    n = active_players_count(players_csv_path)
+    rec = recommended_rounds(n)
+    min_r = cfg.get("min_rondas")
+    max_r = cfg.get("max_rondas")
+    if isinstance(min_r, int):
+        rec = max(rec, min_r)
+    if isinstance(max_r, int):
+        rec = min(rec, max_r)
+    return int(rec)
+
+def format_with_cfg(text: str, cfg: dict) -> str:
+    """Reemplazo sencillo de {nivel} y {anio} en títulos."""
+    if not isinstance(text, str):
+        return text
+    return (text.replace("{nivel}", str(cfg.get("nivel", "") or ""))
+                .replace("{anio}",  str(cfg.get("anio", "") or "")))
+
+
+# ============================================================
 # Publicación robusta (meta + flag-file)
 # ============================================================
 def _pub_flag_path(i: int) -> str:
