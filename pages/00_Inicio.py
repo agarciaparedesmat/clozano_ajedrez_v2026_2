@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 
-from lib.ui import page_header, hero_portada, chip, inject_base_style
+from lib.ui import page_header, hero_portada, inject_base_style
 from lib.tournament import (
     load_config,
     list_round_files,
@@ -20,7 +20,7 @@ page_header("Inicio", "Bienvenido/a — Torneo suizo escolar")
 hero_portada("Ajedrez en los recreos", "Consulta rondas, resultados y clasificación en tiempo real.")
 
 # -------------------------------
-# Resumen de estado (chips)
+# Estado del torneo (tabla 1 línea)
 # -------------------------------
 cfg = load_config()
 n_plan = int(cfg.get("rondas", 5))
@@ -30,7 +30,7 @@ generadas = len(round_nums)
 publicadas = [i for i in round_nums if is_published(i)]
 pub_cnt = len(publicadas)
 ronda_actual = max(publicadas) if publicadas else None
-seed = r1_seed()
+seed = r1_seed() or "—"
 
 def _last_mod_text():
     target = ronda_actual if ronda_actual is not None else (round_nums[-1] if round_nums else None)
@@ -38,20 +38,63 @@ def _last_mod_text():
         return "—"
     return last_modified(round_file(target))
 
-st.markdown("#### Estado del torneo")
-with st.container():
-    chip(f"📣 Publicadas: {pub_cnt} / {n_plan}", "green" if pub_cnt > 0 else ("yellow" if generadas > 0 else "red"))
-    chip(f"🗂️ Generadas: {generadas}", "green" if generadas == n_plan and n_plan > 0 else ("yellow" if generadas > 0 else "red"))
-    chip(f"⭐ Ronda ACTUAL: {ronda_actual if ronda_actual is not None else '—'}", "green" if ronda_actual else "yellow")
-    chip(f"🎲 Semilla R1: {seed if seed else '—'}", "green" if seed else "yellow")
-    chip(f"🕒 Última actualización: {_last_mod_text()}", "yellow")
+last_mod = _last_mod_text()
 
-st.divider()
+TABLE_CSS = """
+<style>
+.state-wrap { overflow-x: auto; margin: .25rem 0 1rem 0; }
+.state-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+.state-table th, .state-table td {
+  border: 1px solid rgba(36,32,36,0.10);
+  padding: .45rem .6rem;
+  white-space: nowrap;
+  text-align: left;
+}
+.state-table thead th {
+  background: rgba(115,192,238,0.12);
+  font-weight: 700;
+}
+.state-table tbody td {
+  background: #fff;
+}
+</style>
+"""
+st.markdown(TABLE_CSS, unsafe_allow_html=True)
+
+st.markdown(
+    f"""
+<div class="state-wrap">
+<table class="state-table">
+  <thead>
+    <tr>
+      <th>📣 Publicadas</th>
+      <th>🗂️ Generadas</th>
+      <th>⭐ Ronda ACTUAL</th>
+      <th>🎲 Semilla R1</th>
+      <th>🕒 Última actualización</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>{pub_cnt} / {n_plan}</td>
+      <td>{generadas}</td>
+      <td>{ronda_actual if ronda_actual is not None else "—"}</td>
+      <td>{seed}</td>
+      <td>{last_mod}</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+""",
+    unsafe_allow_html=True
+)
 
 # -------------------------------
-# Tarjetas de navegación (clicables con ?page=...)
-# Asegúrate de que tus archivos se llaman EXACTAMENTE:
-#   pages/10_Rondas.py, pages/20_Clasificacion.py, pages/99_Admin.py
+# Tarjetas de navegación (clican y abren en la misma pestaña)
 # -------------------------------
 CARD_CSS = """
 <style>
@@ -74,6 +117,7 @@ a.card-link.full:hover {
 """
 st.markdown(CARD_CSS, unsafe_allow_html=True)
 
+# Importante: los href usan ?page=NombreArchivoSinExtension y NO tienen target="_blank"
 st.markdown(
     """
     <div class="card-grid">
@@ -94,11 +138,4 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Fallback visible por si alguna vez cambia el router de Streamlit
-st.caption("Si algún enlace no abre, usa la barra lateral o estos accesos:")
-try:
-    st.page_link("pages/10_Rondas.py", label="Ir a Rondas", icon="🧩")
-    st.page_link("pages/20_Clasificacion.py", label="Ir a Clasificación", icon="🏆")
-    st.page_link("pages/99_Admin.py", label="Ir a Administración", icon="🛠️")
-except Exception:
-    pass
+# (Quitamos los enlaces alternativos para evitar duplicidad)
