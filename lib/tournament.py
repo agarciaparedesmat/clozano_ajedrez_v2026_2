@@ -63,15 +63,26 @@ def _read_text_try_encodings(path: str) -> tuple[str, str]:
     return "", "utf-8"
 
 def _sanitize_json_like(text: str) -> str:
-    """Quita comentarios // y /* */, y comas finales antes de } o ] para tolerar JSON «relajado»."""
-    # quitar comentarios de una línea
+    """Quita comentarios // y /* */, normaliza comillas “curvas” y elimina caracteres de control.
+       También quita comas colgantes antes de } o ]."""
+    import re
+    # quitar comentarios de una línea y de bloque
     text = re.sub(r"//.*?$", "", text, flags=re.MULTILINE)
-    # quitar comentarios de bloque
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
-    # quitar comas colgantes: ,   }
+
+    # normalizar comillas curvas a rectas
+    text = (text
+            .replace("\u201c", '"').replace("\u201d", '"')  # “ ”
+            .replace("\u2018", "'").replace("\u2019", "'")) # ‘ ’
+
+    # eliminar caracteres de control (excepto \t \r \n)
+    text = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", " ", text)
+
+    # quitar comas colgantes: ,  }
     text = re.sub(r",\s*(\})", r"\1", text)
-    # quitar comas colgantes: ,   ]
+    # quitar comas colgantes: ,  ]
     text = re.sub(r",\s*(\])", r"\1", text)
+
     return text.strip()
 
 def load_config() -> dict:
