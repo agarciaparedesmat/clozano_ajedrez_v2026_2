@@ -11,6 +11,9 @@ from lib.tournament import (
     is_published,
     round_file,
 )
+st.set_page_config(page_title="Rondas", page_icon="🧩", layout="wide")
+from lib.ui import page_header; page_header("Rondas", "Emparejamientos y resultados")
+
 
 st.set_page_config(page_title="Rondas", page_icon="🧩", layout="wide")
 from lib.ui import page_header
