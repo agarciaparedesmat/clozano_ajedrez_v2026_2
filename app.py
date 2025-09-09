@@ -7,7 +7,8 @@ st.set_page_config(page_title="Ajedrez en los recreos — IESCL", page_icon="♟
 cfg = load_config()
 titulo     = cfg.get("titulo", "Ajedrez en los recreos — IESCL")
 anio       = cfg.get("anio", "")
-subtitulo  = cfg.get("subtitulo", "Versión 9/Sept/2025")
+subtitulo  = cfg.get("subtitulo", "")
+version  = cfg.get("version", "")
 
 st.title(titulo)
 
@@ -15,9 +16,10 @@ st.title(titulo)
 if anio:
     st.subheader(f"Curso {anio}")
 
-# y luego el subtítulo como texto auxiliar
+# y luego el subtítulo y version como texto auxiliar
 st.caption(subtitulo)
 
+st.caption(subtitulo)
 
 # Ruta de la imagen en tu sistema
 #ruta_imagen = "portada.png"
