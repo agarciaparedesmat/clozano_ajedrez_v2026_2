@@ -19,14 +19,14 @@ inject_base_style()
 
 # Config y contexto
 cfg = load_config()
-nivel = cfg.get("nivel", "Torneo escolar")
+nivel = cfg.get("nivel", "Todos")
 anio = cfg.get("anio", "")
 JUG_PATH = f"{DATA_DIR}/jugadores.csv"
 n_plan = planned_rounds(cfg, JUG_PATH)
 
 # Portada (hero con nivel/año)
 hero_portada(
-    format_with_cfg("{nivel}", cfg) or "Ajedrez en los recreos",
+    format_with_cfg("Ajedrez en los recreos" {nivel}", cfg),
     format_with_cfg("Curso {anio} — Consulta rondas, resultados y clasificación en tiempo real.", cfg)
 )
 
