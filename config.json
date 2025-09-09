@@ -3,13 +3,11 @@
   "subtitulo": "Torneo de Ajedrez.Emparejamientos y clasificación por nivel",
   "anio": "2025-2026",
   "nivel": "1º ESO",
-
   "rondas": "auto",       // "auto" usa ceil(log2(N)) con N = jugadores activos
   "min_rondas": 4,        // (opcional) mínimo permitido si "auto"
   "max_rondas": 7,        // (opcional) máximo permitido si "auto"
-
   "cabecera_pdf": "",
-   "auto_refresh_seconds": 0,
+  "auto_refresh_seconds": 0,
   "genially_url": "https://view.genially.com/68bfc66a46b5ebd63d00b9b0",
   "nivel_urls": {
     "1ESO": "",
