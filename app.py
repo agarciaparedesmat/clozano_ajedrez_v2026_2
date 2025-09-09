@@ -19,7 +19,7 @@ if anio:
 # y luego el subtítulo y version como texto auxiliar
 st.caption(subtitulo)
 
-st.caption(subtitulo)
+st.caption(version)
 
 # Ruta de la imagen en tu sistema
 #ruta_imagen = "portada.png"
