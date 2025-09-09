@@ -2,25 +2,23 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 
-from lib.ui import page_header, hero_portada, inject_base_style
+from lib.ui import hero_portada, inject_base_style
 from lib.tournament import (
     load_config,
     list_round_files,
     is_published,
-    r1_seed,
     round_file,
     last_modified,
 )
 
-st.set_page_config(page_title="Inicio", page_icon="♟️", layout="wide")
+st.set_page_config(page_title="Inicio", page_icon="🏠", layout="wide")
 inject_base_style()
 
-# Cabecera + hero
-#page_header("Ajedrez en los recreos", "Torneo de Ajedrez. Consulta rondas, resultados y clasificación en tiempo real.")
-hero_portada("Ajedrez en los recreos", "Torneo de Ajedrez. Consulta rondas, resultados y clasificación en tiempo real.")
+# Portada (solo hero para que sea limpio)
+hero_portada("Ajedrez en los recreos", "Consulta rondas, resultados y clasificación en tiempo real.")
 
 # -------------------------------
-# Estado del torneo (tabla 1 línea)
+# Estado del torneo (tabla 1 línea, sin semilla)
 # -------------------------------
 cfg = load_config()
 n_plan = int(cfg.get("rondas", 5))
@@ -30,7 +28,6 @@ generadas = len(round_nums)
 publicadas = [i for i in round_nums if is_published(i)]
 pub_cnt = len(publicadas)
 ronda_actual = max(publicadas) if publicadas else None
-seed = r1_seed() or "—"
 
 def _last_mod_text():
     target = ronda_actual if ronda_actual is not None else (round_nums[-1] if round_nums else None)
@@ -72,7 +69,6 @@ st.markdown(
       <th>📣 Publicadas</th>
       <th>🗂️ Generadas</th>
       <th>⭐ Ronda ACTUAL</th>
-      <th>🎲 Semilla R1</th>
       <th>🕒 Última actualización</th>
     </tr>
   </thead>
@@ -81,7 +77,6 @@ st.markdown(
       <td>{pub_cnt} / {n_plan}</td>
       <td>{generadas}</td>
       <td>{ronda_actual if ronda_actual is not None else "—"}</td>
-      <td>{seed}</td>
       <td>{last_mod}</td>
     </tr>
   </tbody>
@@ -98,15 +93,15 @@ st.divider()
 # -------------------------------
 CARD_CSS = """
 <style>
-/* Hacemos que el propio contenedor del page_link parezca una tarjeta */
+/* page_link con estilo de tarjeta */
 .stLinkButton { width: 100% !important; }
 .stLinkButton > a {
   display: block !important;
   width: 100% !important;
   text-decoration: none !important;
   color: inherit !important;
-  white-space: normal !important;          /* rompe líneas correctamente */
-  background: var(--panel) !important;      /* gris crema */
+  white-space: normal !important;
+  background: var(--panel) !important;
   border: 1px solid rgba(36,32,36,0.08) !important;
   border-radius: 14px !important;
   padding: 1rem 1.1rem !important;
@@ -114,7 +109,6 @@ CARD_CSS = """
   font-size: 1.05rem !important;
   box-shadow: none !important;
   transition: transform .08s ease, box-shadow .2s ease;
-  min-height: 72px; display:flex; align-items:center;
 }
 .stLinkButton > a:hover {
   transform: translateY(-1px);

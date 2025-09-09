@@ -1,12 +1,12 @@
 {
-  "titulo": "Torneo Suizo — IES (v7 Baseline Seguro)",
-  "subtitulo": "Emparejamientos y clasificación por nivel",
-  "anio": "2025",
+  "titulo": "Ajedrez en los recreos — IESCL",
+  "subtitulo": "Torneo de Ajedrez.Emparejamientos y clasificación por nivel",
+  "anio": "2025-2026",
   "nivel": "1º ESO",
   "cabecera_pdf": "",
   "rondas": 5,
   "auto_refresh_seconds": 0,
-  "genially_url": "",
+  "genially_url": "https://view.genially.com/68bfc66a46b5ebd63d00b9b0",
   "nivel_urls": {
     "1ESO": "",
     "2-3ESO": "",

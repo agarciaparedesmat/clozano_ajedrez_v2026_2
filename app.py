@@ -2,7 +2,7 @@
 import streamlit as st
 from lib.tournament import load_config
 
-st.set_page_config(page_title="Torneo de Ajedrez IESCL", page_icon="♟️", layout="wide")
+st.set_page_config(page_title="Ajedrez en los recreos — IESCL", page_icon="♟️", layout="wide")
 cfg = load_config()
 st.title(cfg.get("titulo","Ajedrez en los recreos — IESCL"))
 st.title(cfg.get("titulo","Curso 2025-2026"))

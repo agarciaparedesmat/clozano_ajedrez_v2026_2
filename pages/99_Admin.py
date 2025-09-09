@@ -164,6 +164,70 @@ st.write(f"🔒 Rondas cerradas (publicadas y sin vacíos): **{len(closed_rounds
 st.divider()
 
 # =========================
+# 🎲 Semilla R1 (auditoría) + Regenerar R1 con semilla
+# =========================
+st.markdown("### 🎲 Semilla R1 (auditoría)")
+seed_val = r1_seed()
+if seed_val:
+    st.caption("Semilla actualmente guardada:")
+    st.code(seed_val)
+else:
+    st.caption("Aún no hay semilla registrada. Se guardará al generar R1 con semilla.")
+
+col_a, col_b = st.columns([2, 1])
+with col_a:
+    new_seed = st.text_input(
+        "Nueva semilla para R1",
+        value=seed_val or "",
+        key="seed_r1_input",
+        help="Si se deja vacío, se generará una semilla aleatoria."
+    )
+
+with col_b:
+    # Condiciones para permitir regenerar
+    r1_published = is_pub(1)
+    later_exist = any(os.path.exists(round_file(i)) for i in range(2, N_ROUNDS + 1))
+    can_regen = (not r1_published) and (not later_exist)
+
+    if st.button("🔁 Regenerar R1 con esta semilla", use_container_width=True, disabled=not can_regen):
+        if r1_published:
+            st.error("No se puede regenerar R1 porque está PUBLICADA. Despublica o elimina primero.")
+        elif later_exist:
+            st.error("No se puede regenerar R1 porque existen rondas posteriores generadas. Elimina R2.. antes.")
+        else:
+            # Semilla a usar
+            seed_used = new_seed.strip() or f"seed-{random.randint(100000, 999999)}"
+            random.seed(seed_used)
+
+            # Estado inicial de jugadores (sin aplicar rondas previas)
+            players = read_players_from_csv(JUG_PATH)
+            if not players:
+                st.error("No se pudo leer `data/jugadores.csv`.")
+            else:
+                # Emparejar R1 de cero con la semilla indicada
+                df_pairs = swiss_pair_round(players, 1, forced_bye_id=None)
+                outp = round_file(1)
+                df_pairs.astype(str).to_csv(outp, index=False, encoding="utf-8")
+
+                # Guardar semilla en meta
+                meta = load_meta()
+                meta.setdefault("rounds", {}).setdefault("1", {})["seed"] = seed_used
+                save_meta(meta)
+
+                add_log("regen_round1", 1, actor, f"R1 regenerada con seed={seed_used}")
+                st.success(f"✅ Ronda 1 regenerada con semilla `{seed_used}`.")
+                st.rerun()
+
+    if not can_regen:
+        if r1_published:
+            st.info("R1 está publicada: no se puede regenerar.")
+        elif later_exist:
+            st.info("Existen rondas posteriores generadas. Borra R2.. antes de regenerar R1.")
+
+st.divider()
+
+
+# =========================
 # Generar ronda siguiente (Suizo)
 # =========================
 st.markdown("### ♟️ Generar siguiente ronda (sistema suizo)")
