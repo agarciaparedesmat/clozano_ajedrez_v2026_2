@@ -16,7 +16,7 @@ st.set_page_config(page_title="Inicio", page_icon="🏠", layout="wide")
 inject_base_style()
 
 # Cabecera + hero
-#page_header("Inicio", "Bienvenido/a — Torneo suizo escolar")
+page_header("Inicio", "Bienvenido/a — Torneo suizo escolar")
 hero_portada("Ajedrez en los recreos", "Consulta rondas, resultados y clasificación en tiempo real.")
 
 # -------------------------------
@@ -93,49 +93,81 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+st.divider()
+
 # -------------------------------
-# Tarjetas de navegación (clican y abren en la misma pestaña)
+# Tarjetas de navegación (misma pestaña)
+# Usamos st.page_link y lo estilizamos como "card" (clickable de bloque).
 # -------------------------------
 CARD_CSS = """
 <style>
-.card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-@media (max-width: 900px){ .card-grid{ grid-template-columns: 1fr; } }
-a.card-link.full {
-  display:block; text-decoration:none; color:inherit;
+/* Que las page_link parezcan tarjetas y ocupen todo el bloque */
+.stLinkButton > a {
+  display:block !important;
+  text-decoration:none !important;
+  color:inherit !important;
   background: var(--panel);
   border:1px solid rgba(36,32,36,0.08);
-  border-radius: 14px; padding: 1rem 1.1rem;
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
   transition: transform .08s ease, box-shadow .2s ease;
+  white-space: pre-line; /* respeta saltos de línea en label */
+  font-weight: 800;
+  font-size: 1.05rem;
 }
-a.card-link.full:hover {
+.stLinkButton > a:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 22px rgba(36,32,36,0.10);
 }
-.card-title { font-family:'Nunito','Inter',sans-serif; font-weight:800; font-size:1.1rem; margin:0 0 0.25rem 0;}
-.card-desc  { color: var(--muted); font-size:0.95rem; margin:0; }
+.stLinkButton > a small {
+  display:block; font-weight: 500; color: var(--muted); font-size: .95rem; margin-top:.15rem;
+}
 </style>
 """
 st.markdown(CARD_CSS, unsafe_allow_html=True)
 
-# Importante: los href usan ?page=NombreArchivoSinExtension y NO tienen target="_blank"
-st.markdown(
-    """
-    <div class="card-grid">
-      <a class="card-link full" href="./?page=10_Rondas">
-        <div class="card-title">🧩 Rondas</div>
-        <p class="card-desc">Emparejamientos y resultados, con BYEs y estado por ronda.</p>
-      </a>
-      <a class="card-link full" href="./?page=20_Clasificacion">
-        <div class="card-title">🏆 Clasificación</div>
-        <p class="card-desc">Tabla en vivo (solo rondas publicadas), con Buchholz.</p>
-      </a>
-      <a class="card-link full" href="./?page=99_Admin">
-        <div class="card-title">🛠️ Administración</div>
-        <p class="card-desc">Publicar, despublicar, editar resultados y generar rondas.</p>
-      </a>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+# Tres columnas con page_link (abre en la misma pestaña automáticamente)
+c1, c2, c3 = st.columns(3)
 
-# (Quitamos los enlaces alternativos para evitar duplicidad)
+with c1:
+    try:
+        st.page_link(
+            "pages/10_Rondas.py",
+            label="🧩 Rondas\n"
+                  "Emparejamientos y resultados, con BYEs y estado por ronda.",
+        )
+    except Exception:
+        # Fallback mínimo si tu versión no tiene page_link
+        if st.button("🧩 Rondas — Abrir"):
+            try:
+                st.switch_page("pages/10_Rondas.py")
+            except Exception:
+                st.warning("Ve a Rondas desde la barra lateral, por favor.")
+
+with c2:
+    try:
+        st.page_link(
+            "pages/20_Clasificacion.py",
+            label="🏆 Clasificación\n"
+                  "Tabla en vivo (solo rondas publicadas), con Buchholz.",
+        )
+    except Exception:
+        if st.button("🏆 Clasificación — Abrir"):
+            try:
+                st.switch_page("pages/20_Clasificacion.py")
+            except Exception:
+                st.warning("Ve a Clasificación desde la barra lateral, por favor.")
+
+with c3:
+    try:
+        st.page_link(
+            "pages/99_Admin.py",
+            label="🛠️ Administración\n"
+                  "Publicar, despublicar, editar resultados y generar rondas.",
+        )
+    except Exception:
+        if st.button("🛠️ Administración — Abrir"):
+            try:
+                st.switch_page("pages/99_Admin.py")
+            except Exception:
+                st.warning("Ve a Administración desde la barra lateral, por favor.")
