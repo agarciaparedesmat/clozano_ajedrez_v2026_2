@@ -39,8 +39,7 @@ def _last_mod_text():
     return last_modified(round_file(target))
 
 st.markdown("#### Estado del torneo")
-chips = st.container()
-with chips:
+with st.container():
     chip(f"📣 Publicadas: {pub_cnt} / {n_plan}", "green" if pub_cnt > 0 else ("yellow" if generadas > 0 else "red"))
     chip(f"🗂️ Generadas: {generadas}", "green" if generadas == n_plan and n_plan > 0 else ("yellow" if generadas > 0 else "red"))
     chip(f"⭐ Ronda ACTUAL: {ronda_actual if ronda_actual is not None else '—'}", "green" if ronda_actual else "yellow")
@@ -50,36 +49,56 @@ with chips:
 st.divider()
 
 # -------------------------------
-# Tarjetas de navegación (con switch_page)
+# Tarjetas de navegación (clicables con ?page=...)
+# Asegúrate de que tus archivos se llaman EXACTAMENTE:
+#   pages/10_Rondas.py, pages/20_Clasificacion.py, pages/99_Admin.py
 # -------------------------------
-c1, c2, c3 = st.columns(3)
+CARD_CSS = """
+<style>
+.card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 900px){ .card-grid{ grid-template-columns: 1fr; } }
+a.card-link.full {
+  display:block; text-decoration:none; color:inherit;
+  background: var(--panel);
+  border:1px solid rgba(36,32,36,0.08);
+  border-radius: 14px; padding: 1rem 1.1rem;
+  transition: transform .08s ease, box-shadow .2s ease;
+}
+a.card-link.full:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(36,32,36,0.10);
+}
+.card-title { font-family:'Nunito','Inter',sans-serif; font-weight:800; font-size:1.1rem; margin:0 0 0.25rem 0;}
+.card-desc  { color: var(--muted); font-size:0.95rem; margin:0; }
+</style>
+"""
+st.markdown(CARD_CSS, unsafe_allow_html=True)
 
-def card(title_emoji: str, title: str, desc: str, target_py: str, key: str):
-    st.markdown(
-        f"""
-        <div class="card-link">
-          <div class="card-title">{title_emoji} {title}</div>
-          <p class="card-desc">{desc}</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    # Botón de acción dentro de la tarjeta
-    if st.button("Abrir", key=key, use_container_width=True):
-        try:
-            st.switch_page(target_py)  # ✅ robusto: "pages/xxx.py"
-        except Exception:
-            # Fallback: intenta un enlace de página si la API no existe
-            try:
-                st.page_link(target_py, label=f"Abrir {title}", icon="↗️")
-            except Exception:
-                st.warning("No se pudo cambiar de página automáticamente. Usa la barra lateral, por favor.")
+st.markdown(
+    """
+    <div class="card-grid">
+      <a class="card-link full" href="./?page=10_Rondas">
+        <div class="card-title">🧩 Rondas</div>
+        <p class="card-desc">Emparejamientos y resultados, con BYEs y estado por ronda.</p>
+      </a>
+      <a class="card-link full" href="./?page=20_Clasificacion">
+        <div class="card-title">🏆 Clasificación</div>
+        <p class="card-desc">Tabla en vivo (solo rondas publicadas), con Buchholz.</p>
+      </a>
+      <a class="card-link full" href="./?page=99_Admin">
+        <div class="card-title">🛠️ Administración</div>
+        <p class="card-desc">Publicar, despublicar, editar resultados y generar rondas.</p>
+      </a>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
-with c1:
-    card("🧩", "Rondas", "Emparejamientos y resultados, con BYEs y estado por ronda.", "pages/10_Rondas.py", "go_rondas")
-with c2:
-    card("🏆", "Clasificación", "Tabla en vivo (solo rondas publicadas), con Buchholz.", "pages/20_Clasificacion.py", "go_clas")
-with c3:
-    card("🛠️", "Administración", "Publicar, despublicar, editar resultados y generar rondas.", "pages/99_Admin.py", "go_admin")
-
-st.caption("💡 Consejo: fija esta portada como página de inicio en el navegador del aula.")
+# Fallback visible por si alguna vez cambia el router de Streamlit
+st.caption("Si algún enlace no abre, usa la barra lateral o estos accesos:")
+try:
+    st.page_link("pages/10_Rondas.py", label="Ir a Rondas", icon="🧩")
+    st.page_link("pages/20_Clasificacion.py", label="Ir a Clasificación", icon="🏆")
+    st.page_link("pages/99_Admin.py", label="Ir a Administración", icon="🛠️")
+except Exception:
+    pass
