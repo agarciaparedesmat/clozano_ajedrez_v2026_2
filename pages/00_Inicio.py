@@ -16,7 +16,7 @@ st.set_page_config(page_title="Inicio", page_icon="🏠", layout="wide")
 inject_base_style()
 
 # Cabecera + hero
-page_header("Inicio", "Bienvenido/a — Torneo suizo escolar")
+#page_header("Inicio", "Bienvenido/a — Torneo suizo escolar")
 hero_portada("Ajedrez en los recreos", "Consulta rondas, resultados y clasificación en tiempo real.")
 
 # -------------------------------
