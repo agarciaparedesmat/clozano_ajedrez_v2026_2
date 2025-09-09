@@ -18,7 +18,7 @@ st.set_page_config(page_title="Admin", page_icon="🛠️", layout="wide")
 from lib.ui import page_header
 page_header("🛠️ Panel de Administración", "Gestión de rondas, publicación y resultados")
 
-st.header("🛠️ Panel de Administración")
+#st.header("🛠️ Panel de Administración")
 
 # =========================
 # Acceso (simple)

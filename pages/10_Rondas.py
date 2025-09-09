@@ -12,11 +12,11 @@ from lib.tournament import (
     round_file,
 )
 st.set_page_config(page_title="Rondas", page_icon="🧩", layout="wide")
-from lib.ui import page_header; page_header("Rondas", "Emparejamientos y resultados")
+from lib.ui import page_header; page_header("🧩 Rondas", "Emparejamientos y resultados")
 
 
 
-st.title("🧩 Rondas")
+#st.title("🧩 Rondas")
 
 cfg = load_config()
 n = int(cfg.get("rondas", 5))

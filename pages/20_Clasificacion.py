@@ -18,15 +18,10 @@ from lib.tournament import (
 )
 
 st.set_page_config(page_title="Clasificación", page_icon="🏆", layout="wide")
-from lib.ui import page_header; page_header("Clasificación", "Tabla en tiempo real (rondas publicadas)")
+from lib.ui import page_header; page_header("🏆 Clasificación", "Tabla en tiempo real (rondas publicadas)")
 
 
-
-st.set_page_config(page_title="Clasificación", page_icon="🏆", layout="wide")
-from lib.ui import page_header
-page_header("🏆 Clasificación", "Tabla en tiempo real (solo rondas publicadas)")
-
-st.title("🏆 Clasificación")
+#st.title("🏆 Clasificación")
 
 cfg = load_config()
 n = int(cfg.get("rondas", 5))
