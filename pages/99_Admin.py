@@ -12,7 +12,8 @@ from lib.tournament import (
     read_players_from_csv, apply_results, compute_standings,
     swiss_pair_round, formatted_name_from_parts,
     is_published, set_published, r1_seed, add_log,
-    planned_rounds, format_with_cfg,
+    planned_rounds, format_with_cfg,  # ya estaban
+    config_path, config_debug,        # <- añadidos
 )
 
 from lib.ui import page_header
@@ -34,8 +35,13 @@ cfg = load_config()
 JUG_PATH = os.path.join(DATA_DIR, "jugadores.csv")
 N_ROUNDS = planned_rounds(cfg, JUG_PATH)
 st.caption(format_with_cfg("Configuración: {nivel} · {anio}", cfg))
-from lib.tournament import config_path
 st.caption(f"Fuente de configuración: {config_path() or 'config.json no encontrado'}")
+
+# Depuración de config.json (si hubo problemas al parsear)
+dbg = config_debug()
+if dbg.get("error"):
+    st.error(f"Error al parsear config.json en: {dbg.get('path')}\n{dbg.get('error')}")
+    st.text_area("Vista previa de config.json (primeros 500 caracteres)", value=dbg.get("raw_preview", ""), height=150)
 
 # =========================
 # 🧾 Configuración (solo lectura)
@@ -80,11 +86,9 @@ st.dataframe(resumen, use_container_width=True, hide_index=True)
 # aviso amistoso si faltan claves
 missing = [k for k in ("nivel", "anio") if not cfg.get(k)]
 if missing:
-    st.info("Sugerencia: completa estas claves en `data/config.json` → " + ", ".join(missing))
+    st.info("Sugerencia: completa estas claves en `config.json` → " + ", ".join(missing))
 
 st.divider()
-
-
 
 def round_file(i: int) -> str:
     return os.path.join(DATA_DIR, f"pairings_R{i}.csv")

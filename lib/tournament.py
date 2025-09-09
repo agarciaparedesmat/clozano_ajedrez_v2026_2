@@ -32,35 +32,90 @@ CFG_PATH  = os.path.join(DATA_DIR, "config.json")
 META_PATH = os.path.join(DATA_DIR, "meta.json")
 LOG_PATH  = os.path.join(DATA_DIR, "admin_log.csv")
 
+# ====== CONFIG: búsqueda, lectura robusta y depuración ======
+_LAST_CONFIG_PATH: Optional[str] = None
+_LAST_CONFIG_ERROR: Optional[str] = None
+_LAST_CONFIG_RAW: Optional[str] = None
 
-# --- NUEVO: localizar config.json en data/ o en raíz ---
 def _config_candidates() -> list[str]:
+    # Preferimos data/config.json; si no existe, ./config.json (raíz del proyecto)
     return [
-        os.path.join(DATA_DIR, "config.json"),                # preferencia: data/config.json
-        os.path.join(BASE_DIR, "config.json"),                # alternativa: ./config.json (raíz del proyecto)
+        os.path.join(DATA_DIR, "config.json"),
+        os.path.join(BASE_DIR, "config.json"),
     ]
 
-def find_config_file() -> str | None:
+def find_config_file() -> Optional[str]:
     for p in _config_candidates():
         if os.path.isfile(p):
             return p
     return None
 
+def _read_text_try_encodings(path: str) -> tuple[str, str]:
+    last_exc = None
+    for enc in ("utf-8", "utf-8-sig", "latin-1"):
+        try:
+            with open(path, "r", encoding=enc) as f:
+                return f.read(), enc
+        except Exception as e:
+            last_exc = e
+    if last_exc:
+        raise last_exc
+    return "", "utf-8"
+
+def _sanitize_json_like(text: str) -> str:
+    """Quita comentarios // y /* */, y comas finales antes de } o ] para tolerar JSON «relajado»."""
+    # quitar comentarios de una línea
+    text = re.sub(r"//.*?$", "", text, flags=re.MULTILINE)
+    # quitar comentarios de bloque
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    # quitar comas colgantes: ,   }
+    text = re.sub(r",\s*(\})", r"\1", text)
+    # quitar comas colgantes: ,   ]
+    text = re.sub(r",\s*(\])", r"\1", text)
+    return text.strip()
+
 def load_config() -> dict:
-    """Carga config.json desde data/ o, si no existe, desde la raíz del proyecto."""
+    """Carga config.json desde data/ o raíz. Tolera comentarios/comas colgantes y BOM."""
+    global _LAST_CONFIG_PATH, _LAST_CONFIG_ERROR, _LAST_CONFIG_RAW
+    _LAST_CONFIG_PATH = None
+    _LAST_CONFIG_ERROR = None
+    _LAST_CONFIG_RAW = None
+
     path = find_config_file()
     if not path:
         return {}
+
+    _LAST_CONFIG_PATH = path
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
+        raw, enc = _read_text_try_encodings(path)
+        _LAST_CONFIG_RAW = raw[:2000]  # vista previa acotada
+
+        # 1º intento: JSON estricto
+        try:
+            return json.loads(raw)
+        except Exception as e1:
+            # 2º intento: sanitizar comentarios/comas colgantes
+            try:
+                clean = _sanitize_json_like(raw)
+                return json.loads(clean)
+            except Exception as e2:
+                _LAST_CONFIG_ERROR = f"Primero {type(e1).__name__}: {e1}; tras sanitizar {type(e2).__name__}: {e2}"
+                return {}
+    except Exception as e:
+        _LAST_CONFIG_ERROR = f"{type(e).__name__}: {e}"
         return {}
 
 def config_path() -> str:
     """Devuelve la ruta efectiva usada para cargar config.json (o '' si no hay)."""
-    return find_config_file() or ""
+    return _LAST_CONFIG_PATH or ""
 
+def config_debug() -> dict:
+    """Datos de depuración para mostrar en Admin."""
+    return {
+        "path": _LAST_CONFIG_PATH or "",
+        "error": _LAST_CONFIG_ERROR or "",
+        "raw_preview": (_LAST_CONFIG_RAW or "")[:500],
+    }
 
 def load_meta() -> dict:
     """Lee meta.json (o dict vacío si no existe / error)."""
@@ -186,7 +241,6 @@ def format_with_cfg(text: str, cfg: dict) -> str:
     return (text.replace("{nivel}", str(cfg.get("nivel", "") or ""))
                 .replace("{anio}",  str(cfg.get("anio", "") or "")))
 
-
 # ============================================================
 # Publicación robusta (meta + flag-file)
 # ============================================================
@@ -241,7 +295,6 @@ def set_published(i: int, value: bool, seed: Optional[str] = None) -> None:
             if os.path.exists(flag):
                 os.remove(flag)
     except Exception:
-        # opcionalmente podríamos add_log del error
         pass
 
 # ============================================================
@@ -346,8 +399,8 @@ def _award_points_for_result(res: str, bye_default: float = 1.0) -> Tuple[float,
     - '1-0'      -> (1.0, 0.0, None)
     - '0-1'      -> (0.0, 1.0, None)
     - '1/2-1/2'  -> (0.5, 0.5, None)
-    - '+/-'      -> (1.0, 0.0, None) (incomparecencia negras)
-    - '-/+'      -> (0.0, 1.0, None) (incomparecencia blancas)
+    - '+/-'      -> (1.0, 0.0, None)
+    - '-/+'      -> (0.0, 1.0, None)
     - 'BYE1.0'   -> (1.0, 0.0, 1.0)   (negras es BYE)
     - 'BYE0.5'   -> (0.5, 0.0, 0.5)
     - 'BYE'      -> (bye_default, 0.0, bye_default)
