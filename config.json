@@ -4,7 +4,7 @@
   "anio": "2025-2026",
   "nivel": "1º ESO",
   "rondas": "auto",
-  "min_rondas": 4,
+  "min_rondas": 5,
   "max_rondas": 7,
   "cabecera_pdf": "",
   "auto_refresh_seconds": 0,
