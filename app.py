@@ -5,21 +5,23 @@ from lib.tournament import load_config
 st.set_page_config(page_title="Ajedrez en los recreos — IESCL", page_icon="♟️", layout="wide")
 
 cfg = load_config()
+
 titulo     = cfg.get("titulo", "")
-
-
 st.title(titulo)
+
+subtitulo  = cfg.get("subtitulo", "")
+st.caption(subtitulo)
+
 titulo     = cfg.get("nivel", "")
 st.title(titulo)
+
 # si quieres mostrar el curso debajo del título principal:
 anio       = cfg.get("anio", "")
 
 if anio:
     st.subheader(f"Curso {anio}")
 
-# y luego el subtítulo y version como texto auxiliar
-subtitulo  = cfg.get("subtitulo", "")
-st.caption(subtitulo)
+# texto auxiliar
 
 version  = cfg.get("version", "")
 st.caption(version)
