@@ -35,6 +35,55 @@ JUG_PATH = os.path.join(DATA_DIR, "jugadores.csv")
 N_ROUNDS = planned_rounds(cfg, JUG_PATH)
 st.caption(format_with_cfg("Configuración: {nivel} · {anio}", cfg))
 
+# =========================
+# 🧾 Configuración (solo lectura)
+# =========================
+import json
+
+st.markdown("### 🧾 Configuración (solo lectura)")
+
+# Mostrar JSON crudo cargado por load_config()
+try:
+    st.code(json.dumps(cfg, ensure_ascii=False, indent=2), language="json")
+except Exception:
+    st.write(cfg)
+
+# Resumen práctico
+df_j = read_csv_safe(JUG_PATH)
+activos = 0
+if df_j is not None and not df_j.empty:
+    if "estado" in df_j.columns:
+        activos = int((df_j["estado"].astype(str).str.lower() != "retirado").sum())
+    else:
+        activos = len(df_j)
+
+plan_mode = cfg.get("rondas", "auto")  # puede ser "auto" o un número
+min_r = cfg.get("min_rondas", "—")
+max_r = cfg.get("max_rondas", "—")
+nivel = cfg.get("nivel", "—")
+anio = cfg.get("anio", "—")
+
+resumen = pd.DataFrame([{
+    "🎓 Nivel": nivel,
+    "📅 Año": anio,
+    "⚙️ rondas (config)": plan_mode,
+    "⬇️ min_rondas": min_r,
+    "⬆️ max_rondas": max_r,
+    "🧑‍🎓 Jugadores activos": activos,
+    "🧭 Plan de rondas (resuelto)": N_ROUNDS,  # calculado con planned_rounds(cfg, JUG_PATH)
+}], index=[0])
+
+st.dataframe(resumen, use_container_width=True, hide_index=True)
+
+# aviso amistoso si faltan claves
+missing = [k for k in ("nivel", "anio") if not cfg.get(k)]
+if missing:
+    st.info("Sugerencia: completa estas claves en `data/config.json` → " + ", ".join(missing))
+
+st.divider()
+
+
+
 def round_file(i: int) -> str:
     return os.path.join(DATA_DIR, f"pairings_R{i}.csv")
 
