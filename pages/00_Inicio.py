@@ -96,6 +96,9 @@ st.divider()
 # -------------------------------
 # Tarjetas de navegación (misma pestaña, sin solaparse)
 # -------------------------------
+# -------------------------------
+# Tarjetas de navegación (misma pestaña, altura uniforme)
+# -------------------------------
 CARD_CSS = """
 <style>
 .app-card {
@@ -104,6 +107,10 @@ CARD_CSS = """
   border-radius: 14px;
   padding: 1rem 1.1rem;
   transition: transform .08s ease, box-shadow .2s ease;
+  /* Igualar altura entre tarjetas */
+  display: flex;
+  flex-direction: column;
+  min-height: 160px;        /* ⇠ ajusta aquí si quieres más/menos altura */
 }
 .app-card:hover {
   transform: translateY(-1px);
@@ -123,15 +130,20 @@ CARD_CSS = """
   border: 0 !important;
   box-shadow: none !important;
 }
-/* Descripción bajo el título */
+/* Descripción al final del bloque (si hay mucha altura) */
 .app-card .desc {
   color: var(--muted);
   font-size: .95rem;
-  margin-top: .25rem;
+  margin-top: .45rem;
+}
+@media (max-width: 900px){
+  /* En móvil no forzamos altura mínima */
+  .app-card { min-height: auto; }
 }
 </style>
 """
 st.markdown(CARD_CSS, unsafe_allow_html=True)
+
 
 def card_page(title_emoji: str, title: str, desc: str, target_py: str, key: str):
     with st.container():
