@@ -19,7 +19,7 @@ from lib.tournament import (
 
 st.set_page_config(page_title="Clasificación", page_icon="🏆", layout="wide")
 from lib.ui import page_header
-page_header("Clasificación", "Tabla en tiempo real (solo rondas publicadas)")
+page_header("🏆 Clasificación", "Tabla en tiempo real (solo rondas publicadas)")
 
 st.title("🏆 Clasificación")
 

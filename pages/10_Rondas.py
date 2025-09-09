@@ -14,7 +14,7 @@ from lib.tournament import (
 
 st.set_page_config(page_title="Rondas", page_icon="🧩", layout="wide")
 from lib.ui import page_header
-page_header("Rondas", "Emparejamientos y resultados")
+page_header("🧩 Rondas", "Emparejamientos y resultados")
 
 st.title("🧩 Rondas")
 
