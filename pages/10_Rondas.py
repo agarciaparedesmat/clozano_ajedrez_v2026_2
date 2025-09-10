@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 
 from lib.ui import page_header
-from lib.ui import hero_portada, inject_base_style, sidebar_title
+from lib.ui import hero_portada, inject_base_style, sidebar_title_and_nav
 
 from lib.tournament import (
     DATA_DIR,
@@ -25,7 +25,8 @@ def _slugify(s: str) -> str:
     s = re.sub(r"\s+", "_", str(s or "").strip())
     return re.sub(r"[^A-Za-z0-9_\-]+", "", s) or "torneo"
 
-sidebar_title(extras=True)  
+# NAV personalizada debajo de la cabecera (título + nivel/año)
+sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
 
 # Cabecera con nivel/año
 cfg = load_config()

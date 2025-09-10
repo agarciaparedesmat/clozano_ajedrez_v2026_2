@@ -17,9 +17,10 @@ from lib.tournament import (
 )
 
 from lib.ui import page_header
-from lib.ui import hero_portada, inject_base_style, sidebar_title
+from lib.ui import hero_portada, inject_base_style, sidebar_title_and_nav
 
-sidebar_title(extras=True) 
+# NAV personalizada debajo de la cabecera (título + nivel/año)
+sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
 
 page_header("🛠️ Panel de Administración", "Gestión de rondas, publicación y resultados")
  
