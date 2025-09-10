@@ -246,11 +246,13 @@ def planned_rounds(cfg: dict, players_csv_path: str) -> int:
     return int(rec)
 
 def format_with_cfg(text: str, cfg: dict) -> str:
-    """Reemplazo sencillo de {nivel} y {anio} en títulos."""
-    if not isinstance(text, str):
-        return text
-    return (text.replace("{nivel}", str(cfg.get("nivel", "") or ""))
-                .replace("{anio}",  str(cfg.get("anio", "") or "")))
+    """Reemplaza {clave} por cfg['clave'] para cualquier clave presente."""
+    if text is None:
+        return ""
+    def repl(m):
+        key = m.group(1)
+        return str(cfg.get(key, "") or "")
+    return re.sub(r"\{([A-Za-z0-9_]+)\}", repl, str(text))
 
 # ============================================================
 # Publicación robusta (meta + flag-file)
