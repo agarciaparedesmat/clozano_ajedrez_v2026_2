@@ -171,14 +171,18 @@ def chip(text: str, kind: str = "green"):
 
 
 
+import streamlit as st
+
 def sidebar_title(text: str | None = None, extras: bool = True, hide_nav_header: bool = True) -> None:
     """
     Barra lateral compacta:
-      1) Título del torneo (config['titulo'])
+      1) Título (config['titulo'])
       2) Línea gris: 🎓 nivel · 📅 año (si existen)
       3) Separador fino visible
       4) Navegación automática justo debajo, sin huecos.
-    hide_nav_header=True oculta el encabezado "app" de la nav (reduce mucho el espacio).
+
+    hide_nav_header=True  -> oculta el encabezado "app".
+    hide_nav_header=False -> lo muestra y compacta (aunque antes se hubiera ocultado).
     """
     # Cargar config (sirve lib/ o raíz)
     try:
@@ -195,40 +199,49 @@ def sidebar_title(text: str | None = None, extras: bool = True, hide_nav_header:
     nivel = (cfg.get("nivel") or "").strip()
     anio  = (cfg.get("anio")  or "").strip()
 
-    # --- CSS ultra-compacto ---
+    # Reglas para mostrar/ocultar el encabezado de la nav
+    if hide_nav_header:
+        nav_header_rule = """
+        /* Ocultar encabezado de la nav (robusto a cambios de etiquetas) */
+        [data-testid="stSidebarNav"] > div:first-child { display: none !important; }
+        [data-testid="stSidebarNav"] h1,
+        [data-testid="stSidebarNav"] h2,
+        [data-testid="stSidebarNav"] h3,
+        [data-testid="stSidebarNav"] p,
+        [data-testid="stSidebarNav"] div[role="heading"] { display: none !important; }
+        """
+    else:
+        nav_header_rule = """
+        /* Forzar a MOSTRAR (anula cualquier rule previa con !important) */
+        [data-testid="stSidebarNav"] > div:first-child { 
+          display: block !important; 
+          margin: .05rem 0 !important; padding: 0 !important;
+        }
+        [data-testid="stSidebarNav"] h1,
+        [data-testid="stSidebarNav"] h2,
+        [data-testid="stSidebarNav"] h3,
+        [data-testid="stSidebarNav"] p,
+        [data-testid="stSidebarNav"] div[role="heading"] {
+          display: block !important;
+          margin: .05rem 0 !important; padding: 0 !important;
+          line-height: 1.1 !important; font-size: .90rem !important; opacity: .75;
+        }
+        """
+
+    # CSS: reordenar y compactar
     st.sidebar.markdown(
         f"""
         <style>
-        /* Contenedor: columna sin huecos y casi sin padding superior */
         [data-testid="stSidebar"] > div:first-child {{
-          display: flex;
-          flex-direction: column;
-          gap: 0 !important;
-          padding-top: .05rem !important;
+          display: flex; flex-direction: column; gap: 0 !important; padding-top: .05rem !important;
         }}
+        [data-testid="stSidebarContent"] {{ padding-top: .05rem !important; }}
 
-        /* Contenido interno de la sidebar */
-        [data-testid="stSidebarContent"] {{
-          padding-top: .05rem !important;
-        }}
+        [data-testid="stSidebarNav"] {{ order: 2; margin: 0 !important; padding: 0 !important; }}
+        [data-testid="stSidebarNav"] ul {{ margin: .05rem 0 0 0 !important; padding-left: .25rem !important; }}
 
-        /* Navegación automática: pegada y sin márgenes */
-        [data-testid="stSidebarNav"] {{
-          order: 2;
-          margin: 0 !important;
-          padding: 0 !important;
-        }}
-        [data-testid="stSidebarNav"] ul {{
-          margin: .05rem 0 0 0 !important;
-          padding-left: .25rem !important;
-        }}
-        /* Encabezado "app" (lo podemos ocultar para quitar aire) */
-        [data-testid="stSidebarNav"] h2,
-        [data-testid="stSidebarNav"] h3 {{
-          {"display:none !important;" if hide_nav_header else "margin:.05rem 0 !important; padding:0 !important; line-height:1.1 !important; font-size:.90rem !important; opacity:.75;"}
-        }}
+        {nav_header_rule}
 
-        /* Nuestros bloques: márgenes mínimos */
         ._csb_title {{ margin: 0 0 .10rem 0 !important; font-weight: 800; font-size: 1.05rem; line-height: 1.2; }}
         ._csb_meta  {{ margin: 0 0 .10rem 0 !important; color: var(--muted); }}
         ._csb_sep   {{ border: none; border-top: 1px solid rgba(36,32,36,.25);
@@ -238,11 +251,9 @@ def sidebar_title(text: str | None = None, extras: bool = True, hide_nav_header:
         unsafe_allow_html=True,
     )
 
-    # --- Render cabecera ---
+    # Render cabecera
     st.sidebar.markdown(f'<div class="_csb_title">{text}</div>', unsafe_allow_html=True)
-
     if extras and (nivel or anio):
         meta = " · ".join([p for p in [f"🎓 {nivel}" if nivel else "", f"📅 {anio}" if anio else ""] if p])
         st.sidebar.markdown(f'<div class="_csb_meta">{meta}</div>', unsafe_allow_html=True)
-
     st.sidebar.markdown('<hr class="_csb_sep" />', unsafe_allow_html=True)
