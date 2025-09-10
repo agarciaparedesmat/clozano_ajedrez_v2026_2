@@ -3,7 +3,6 @@
 import streamlit as st
 
 from lib.ui import hero_portada, inject_base_style
-
 from lib.tournament import (
     DATA_DIR,
     load_config,

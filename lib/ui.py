@@ -107,136 +107,46 @@ h1, h2, h3 {
 </style>
 """
 
-# lib/ui.py
-import streamlit as st
-
 def inject_base_style(bg_color: str | None = None) -> None:
     """
-    Inyecta CSS base (fondo + paleta) para toda la app.
-    Lee de config.json:
-      - theme_mode: "system" | "light" | "dark" | "auto_by_hour"
-      - bg_color (claro) y bg_color_dark (oscuro)
-    Si theme_mode="system", respeta el ajuste del SO (prefers-color-scheme).
-    Si theme_mode="auto_by_hour", usa hora local de Europa/Madrid (20:00–07:59 = oscuro).
+    Inyecta CSS base para toda la app, incluyendo:
+      - color de fondo global (o gradient) tomado de config.json (clave 'bg_color')
+      - header con leve degradado y blur
+      - pequeños ajustes de padding
+    Puedes forzar un color pasando bg_color="...".
     """
-    # Cargar configuración sin depender a nivel de módulo (evita ciclos)
-    try:
-        from lib.tournament import load_config
-        cfg = load_config()
-    except Exception:
-        cfg = {}
-
-    # Paletas por defecto
-    light = {
-        "bg": (bg_color or cfg.get("bg_color") or "#F7F5F0").strip(),
-        "panel": "#FFFFFF",
-        "text": "#222222",
-        "muted": "rgba(34,34,34,.65)",
-        "link": "#0B74DE",
-        "border": "rgba(36,32,36,.10)",
-    }
-    dark = {
-        "bg": (cfg.get("bg_color_dark") or "#0D1117").strip(),
-        "panel": "#10161F",
-        "text": "#EDEEF0",
-        "muted": "rgba(237,238,240,.65)",
-        "link": "#58A6FF",
-        "border": "rgba(255,255,255,.12)",
-    }
-
-    mode = (cfg.get("theme_mode") or "system").lower()
-
-    def _css_vars(p):  # genera bloque :root con variables de una paleta
-        return f"""
-        :root {{
-          --app-bg: {p["bg"]};
-          --panel: {p["panel"]};
-          --text: {p["text"]};
-          --muted: {p["muted"]};
-          --link: {p["link"]};
-          --border: {p["border"]};
-        }}
-        """
-
-    css = "<style>"
-
-    if mode == "dark":
-        css += _css_vars(dark)
-    elif mode == "light":
-        css += _css_vars(light)
-    elif mode == "auto_by_hour":
-        # Oscuro entre 20:00 y 08:00 en Europa/Madrid
-        from datetime import datetime
+    if bg_color is None:
         try:
-            from zoneinfo import ZoneInfo  # Py3.9+
-            hour = datetime.now(ZoneInfo("Europe/Madrid")).hour
+            # Importamos aquí para evitar dependencias circulares a nivel de módulo
+            from lib.tournament import load_config
+            cfg = load_config()
+            bg_color = (cfg.get("bg_color") or "#F7F5F0").strip()
         except Exception:
-            hour = datetime.now().hour  # Fallback al TZ del servidor
-        palette = dark if (hour >= 20 or hour < 8) else light
-        css += _css_vars(palette)
-    else:
-        # "system": claro por defecto + override si el SO/ navegador está en oscuro
-        css += _css_vars(light)
-        css += f"""
-        @media (prefers-color-scheme: dark) {{
-          {_css_vars(dark)}
-        }}
-        """
+            bg_color = "#F7F5F0"
 
-    # Estilos comunes
-    css += """
-    /* Fondo global + colores de texto/enlaces */
-    [data-testid="stAppViewContainer"] { background: var(--app-bg) !important; }
-    .stApp, .block-container { color: var(--text); }
-    a, .stLinkButton a { color: var(--link) !important; }
-
-    /* Paneles */
-    .stButton>button, .stDownloadButton>button,
-    .stTextInput>div>div>input, .stSelectbox>div>div>div,
-    .stDataFrame, .stDataEditor, .stAlert, .stExpander,
-    .st-emotion-cache-16txtl3, .st-emotion-cache-1r4qj8v {
-      border-color: var(--border) !important;
-    }
-    [data-testid="stSidebar"] > div:first-child {
-      background: var(--panel) !important;
-      border-right: 1px solid var(--border);
-    }
-
+    css = f"""
+    <style>
+    :root {{
+      --app-bg: {bg_color};
+    }}
+    /* Área principal */
+    [data-testid="stAppViewContainer"] {{
+      background: var(--app-bg) !important;
+    }}
     /* Header translúcido */
-    [data-testid="stHeader"] {
+    [data-testid="stHeader"] {{
       background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0)) !important;
       backdrop-filter: blur(6px);
-    }
-
-    /* Tablas sencillas tuyas */
-    .state-table thead th { background: rgba(115,192,238,0.12); color: var(--text); }
-    .state-table tbody td { background: #fff; }
-
-    /* Botones tipo tarjeta (page_link) */
-    .stLinkButton { width: 100% !important; }
-    .stLinkButton > a {
-      display: block !important;
-      width: 100% !important;
-      text-decoration: none !important;
-      color: var(--text) !important;
-      background: var(--panel) !important;
-      border: 1px solid var(--border) !important;
-      border-radius: 14px !important;
-      padding: 1rem 1.1rem !important;
-      font-weight: 800 !important;
-      font-size: 1.05rem !important;
-      box-shadow: none !important;
-      transition: transform .08s ease, box-shadow .2s ease;
-    }
-    .stLinkButton > a:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 10px 22px rgba(36,32,36,0.10);
-    }
-
-    .card-desc { color: var(--muted); font-size: .95rem; margin-top: .35rem; }
+    }}
+    /* Un poco de aire en el contenido */
+    .block-container {{
+      padding-top: 1.2rem;
+      padding-bottom: 2rem;
+    }}
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
+
 
 
 def page_header(title: str, subtitle: str = ""):

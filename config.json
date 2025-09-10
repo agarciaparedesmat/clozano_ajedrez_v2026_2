@@ -15,7 +15,5 @@
     "2-3ESO": "",
     "4ESO-BACH": ""
   },
-  "theme_mode": "system",       // "system" | "light" | "dark" | "auto_by_hour"//
-  "bg_color": "linear-gradient(180deg,#f9f7f3,#f1efe8)",
-  "bg_color_dark": "linear-gradient(180deg,#0d1117,#0a0e13)"
+  "bg_color": "linear-gradient(180deg,#f9f7f3,#f1efe8)"
 }
