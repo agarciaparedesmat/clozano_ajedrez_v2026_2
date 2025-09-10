@@ -58,16 +58,29 @@ def _results_empty_count(df: pd.DataFrame) -> int:
 
 # ---------- datos de rondas ----------
 JUG_PATH = f"{DATA_DIR}/jugadores.csv"
-n_plan = planned_rounds(cfg, JUG_PATH)
+n_plan = planned_rounds(cfg, JUG_PATH)          # plan de rondas (auto o fijo)
 
-nums = sorted(list_round_files(n_plan))
-publicadas = [i for i in nums if is_published(i)]
+round_nums = sorted(list_round_files(n_plan))   # generadas (publicadas o no)
+generadas = len(round_nums)
+publicadas = [i for i in round_nums if is_published(i)]
+ronda_actual = max(publicadas) if publicadas else None
+total_plan = n_plan
 
+# ---------- RESUMEN (chips) ----------
+c1, c2 = st.columns([2, 2])
+with c1:
+    if ronda_actual is not None:
+        st.success(f"⭐ Ronda ACTUAL: **Ronda {ronda_actual}**")
+    else:
+        st.warning("Sin rondas publicadas.")
+with c2:
+    st.info(f"📣 Publicadas: **{len(publicadas)} / {total_plan}**")
+
+st.divider()
+
+# Si no hay publicadas, terminar aquí (la vista pública no enseña borradores)
 if not publicadas:
-    st.info("Aún no hay **rondas publicadas**.")
     st.stop()
-
-ronda_actual = max(publicadas)
 
 # ---------- estado inicial seguro ----------
 if "rondas_view_select" not in st.session_state:
@@ -92,10 +105,9 @@ sel = st.selectbox(
     key="rondas_view_select",
 )
 
-# === Estilo “pill” para la botonera ===
+# === Estilo “pill” para la botonera (sin afectar a st.download_button) ===
 PILLS_CSS = """
 <style>
-/* Estilo pill para los botones de la botonera (sin afectar a st.download_button) */
 .stButton > button {
   border-radius: 9999px !important;
   padding: .28rem .75rem !important;
@@ -141,9 +153,8 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict) -> bytes | None:
     Devuelve bytes PDF de la ronda usando reportlab si está disponible,
     y si no, intenta fpdf2 como fallback. Si no hay ninguna, devuelve None.
     """
-    # Normalizar datos para la tabla
+    # Normalizar datos para la tabla del PDF
     tbl = table_df.copy()
-    # columnas visibles para el PDF
     tbl = tbl[["mesa", "blancas_nombre", "negras_nombre", "resultado_mostrar"]].copy()
     tbl = tbl.fillna("")
 
@@ -225,7 +236,7 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict) -> bytes | None:
         for _, row in tbl.iterrows():
             cells = [str(row["mesa"]), str(row["blancas_nombre"]), str(row["negras_nombre"]), str(row["resultado_mostrar"])]
             for c, w in zip(cells, widths):
-                pdf.cell(w, 7, c[:60], border=1)  # recorte simple
+                pdf.cell(w, 7, c[:60], border=1)
             pdf.ln(7)
 
         return bytes(pdf.output(dest="S"))
@@ -241,8 +252,7 @@ def render_round(i: int):
         return
 
     safe_df = df.copy()
-    # quitar columna 'seleccionar' si existiera (solo admin)
-    if "seleccionar" in safe_df.columns:
+    if "seleccionar" in safe_df.columns:  # columna solo usada en admin
         safe_df = safe_df.drop(columns=["seleccionar"])
 
     # asegurar columnas básicas
@@ -265,7 +275,6 @@ def render_round(i: int):
     safe_df = safe_df.sort_values(by=["mesa"], na_position="last")
 
     # ---- BYE y resultado mostrado (badge en RESULTADO) ----
-    # BYE si aparece en cualquier lado (blancas o negras)
     bye_mask = (
         safe_df["blancas_id"].astype(str).str.upper().eq("BYE")
         | safe_df["blancas_nombre"].astype(str).str.upper().eq("BYE")
@@ -276,7 +285,6 @@ def render_round(i: int):
     show_df = safe_df.copy()
     show_df["resultado_mostrar"] = _normalize_result_series(show_df["resultado"])
     show_df.loc[show_df["resultado_mostrar"] == "", "resultado_mostrar"] = "—"
-    # Añade el badge BYE al lado del resultado
     show_df.loc[bye_mask, "resultado_mostrar"] = show_df["resultado_mostrar"] + "  🟨 BYE"
 
     # normalizar resultados crudos para export
@@ -331,8 +339,7 @@ def render_round(i: int):
     else:
         st.info(
             "Para generar PDF instala **reportlab** o **fpdf2** en `requirements.txt`.\n"
-            "Ejemplo:\n"
-            "`reportlab==4.2.2`"
+            "Ejemplo: `reportlab==4.2.2`"
         )
 
 # pinta solo la ronda seleccionada
