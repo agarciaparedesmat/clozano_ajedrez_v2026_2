@@ -21,54 +21,6 @@ from lib.tournament import (
 st.set_page_config(page_title="Rondas", page_icon="🧩", layout="wide")
 inject_base_style()
 
-# —— Selector de ronda con color fuerte (elige tema: "blue" | "green" | "amber")
-THEME = "amber"  # ← cámbialo aquí si quieres
-
-_palette = {
-    "blue": {
-        "bg": "#DCEBFF", "hover": "#E9F2FF",
-        "border": "#1D4ED8", "border_hover": "#1743BD",
-        "icon": "#1743BD", "ring": "rgba(29,78,216,.25)", "text": "#0B3B8F"
-    },
-    "green": {
-        "bg": "#E6F6EA", "hover": "#EEF9F1",
-        "border": "#16A34A", "border_hover": "#14833F",
-        "icon": "#14833F", "ring": "rgba(22,163,74,.25)", "text": "#0F5132"
-    },
-    "amber": {
-        "bg": "#FFF1D6", "hover": "#FFF6E6",
-        "border": "#D97706", "border_hover": "#B75E03",
-        "icon": "#B75E03", "ring": "rgba(217,119,6,.25)", "text": "#8A4B00"
-    },
-}
-c = _palette.get(THEME, _palette["blue"])
-
-st.markdown(f"""
-<style>
-/* SOLO selectbox de esta página */
-[data-testid="stSelectbox"] div[role="combobox"] {{
-  background: {c['bg']} !important;
-  border: 2px solid {c['border']} !important;
-  border-radius: 12px !important;
-  padding: 2px 8px !important;
-  transition: all .15s ease-in-out;
-  color: {c['text']} !important;
-  font-weight: 700 !important;
-}}
-[data-testid="stSelectbox"] div[role="combobox"]:hover {{
-  background: {c['hover']} !important;
-  border-color: {c['border_hover']} !important;
-}}
-[data-testid="stSelectbox"] div[role="combobox"]:focus-within {{
-  box-shadow: 0 0 0 3px {c['ring']} !important;
-}}
-[data-testid="stSelectbox"] svg {{
-  color: {c['icon']} !important;
-}}
-</style>
-""", unsafe_allow_html=True)
-
-
 # NAV (personalizada) bajo cabecera lateral
 sidebar_title_and_nav(
     extras=True,
@@ -144,23 +96,41 @@ if st.session_state["rondas_view_select"] not in publicadas:
     st.session_state["rondas_view_select"] = ronda_actual
 
 # ---------- selector + botonera numérica EN UNA SOLA LÍNEA ----------
-# CSS “pill” (no afecta a st.download_button)
-PILLS_CSS = """
+# (colores del selector – cambia THEME si quieres)
+THEME = "amber"
+_palette = {
+    "blue":  {"bg": "#DCEBFF","hover": "#E9F2FF","border": "#1D4ED8","border_hover":"#1743BD","icon":"#1743BD","ring":"rgba(29,78,216,.25)","text":"#0B3B8F"},
+    "green": {"bg": "#E6F6EA","hover": "#EEF9F1","border": "#16A34A","border_hover":"#14833F","icon":"#14833F","ring":"rgba(22,163,74,.25)","text":"#0F5132"},
+    "amber": {"bg": "#FFF1D6","hover": "#FFF6E6","border": "#D97706","border_hover":"#B75E03","icon":"#B75E03","ring":"rgba(217,119,6,.25)","text":"#8A4B00"},
+}
+c = _palette.get(THEME, _palette["blue"])
+st.markdown(f"""
 <style>
-._chips_row .stButton > button {
-  border-radius: 9999px !important;
-  padding: .28rem .75rem !important;
-  border: 1px solid var(--border) !important;
-  background: #fff !important;
-  color: var(--text) !important;
-  font-weight: 700 !important;
-}
-._chips_row .stButton > button:hover {
+/* Selectbook estilizado SOLO en esta página */
+[data-testid="stSelectbox"] div[role="combobox"] {{
+  background: {c['bg']} !important; border: 2px solid {c['border']} !important;
+  border-radius: 12px !important; padding: 2px 8px !important;
+  color: {c['text']} !important; font-weight: 700 !important;
+}}
+[data-testid="stSelectbox"] div[role="combobox"]:hover {{
+  background: {c['hover']} !important; border-color: {c['border_hover']} !important;
+}}
+[data-testid="stSelectbox"] div[role="combobox"]:focus-within {{
+  box-shadow: 0 0 0 3px {c['ring']} !important;
+}}
+[data-testid="stSelectbox"] svg {{ color: {c['icon']} !important; }}
+
+/* Pills de la botonera (no afecta a download_button) */
+._chips_row .stButton > button {{
+  border-radius: 9999px !important; padding: .28rem .75rem !important;
+  border: 1px solid var(--border) !important; background: #fff !important;
+  color: var(--text) !important; font-weight: 700 !important;
+}}
+._chips_row .stButton > button:hover {{
   background: rgba(36,32,36,.06) !important;
-}
+}}
 </style>
-"""
-st.markdown(PILLS_CSS, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # Fila con 3 columnas: [etiqueta] [selector] [chips]
 c_lbl, c_sel, c_chips = st.columns([1.1, 1.8, 5.1])
@@ -168,10 +138,7 @@ with c_lbl:
     st.markdown("**Ver ronda publicada**")
 
 current_round = st.session_state["rondas_view_select"]
-
 with c_sel:
-    # contenedor para aplicar estilos solo a este select
-    st.markdown('<div class="rondas-select">', unsafe_allow_html=True)
     sel = st.selectbox(
         label="Ver ronda publicada",
         options=publicadas,
@@ -180,7 +147,6 @@ with c_sel:
         key="rondas_view_select",
         label_visibility="collapsed",
     )
-    st.markdown('</div>', unsafe_allow_html=True)
 
 with c_chips:
     st.markdown("**Ir directo a…**")
@@ -205,45 +171,88 @@ with c_chips:
 st.divider()
 
 # ---------- PDF builder ----------
-def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict) -> bytes | None:
+def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: bool = True) -> bytes | None:
     """
     Devuelve bytes PDF de la ronda usando reportlab si está disponible,
     y si no, intenta fpdf2 como fallback. Si no hay ninguna, devuelve None.
+    include_results=True -> imprime resultado; False -> deja hueco ":".
     """
     # Normalizar datos para la tabla del PDF
     tbl = table_df.copy()
     tbl = tbl[["mesa", "blancas_nombre", "negras_nombre", "resultado_mostrar"]].copy()
     tbl = tbl.fillna("")
+    if not include_results:
+        tbl["resultado_mostrar"] = ":"  # hueco como en tu plantilla
 
     # 1) ReportLab
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
         from reportlab.lib.units import mm
 
         buf = io.BytesIO()
-        doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=18*mm, rightMargin=18*mm, topMargin=18*mm, bottomMargin=18*mm)
+        doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=18*mm, rightMargin=18*mm, topMargin=15*mm, bottomMargin=15*mm)
 
         styles = getSampleStyleSheet()
         H = styles["Heading1"]; H.fontSize = 18; H.leading = 22
-        H2 = styles["Heading2"]; H2.fontSize = 16; H2.leading = 20
-        N = styles["Normal"]; N.fontSize = 11; N.leading = 14
+        H2 = styles["Heading2"]; H2.fontSize = 26; H2.leading = 30  # RONDA grande
+        N = styles["Normal"];   N.fontSize = 12; N.leading = 14
+
+        # Paleta aproximada de tu ejemplo
+        verde = colors.HexColor("#d9ead3")
+        melocoton = colors.HexColor("#f7e1d5")
+        azul = colors.HexColor("#cfe2f3")
 
         anio = (cfg.get("anio") or "").strip()
         nivel = (cfg.get("nivel") or "").strip()
-        titulo = f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ"
-        subt = f"RONDA {i}"
-        sub2 = nivel
+        linea_fecha = (cfg.get("pdf_fecha") or "").strip()
+        linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-        story = []
-        story.append(Paragraph(titulo, H))
-        story.append(Paragraph(subt, H2))
-        if sub2:
-            story.append(Paragraph(sub2, N))
-        story.append(Spacer(1, 8))
+        # Banda 1 (verde): TORNEO DE AJEDREZ {anio}
+        band1 = Table([[Paragraph(f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", H)]],
+                      colWidths=[doc.width])
+        band1.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), verde),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING", (0,0), (-1,-1), 6),
+        ]))
 
+        # Banda 2 (melocotón): RONDA {i}
+        band2 = Table([[Paragraph(f"RONDA {i}", H2)]], colWidths=[doc.width])
+        band2.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), melocoton),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+            ("TOPPADDING", (0,0), (-1,-1), 10),
+        ]))
+
+        # Banda 3 (azul): izquierda NIVEL grande, derecha fecha + hora/aula
+        right_text = "<br/>".join([t for t in [linea_fecha, linea_hora] if t])
+        left_par = Paragraph(f"<b>{nivel}</b>" if nivel else "", ParagraphStyle("L", fontSize=24, leading=28))
+        right_par = Paragraph(right_text, ParagraphStyle("R", fontSize=14, leading=18, alignment=1))  # centered
+        band3 = Table([[left_par, right_par]], colWidths=[doc.width*0.35, doc.width*0.65])
+        band3.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), azul),
+            ("BOX", (0,0), (-1,-1), 0.5, colors.black),
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+            ("LEFTPADDING", (0,0), (-1,-1), 8),
+            ("RIGHTPADDING", (0,0), (-1,-1), 8),
+            ("TOPPADDING", (0,0), (-1,-1), 10),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+        ]))
+
+        # Título de sección
+        sec = Table([[Paragraph("<b>Lista de emparejamientos</b>", styles["Title"])]], colWidths=[doc.width])
+        sec.setStyle(TableStyle([
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING", (0,0), (-1,-1), 6),
+        ]))
+
+        # Tabla principal
         data = [["Nº MESA", "BLANCAS", "NEGRAS", "RESULTADO"]] + tbl.values.tolist()
         t = Table(data, colWidths=[20*mm, 60*mm, 60*mm, 25*mm])
         t.setStyle(TableStyle([
@@ -254,14 +263,14 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict) -> bytes | None:
             ("GRID", (0,0), (-1,-1), 0.5, colors.lightgrey),
             ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
         ]))
-        story.append(t)
 
+        story = [band1, band2, band3, Spacer(1, 6), sec, t]
         doc.build(story)
         return buf.getvalue()
     except Exception:
         pass
 
-    # 2) FPDF (fpdf2)
+    # 2) FPDF (fallback simplificado)
     try:
         from fpdf import FPDF
 
@@ -271,14 +280,22 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict) -> bytes | None:
 
         anio = (cfg.get("anio") or "").strip()
         nivel = (cfg.get("nivel") or "").strip()
+        linea_fecha = (cfg.get("pdf_fecha") or "").strip()
+        linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-        # Título
+        # Bandas simples (sin color de fondo complejo en fpdf para mantenerlo ligero)
         pdf.set_font("Helvetica", "B", 18)
-        pdf.cell(0, 10, f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", ln=1, align="L")
-        pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, f"RONDA {i}", ln=1, align="L")
-        if nivel:
-            pdf.set_font("Helvetica", "", 12); pdf.cell(0, 7, nivel, ln=1, align="L")
+        pdf.cell(0, 10, f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", ln=1, align="C")
+        pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 10, f"RONDA {i}", ln=1, align="C")
+        if nivel or linea_fecha or linea_hora:
+            pdf.set_font("Helvetica", "", 14)
+            pdf.cell(0, 8, nivel, ln=1, align="L")
+            pdf.cell(0, 7, linea_fecha, ln=1, align="R")
+            pdf.cell(0, 7, linea_hora, ln=1, align="R")
         pdf.ln(2)
+
+        pdf.set_font("Helvetica", "B", 14); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C")
+        pdf.ln(1)
 
         # Cabecera tabla
         pdf.set_font("Helvetica", "B", 11)
@@ -360,6 +377,9 @@ def render_round(i: int):
         },
     )
 
+    # ---- OPCIÓN PDF: incluir resultados o dejar hueco ----
+    include_results = st.checkbox("Incluir resultados en el PDF", value=True, key=f"pdf_include_results_R{i}")
+
     # ---- DESCARGAS CSV + PDF (misma línea) ----
     export_cols = ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]
     df_export = safe_df[export_cols].copy()
@@ -374,8 +394,8 @@ def render_round(i: int):
     buf_csv = io.StringIO()
     df_export.to_csv(buf_csv, index=False, encoding="utf-8")
 
-    # PDF (ya calculado arriba con build_round_pdf)
-    pdf_bytes = build_round_pdf(i, show_df, cfg)
+    # PDF
+    pdf_bytes = build_round_pdf(i, show_df, cfg, include_results=include_results)
 
     col_csv, col_pdf = st.columns(2)
     with col_csv:
