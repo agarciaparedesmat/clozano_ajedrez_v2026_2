@@ -57,19 +57,15 @@ generadas = len(round_nums)
 total_plan = n
 
 # Chips
-c1, c2, c3 = st.columns([2, 2, 2])
+c1, c2= st.columns([2, 2])
 with c1:
     if ronda_actual is not None:
         st.success(f"⭐ Ronda ACTUAL: **Ronda {ronda_actual}**")
     else:
         st.warning("Sin rondas publicadas.")
 with c2:
-    st.info(f"📣 Publicadas: **{len(publicadas)} / {total_plan}**  ·  🗂️ Generadas: **{generadas}**")
-with c3:
-    try:
-        st.page_link("pages/10_Rondas.py", label="Abrir Rondas", icon="📄")
-    except Exception:
-        pass
+    st.info(f"📣 Publicadas: **{len(publicadas)} / {total_plan}** ")
+
 
 st.divider()
 
