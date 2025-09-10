@@ -135,6 +135,103 @@ for idx, i in enumerate(publicadas):
 
 st.divider()
 
+# ---------- PDF builder ----------
+def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict) -> bytes | None:
+    """
+    Devuelve bytes PDF de la ronda usando reportlab si está disponible,
+    y si no, intenta fpdf2 como fallback. Si no hay ninguna, devuelve None.
+    """
+    # Normalizar datos para la tabla
+    tbl = table_df.copy()
+    # columnas visibles para el PDF
+    tbl = tbl[["mesa", "blancas_nombre", "negras_nombre", "resultado_mostrar"]].copy()
+    tbl = tbl.fillna("")
+
+    # 1) ReportLab
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
+        from reportlab.lib.units import mm
+
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=18*mm, rightMargin=18*mm, topMargin=18*mm, bottomMargin=18*mm)
+
+        styles = getSampleStyleSheet()
+        H = styles["Heading1"]; H.fontSize = 18; H.leading = 22
+        H2 = styles["Heading2"]; H2.fontSize = 16; H2.leading = 20
+        N = styles["Normal"]; N.fontSize = 11; N.leading = 14
+
+        anio = (cfg.get("anio") or "").strip()
+        nivel = (cfg.get("nivel") or "").strip()
+        titulo = f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ"
+        subt = f"RONDA {i}"
+        sub2 = nivel
+
+        story = []
+        story.append(Paragraph(titulo, H))
+        story.append(Paragraph(subt, H2))
+        if sub2:
+            story.append(Paragraph(sub2, N))
+        story.append(Spacer(1, 8))
+
+        data = [["Nº MESA", "BLANCAS", "NEGRAS", "RESULTADO"]] + tbl.values.tolist()
+        t = Table(data, colWidths=[20*mm, 60*mm, 60*mm, 25*mm])
+        t.setStyle(TableStyle([
+            ("FONT", (0,0), (-1,0), "Helvetica-Bold", 11),
+            ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
+            ("ALIGN", (0,0), (0,-1), "CENTER"),
+            ("ALIGN", (3,0), (3,-1), "CENTER"),
+            ("GRID", (0,0), (-1,-1), 0.5, colors.lightgrey),
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ]))
+        story.append(t)
+
+        doc.build(story)
+        return buf.getvalue()
+    except Exception:
+        pass
+
+    # 2) FPDF (fpdf2)
+    try:
+        from fpdf import FPDF
+
+        pdf = FPDF(orientation="P", unit="mm", format="A4")
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=12)
+
+        anio = (cfg.get("anio") or "").strip()
+        nivel = (cfg.get("nivel") or "").strip()
+
+        # Título
+        pdf.set_font("Helvetica", "B", 18)
+        pdf.cell(0, 10, f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", ln=1, align="L")
+        pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, f"RONDA {i}", ln=1, align="L")
+        if nivel:
+            pdf.set_font("Helvetica", "", 12); pdf.cell(0, 7, nivel, ln=1, align="L")
+        pdf.ln(2)
+
+        # Cabecera tabla
+        pdf.set_font("Helvetica", "B", 11)
+        headers = ["Nº MESA", "BLANCAS", "NEGRAS", "RESULTADO"]
+        widths = [20, 75, 75, 20]
+        for h, w in zip(headers, widths):
+            pdf.cell(w, 8, h, border=1, align="C")
+        pdf.ln(8)
+
+        # Filas
+        pdf.set_font("Helvetica", "", 11)
+        for _, row in tbl.iterrows():
+            cells = [str(row["mesa"]), str(row["blancas_nombre"]), str(row["negras_nombre"]), str(row["resultado_mostrar"])]
+            for c, w in zip(cells, widths):
+                pdf.cell(w, 7, c[:60], border=1)  # recorte simple
+            pdf.ln(7)
+
+        return bytes(pdf.output(dest="S"))
+    except Exception:
+        return None
+
 # ---------- render de UNA sola ronda (la seleccionada) ----------
 def render_round(i: int):
     path = round_file(i)
@@ -160,58 +257,83 @@ def render_round(i: int):
     st.markdown(f"### Ronda {i} — {estado}")
     st.caption(f"Archivo: `{path}` · Última modificación: {lm} · Resultados vacíos: {empties}")
 
-    # BYE: badge en línea, sin columna extra
-    bye_mask = (
-        safe_df["negras_id"].astype(str).str.upper().eq("BYE")
-        | safe_df["negras_nombre"].astype(str).str.upper().eq("BYE")
-    )
-    show_df = safe_df.copy()
-    show_df["negras_nombre_show"] = show_df["negras_nombre"].astype(str)
-    show_df.loc[bye_mask, "negras_nombre_show"] = show_df["negras_nombre_show"].replace(
-        {"": "BYE"}
-    )
-    show_df.loc[bye_mask, "negras_nombre_show"] = show_df["negras_nombre_show"] + "  🟨 BYE"
-
-    # ordenar por mesa
+    # ordenar por mesa (para vista y export)
     try:
-        show_df["mesa"] = pd.to_numeric(show_df["mesa"], errors="coerce")
+        safe_df["mesa"] = pd.to_numeric(safe_df["mesa"], errors="coerce")
     except Exception:
         pass
-    show_df = show_df.sort_values(by=["mesa"], na_position="last")
+    safe_df = safe_df.sort_values(by=["mesa"], na_position="last")
 
-    # normalizar resultados para vista
-    show_df["resultado"] = _normalize_result_series(show_df["resultado"])
-    show_df.loc[show_df["resultado"] == "", "resultado"] = "—"
+    # ---- BYE y resultado mostrado (badge en RESULTADO) ----
+    # BYE si aparece en cualquier lado (blancas o negras)
+    bye_mask = (
+        safe_df["blancas_id"].astype(str).str.upper().eq("BYE")
+        | safe_df["blancas_nombre"].astype(str).str.upper().eq("BYE")
+        | safe_df["negras_id"].astype(str).str.upper().eq("BYE")
+        | safe_df["negras_nombre"].astype(str).str.upper().eq("BYE")
+    )
 
+    show_df = safe_df.copy()
+    show_df["resultado_mostrar"] = _normalize_result_series(show_df["resultado"])
+    show_df.loc[show_df["resultado_mostrar"] == "", "resultado_mostrar"] = "—"
+    # Añade el badge BYE al lado del resultado
+    show_df.loc[bye_mask, "resultado_mostrar"] = show_df["resultado_mostrar"] + "  🟨 BYE"
+
+    # normalizar resultados crudos para export
+    safe_df["resultado"] = _normalize_result_series(safe_df["resultado"])
+
+    # ---- TABLA EN PANTALLA (4 columnas limpias) ----
     st.dataframe(
-        show_df[["mesa", "blancas_nombre", "negras_nombre_show", "resultado"]],
+        show_df[["mesa", "blancas_nombre", "negras_nombre", "resultado_mostrar"]],
         use_container_width=True,
         hide_index=True,
         column_config={
             "mesa": st.column_config.NumberColumn("Mesa", help="Número de mesa"),
             "blancas_nombre": st.column_config.TextColumn("Blancas"),
-            "negras_nombre_show": st.column_config.TextColumn("Negras"),
-            "resultado": st.column_config.TextColumn("Resultado"),
+            "negras_nombre": st.column_config.TextColumn("Negras"),
+            "resultado_mostrar": st.column_config.TextColumn("Resultado"),
         },
     )
 
-    # descarga CSV
+    # ---- DESCARGAS CSV + PDF ----
     export_cols = ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]
     df_export = safe_df[export_cols].copy()
+
     nivel_slug = _slugify(cfg.get("nivel", ""))
     anio_slug = _slugify(cfg.get("anio", ""))
-    file_name = f"ronda_{i}_{nivel_slug}_{anio_slug}.csv" if (nivel_slug or anio_slug) else f"ronda_{i}.csv"
+    base = f"ronda_{i}"
+    if nivel_slug or anio_slug:
+        base = f"{base}_{nivel_slug}_{anio_slug}"
 
-    buf = io.StringIO()
-    df_export.to_csv(buf, index=False, encoding="utf-8")
+    # CSV
+    buf_csv = io.StringIO()
+    df_export.to_csv(buf_csv, index=False, encoding="utf-8")
     st.download_button(
         label=f"⬇️ Descargar CSV · Ronda {i}",
-        data=buf.getvalue().encode("utf-8"),
-        file_name=file_name,
+        data=buf_csv.getvalue().encode("utf-8"),
+        file_name=f"{base}.csv",
         mime="text/csv",
         use_container_width=True,
-        key=f"dl_ronda_{i}",
+        key=f"dl_csv_ronda_{i}",
     )
+
+    # PDF
+    pdf_bytes = build_round_pdf(i, show_df, cfg)
+    if pdf_bytes:
+        st.download_button(
+            label=f"📄 Descargar PDF · Ronda {i}",
+            data=pdf_bytes,
+            file_name=f"{base}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key=f"dl_pdf_ronda_{i}",
+        )
+    else:
+        st.info(
+            "Para generar PDF instala **reportlab** o **fpdf2** en `requirements.txt`.\n"
+            "Ejemplo:\n"
+            "`reportlab==4.2.2`"
+        )
 
 # pinta solo la ronda seleccionada
 render_round(sel)
