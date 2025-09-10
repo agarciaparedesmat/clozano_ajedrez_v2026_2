@@ -173,79 +173,122 @@ st.divider()
 # ---------- PDF builder ----------
 def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: bool = True) -> bytes | None:
     """
-    Devuelve bytes PDF de la ronda usando reportlab si está disponible,
-    y si no, intenta fpdf2 como fallback. Si no hay ninguna, devuelve None.
-    include_results=True -> imprime resultado; False -> deja hueco ":".
+    Devuelve bytes PDF de la ronda con estética 'Genially'.
+    - Marco exterior
+    - Bandas de color (verde, melocotón, azul)
+    - Nivel grande + fecha/hora (si están en config.json)
+    - Tabla con cabecera destacada
+    - include_results=False -> imprime ":" en resultado (hueco)
     """
-    # Normalizar datos para la tabla del PDF
     tbl = table_df.copy()
-    tbl = tbl[["mesa", "blancas_nombre", "negras_nombre", "resultado_mostrar"]].copy()
-    tbl = tbl.fillna("")
+    tbl = tbl[["mesa", "blancas_nombre", "negras_nombre", "resultado_mostrar"]].copy().fillna("")
     if not include_results:
-        tbl["resultado_mostrar"] = ":"  # hueco como en tu plantilla
+        tbl["resultado_mostrar"] = ":"
 
-    # 1) ReportLab
     try:
+        # ---------- ReportLab ----------
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
+        )
         from reportlab.lib.units import mm
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import os
 
+        # Paleta aproximada al ejemplo
+        VERDE = colors.HexColor("#d9ead3")
+        MELOCOTON = colors.HexColor("#f7e1d5")
+        AZUL = colors.HexColor("#cfe2f3")
+
+        # Fonts: intentamos Old Standard / Playfair si existen
+        def _register_optional_fonts():
+            base = os.path.join("assets", "fonts")
+            ok = False
+            try:
+                if os.path.exists(os.path.join(base, "OldStandard-Regular.ttf")):
+                    pdfmetrics.registerFont(TTFont("Serif", os.path.join(base, "OldStandard-Regular.ttf")))
+                    pdfmetrics.registerFont(TTFont("Serif-Bold", os.path.join(base, "OldStandard-Bold.ttf")))
+                    ok = True
+                if os.path.exists(os.path.join(base, "PlayfairDisplay-Regular.ttf")):
+                    pdfmetrics.registerFont(TTFont("Display", os.path.join(base, "PlayfairDisplay-Regular.ttf")))
+                    ok = True
+            except Exception:
+                pass
+            return ok
+
+        has_custom = _register_optional_fonts()
+        SERIF = "Serif" if has_custom else "Times-Roman"
+        SERIF_B = "Serif-Bold" if has_custom else "Times-Bold"
+        DISPLAY = "Display" if has_custom else SERIF_B
+
+        # Doc + marco exterior
         buf = io.BytesIO()
-        doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=18*mm, rightMargin=18*mm, topMargin=15*mm, bottomMargin=15*mm)
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            leftMargin=18*mm, rightMargin=18*mm,
+            topMargin=15*mm, bottomMargin=15*mm
+        )
+
+        def _draw_frame(canvas, d):
+            canvas.saveState()
+            canvas.setStrokeColor(colors.black)
+            canvas.setLineWidth(1.0)
+            x = doc.leftMargin - 5*mm
+            y = doc.bottomMargin - 5*mm
+            w = doc.width + 10*mm
+            h = doc.height + 10*mm
+            canvas.rect(x, y, w, h)
+            canvas.restoreState()
 
         styles = getSampleStyleSheet()
-        H = styles["Heading1"]; H.fontSize = 18; H.leading = 22
-        H2 = styles["Heading2"]; H2.fontSize = 26; H2.leading = 30  # RONDA grande
-        N = styles["Normal"];   N.fontSize = 12; N.leading = 14
-
-        # Paleta aproximada de tu ejemplo
-        verde = colors.HexColor("#d9ead3")
-        melocoton = colors.HexColor("#f7e1d5")
-        azul = colors.HexColor("#cfe2f3")
+        H_title = ParagraphStyle("H_title", parent=styles["Normal"], fontName=SERIF_B, fontSize=18, leading=22, alignment=1)
+        H_round = ParagraphStyle("H_round", parent=styles["Normal"], fontName=DISPLAY, fontSize=28, leading=32, alignment=1)
+        N = ParagraphStyle("N", parent=styles["Normal"], fontName=SERIF, fontSize=12, leading=14)
+        L_big = ParagraphStyle("L_big", parent=styles["Normal"], fontName=SERIF_B, fontSize=24, leading=28)
+        R_mid = ParagraphStyle("R_mid", parent=styles["Normal"], fontName=SERIF, fontSize=14, leading=18, alignment=1)
 
         anio = (cfg.get("anio") or "").strip()
         nivel = (cfg.get("nivel") or "").strip()
         linea_fecha = (cfg.get("pdf_fecha") or "").strip()
         linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-        # Banda 1 (verde): TORNEO DE AJEDREZ {anio}
-        band1 = Table([[Paragraph(f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", H)]],
+        # Bandas
+        band1 = Table([[Paragraph(f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", H_title)]],
                       colWidths=[doc.width])
         band1.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,-1), verde),
+            ("BACKGROUND", (0,0), (-1,-1), VERDE),
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
             ("BOTTOMPADDING", (0,0), (-1,-1), 6),
             ("TOPPADDING", (0,0), (-1,-1), 6),
         ]))
 
-        # Banda 2 (melocotón): RONDA {i}
-        band2 = Table([[Paragraph(f"RONDA {i}", H2)]], colWidths=[doc.width])
+        band2 = Table([[Paragraph(f"RONDA {i}", H_round)]], colWidths=[doc.width])
         band2.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,-1), melocoton),
+            ("BACKGROUND", (0,0), (-1,-1), MELOCOTON),
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 10),
-            ("TOPPADDING", (0,0), (-1,-1), 10),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 12),
+            ("TOPPADDING", (0,0), (-1,-1), 12),
         ]))
 
-        # Banda 3 (azul): izquierda NIVEL grande, derecha fecha + hora/aula
         right_text = "<br/>".join([t for t in [linea_fecha, linea_hora] if t])
-        left_par = Paragraph(f"<b>{nivel}</b>" if nivel else "", ParagraphStyle("L", fontSize=24, leading=28))
-        right_par = Paragraph(right_text, ParagraphStyle("R", fontSize=14, leading=18, alignment=1))  # centered
+        left_par = Paragraph(f"{nivel}" if nivel else "", L_big)
+        right_par = Paragraph(right_text, R_mid)
         band3 = Table([[left_par, right_par]], colWidths=[doc.width*0.35, doc.width*0.65])
         band3.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,-1), azul),
+            ("BACKGROUND", (0,0), (-1,-1), AZUL),
             ("BOX", (0,0), (-1,-1), 0.5, colors.black),
             ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
-            ("LEFTPADDING", (0,0), (-1,-1), 8),
-            ("RIGHTPADDING", (0,0), (-1,-1), 8),
+            ("LEFTPADDING", (0,0), (-1,-1), 10),
+            ("RIGHTPADDING", (0,0), (-1,-1), 10),
             ("TOPPADDING", (0,0), (-1,-1), 10),
             ("BOTTOMPADDING", (0,0), (-1,-1), 10),
         ]))
 
-        # Título de sección
-        sec = Table([[Paragraph("<b>Lista de emparejamientos</b>", styles["Title"])]], colWidths=[doc.width])
+        sec = Table([[Paragraph("<b>Lista de emparejamientos</b>", ParagraphStyle("T", fontName=SERIF_B, fontSize=16, leading=20))]],
+                    colWidths=[doc.width])
         sec.setStyle(TableStyle([
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
             ("BOTTOMPADDING", (0,0), (-1,-1), 6),
@@ -256,66 +299,59 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         data = [["Nº MESA", "BLANCAS", "NEGRAS", "RESULTADO"]] + tbl.values.tolist()
         t = Table(data, colWidths=[20*mm, 60*mm, 60*mm, 25*mm])
         t.setStyle(TableStyle([
-            ("FONT", (0,0), (-1,0), "Helvetica-Bold", 11),
+            # cabecera
+            ("FONT", (0,0), (-1,0), SERIF_B, 11),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
             ("ALIGN", (0,0), (0,-1), "CENTER"),
             ("ALIGN", (3,0), (3,-1), "CENTER"),
-            ("GRID", (0,0), (-1,-1), 0.5, colors.lightgrey),
             ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+            # “doble” línea bajo cabecera (grosor mayor)
+            ("LINEBELOW", (0,0), (-1,0), 1.2, colors.black),
+            # grid suave
+            ("GRID", (0,0), (-1,-1), 0.5, colors.lightgrey),
         ]))
 
         story = [band1, band2, band3, Spacer(1, 6), sec, t]
-        doc.build(story)
+        doc.build(story, onFirstPage=_draw_frame, onLaterPages=_draw_frame)
         return buf.getvalue()
+
     except Exception:
-        pass
+        # ---------- FPDF fallback (más simple) ----------
+        try:
+            from fpdf import FPDF
+            pdf = FPDF(orientation="P", unit="mm", format="A4")
+            pdf.add_page()
+            pdf.set_auto_page_break(auto=True, margin=12)
 
-    # 2) FPDF (fallback simplificado)
-    try:
-        from fpdf import FPDF
+            anio = (cfg.get("anio") or "").strip()
+            nivel = (cfg.get("nivel") or "").strip()
+            linea_fecha = (cfg.get("pdf_fecha") or "").strip()
+            linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-        pdf = FPDF(orientation="P", unit="mm", format="A4")
-        pdf.add_page()
-        pdf.set_auto_page_break(auto=True, margin=12)
-
-        anio = (cfg.get("anio") or "").strip()
-        nivel = (cfg.get("nivel") or "").strip()
-        linea_fecha = (cfg.get("pdf_fecha") or "").strip()
-        linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
-
-        # Bandas simples (sin color de fondo complejo en fpdf para mantenerlo ligero)
-        pdf.set_font("Helvetica", "B", 18)
-        pdf.cell(0, 10, f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", ln=1, align="C")
-        pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 10, f"RONDA {i}", ln=1, align="C")
-        if nivel or linea_fecha or linea_hora:
+            # Títulos
+            pdf.set_font("Helvetica", "B", 18); pdf.cell(0, 10, f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", ln=1, align="C")
+            pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 10, f"RONDA {i}", ln=1, align="C")
             pdf.set_font("Helvetica", "", 14)
-            pdf.cell(0, 8, nivel, ln=1, align="L")
-            pdf.cell(0, 7, linea_fecha, ln=1, align="R")
-            pdf.cell(0, 7, linea_hora, ln=1, align="R")
-        pdf.ln(2)
+            if nivel: pdf.cell(0, 8, nivel, ln=1, align="L")
+            if linea_fecha: pdf.cell(0, 7, linea_fecha, ln=1, align="R")
+            if linea_hora:  pdf.cell(0, 7, linea_hora, ln=1, align="R")
+            pdf.ln(2)
+            pdf.set_font("Helvetica", "B", 14); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
 
-        pdf.set_font("Helvetica", "B", 14); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C")
-        pdf.ln(1)
+            # Tabla
+            headers = ["Nº MESA", "BLANCAS", "NEGRAS", "RESULTADO"]; widths = [20, 75, 75, 20]
+            pdf.set_font("Helvetica", "B", 11)
+            for h, w in zip(headers, widths): pdf.cell(w, 8, h, border=1, align="C")
+            pdf.ln(8)
+            pdf.set_font("Helvetica", "", 11)
+            for _, row in tbl.iterrows():
+                cells = [str(row["mesa"]), str(row["blancas_nombre"]), str(row["negras_nombre"]), str(row["resultado_mostrar"])]
+                for c, w in zip(cells, widths): pdf.cell(w, 7, c[:60], border=1)
+                pdf.ln(7)
 
-        # Cabecera tabla
-        pdf.set_font("Helvetica", "B", 11)
-        headers = ["Nº MESA", "BLANCAS", "NEGRAS", "RESULTADO"]
-        widths = [20, 75, 75, 20]
-        for h, w in zip(headers, widths):
-            pdf.cell(w, 8, h, border=1, align="C")
-        pdf.ln(8)
-
-        # Filas
-        pdf.set_font("Helvetica", "", 11)
-        for _, row in tbl.iterrows():
-            cells = [str(row["mesa"]), str(row["blancas_nombre"]), str(row["negras_nombre"]), str(row["resultado_mostrar"])]
-            for c, w in zip(cells, widths):
-                pdf.cell(w, 7, c[:60], border=1)
-            pdf.ln(7)
-
-        return bytes(pdf.output(dest="S"))
-    except Exception:
-        return None
+            return bytes(pdf.output(dest="S"))
+        except Exception:
+            return None
 
 # ---------- render de UNA sola ronda (la seleccionada) ----------
 def render_round(i: int):
