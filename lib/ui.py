@@ -107,19 +107,19 @@ h1, h2, h3 {
 </style>
 """
 
+# lib/ui.py
+import streamlit as st
 
 def inject_base_style(bg_color: str | None = None) -> None:
     """
     Inyecta CSS base (fondo + paleta) para toda la app.
-    Prioridad del modo:
-      1) st.session_state["theme_mode_override"] (conmutador UI)
-      2) config.json -> theme_mode
-      3) "system" por defecto
-    Claves de config.json soportadas:
+    Lee de config.json:
       - theme_mode: "system" | "light" | "dark" | "auto_by_hour"
-      - bg_color (claro) y bg_color_dark (oscuro) -> pueden ser colores o linear-gradient(...)
+      - bg_color (claro) y bg_color_dark (oscuro)
+    Si theme_mode="system", respeta el ajuste del SO (prefers-color-scheme).
+    Si theme_mode="auto_by_hour", usa hora local de Europa/Madrid (20:00–07:59 = oscuro).
     """
-    # Cargar configuración sin dependencias circulares
+    # Cargar configuración sin depender a nivel de módulo (evita ciclos)
     try:
         from lib.tournament import load_config
         cfg = load_config()
@@ -144,12 +144,9 @@ def inject_base_style(bg_color: str | None = None) -> None:
         "border": "rgba(255,255,255,.12)",
     }
 
-    # Modo elegido (override de la UI > config.json > system)
-    mode = (st.session_state.get("theme_mode_override")
-            or cfg.get("theme_mode")
-            or "system").lower()
+    mode = (cfg.get("theme_mode") or "system").lower()
 
-    def _css_vars(p):  # variables CSS para una paleta
+    def _css_vars(p):  # genera bloque :root con variables de una paleta
         return f"""
         :root {{
           --app-bg: {p["bg"]};
@@ -168,16 +165,17 @@ def inject_base_style(bg_color: str | None = None) -> None:
     elif mode == "light":
         css += _css_vars(light)
     elif mode == "auto_by_hour":
+        # Oscuro entre 20:00 y 08:00 en Europa/Madrid
         from datetime import datetime
         try:
-            from zoneinfo import ZoneInfo
+            from zoneinfo import ZoneInfo  # Py3.9+
             hour = datetime.now(ZoneInfo("Europe/Madrid")).hour
         except Exception:
-            hour = datetime.now().hour
+            hour = datetime.now().hour  # Fallback al TZ del servidor
         palette = dark if (hour >= 20 or hour < 8) else light
         css += _css_vars(palette)
     else:
-        # "system": claro por defecto + override si el SO está en dark
+        # "system": claro por defecto + override si el SO/ navegador está en oscuro
         css += _css_vars(light)
         css += f"""
         @media (prefers-color-scheme: dark) {{
@@ -187,10 +185,12 @@ def inject_base_style(bg_color: str | None = None) -> None:
 
     # Estilos comunes
     css += """
+    /* Fondo global + colores de texto/enlaces */
     [data-testid="stAppViewContainer"] { background: var(--app-bg) !important; }
     .stApp, .block-container { color: var(--text); }
     a, .stLinkButton a { color: var(--link) !important; }
 
+    /* Paneles */
     .stButton>button, .stDownloadButton>button,
     .stTextInput>div>div>input, .stSelectbox>div>div>div,
     .stDataFrame, .stDataEditor, .stAlert, .stExpander,
@@ -202,14 +202,17 @@ def inject_base_style(bg_color: str | None = None) -> None:
       border-right: 1px solid var(--border);
     }
 
+    /* Header translúcido */
     [data-testid="stHeader"] {
       background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0)) !important;
       backdrop-filter: blur(6px);
     }
 
+    /* Tablas sencillas tuyas */
     .state-table thead th { background: rgba(115,192,238,0.12); color: var(--text); }
     .state-table tbody td { background: #fff; }
 
+    /* Botones tipo tarjeta (page_link) */
     .stLinkButton { width: 100% !important; }
     .stLinkButton > a {
       display: block !important;
@@ -234,40 +237,6 @@ def inject_base_style(bg_color: str | None = None) -> None:
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
-
-
-def theme_switcher():
-    """
-    Conmutador de tema en la barra lateral.
-    Guarda la elección en st.session_state["theme_mode_override"].
-    Opciones: Claro, Oscuro, Sistema, Según hora.
-    """
-    try:
-        from lib.tournament import load_config
-        cfg = load_config()
-    except Exception:
-        cfg = {}
-
-    default_mode = (cfg.get("theme_mode") or "system").lower()
-    label_to_mode = {
-        "Claro": "light",
-        "Oscuro": "dark",
-        "Sistema": "system",
-        "Según hora": "auto_by_hour",
-    }
-    mode_to_label = {v: k for k, v in label_to_mode.items()}
-
-    current = st.session_state.get("theme_mode_override", default_mode)
-    with st.sidebar:
-        sel = st.radio(
-            "Tema",
-            options=list(label_to_mode.keys()),
-            index=list(label_to_mode.values()).index(current) if current in label_to_mode.values() else 2,
-            help="Puedes forzar claro/oscuro, seguir el sistema o cambiar según hora local (20:00–07:59 oscuro).",
-            horizontal=True,
-            key="theme_switcher_radio",
-        )
-    st.session_state["theme_mode_override"] = label_to_mode[sel]
 
 
 def page_header(title: str, subtitle: str = ""):

@@ -5,8 +5,7 @@ import re
 import streamlit as st
 import pandas as pd
 
-
-from lib.ui import hero_portada, inject_base_style,theme_switcher
+from lib.ui import page_header
 from lib.tournament import (
     DATA_DIR,
     load_config,
@@ -23,9 +22,6 @@ from lib.tournament import (
 def _slugify(s: str) -> str:
     s = re.sub(r"\s+", "_", str(s or "").strip())
     return re.sub(r"[^A-Za-z0-9_\-]+", "", s) or "torneo"
-
-theme_switcher()      # ← primero: guarda/lee la preferencia del usuario
-inject_base_style()
 
 # Cabecera con nivel/año
 cfg = load_config()

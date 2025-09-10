@@ -16,8 +16,7 @@ from lib.tournament import (
     config_path, config_debug,        # <- añadidos
 )
 
-
-from lib.ui import hero_portada, inject_base_style,theme_switcher
+from lib.ui import page_header
 page_header("🛠️ Panel de Administración", "Gestión de rondas, publicación y resultados")
 
 # =========================

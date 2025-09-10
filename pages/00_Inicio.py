@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 
-from lib.ui import hero_portada, inject_base_style,theme_switcher
+from lib.ui import hero_portada, inject_base_style
 
 from lib.tournament import (
     DATA_DIR,
@@ -16,8 +16,6 @@ from lib.tournament import (
 )
 
 st.set_page_config(page_title="Inicio", page_icon="🏠", layout="wide")
-
-theme_switcher()      # ← primero: guarda/lee la preferencia del usuario
 inject_base_style()
 
 # Config y contexto
