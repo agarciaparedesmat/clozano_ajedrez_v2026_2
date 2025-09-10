@@ -20,7 +20,16 @@ from lib.ui import page_header
 from lib.ui import hero_portada, inject_base_style, sidebar_title_and_nav
 
 # NAV personalizada debajo de la cabecera (título + nivel/año)
-sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
+#sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
+sidebar_title_and_nav(
+    extras=True,
+    items=[
+        ("app.py", "🏠 Inicio"),
+        ("pages/10_Rondas.py", "🧩 Rondas"),
+        ("pages/20_Clasificacion.py", "🏆 Clasificación"),
+        ("pages/99_Admin.py", "🛠️ Administración"),
+    ]
+)
 
 page_header("🛠️ Panel de Administración", "Gestión de rondas, publicación y resultados")
  

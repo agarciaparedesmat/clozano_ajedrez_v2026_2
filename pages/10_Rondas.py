@@ -26,7 +26,16 @@ def _slugify(s: str) -> str:
     return re.sub(r"[^A-Za-z0-9_\-]+", "", s) or "torneo"
 
 # NAV personalizada debajo de la cabecera (título + nivel/año)
-sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
+#sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
+sidebar_title_and_nav(
+    extras=True,
+    items=[
+        ("app.py", "🏠 Inicio"),
+        ("pages/10_Rondas.py", "🧩 Rondas"),
+        ("pages/20_Clasificacion.py", "🏆 Clasificación"),
+        ("pages/99_Admin.py", "🛠️ Administración"),
+    ]
+)
 
 # Cabecera con nivel/año
 cfg = load_config()
