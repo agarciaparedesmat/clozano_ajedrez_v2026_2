@@ -171,49 +171,66 @@ def chip(text: str, kind: str = "green"):
 
 
 
-# ui.py  (o lib/ui.py)
-import streamlit as st
-
-def sidebar_title(text: str | None = None, extras: bool = False) -> None:
+def sidebar_title(text: str | None = None, extras: bool = True) -> None:
     """
-    Muestra un título en la barra lateral. Si extras=True, debajo añade
-    '🎓 {nivel} · 📅 {anio}' usando valores de config.json.
+    Dibuja en la barra lateral:
+      1) Título del torneo (de config.json -> "titulo")
+      2) Línea gris: 🎓 {nivel} · 📅 {anio} (si existen)
+      3) Una línea divisoria
+    Y posiciona la navegación automática de Streamlit DEBAJO de esta cabecera.
     """
-    nivel = anio = ""
-    if text is None or extras:
-        try:
-            # Carga perezosa para evitar bucles de importación
-            from lib.tournament import load_config  # usa 'from ui import ...' si tu módulo está en raíz
-        except Exception:
-            # Si el módulo está en raíz (ui.py y tournament.py también en raíz),
-            # descomenta la línea siguiente y comenta la anterior:
-            # from tournament import load_config
-            load_config = None
+    # Cargar configuración (perezosa para evitar ciclos de import)
+    try:
+        from tournament import load_config
+        cfg = load_config()
+    except Exception:
+        cfg = {}
 
-        cfg = load_config() if load_config else {}
-        if text is None:
-            text = (cfg.get("titulo") or "Ajedrez en los recreos").strip()
-        nivel = (cfg.get("nivel") or "").strip()
-        anio  = (cfg.get("anio")  or "").strip()
+    if text is None:
+        text = (cfg.get("titulo") or "Ajedrez en los recreos").strip()
+    nivel = (cfg.get("nivel") or "").strip()
+    anio  = (cfg.get("anio")  or "").strip()
 
-    # Render
+    # CSS: convierte el contenedor de la sidebar en flex-column y reordena:
+    # - nuestra cabecera con clase ._csb_header -> order:1
+    # - la navegación automática [data-testid="stSidebarNav"] -> order:2
+    st.sidebar.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] > div:first-child {
+          display: flex; 
+          flex-direction: column;
+        }
+        ._csb_header { order: 1; }
+        [data-testid="stSidebarNav"] { 
+          order: 2; 
+          margin-top: .4rem; 
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Cabecera (título)
     st.sidebar.markdown(
         f"""
-        <div style="font-weight:800; font-size:1.05rem; line-height:1.2; margin:.25rem 0 .6rem 0;">
+        <div class="_csb_header" style="font-weight:800; font-size:1.05rem; line-height:1.2; margin:.25rem 0 .6rem 0;">
           {text}
         </div>
         """,
         unsafe_allow_html=True,
     )
 
+    # Línea 2 (gris) con nivel/año (si existen)
     if extras and (nivel or anio):
         meta = " · ".join([p for p in [f"🎓 {nivel}" if nivel else "", f"📅 {anio}" if anio else ""] if p])
         st.sidebar.markdown(
-            f"""<div style="color: var(--muted); margin:-.4rem 0 .75rem 0;">{meta}</div>""",
+            f"""<div class="_csb_header" style="color: var(--muted); margin:-.4rem 0 .7rem 0;">{meta}</div>""",
             unsafe_allow_html=True,
         )
 
+    # Separador
     st.sidebar.markdown(
-        """<hr style="margin:.2rem 0 .9rem 0; border:none; border-top:1px solid var(--border);" />""",
+        """<hr class="_csb_header" style="margin:.2rem 0 .9rem 0; border:none; border-top:1px solid var(--border);" />""",
         unsafe_allow_html=True,
     )
