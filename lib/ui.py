@@ -173,101 +173,152 @@ def chip(text: str, kind: str = "green"):
 
 
 # lib/ui.py
-import streamlit as st
+import os, re
 
-def sidebar_title(
+
+def _autodiscover_pages():
+    """
+    Devuelve una lista de (path, label) ordenada:
+      - app.py como Inicio (si existe)
+      - pages/*.py ordenadas por prefijo numérico (00_, 10_, 20_...)
+    El label se deriva del nombre de archivo tras el prefijo.
+    """
+    # Localizar BASE_DIR de forma robusta (lib/ -> padre; si no, actual)
+    CURR = os.path.abspath(os.path.dirname(__file__))
+    BASE = os.path.abspath(os.path.join(CURR, "..")) if os.path.basename(CURR) == "lib" else CURR
+
+    out = []
+
+    # app.py (Inicio)
+    app_py = os.path.join(BASE, "app.py")
+    if os.path.isfile(app_py):
+        out.append(("app.py", "🏠 Inicio"))
+
+    # pages/
+    pages_dir = os.path.join(BASE, "pages")
+    if os.path.isdir(pages_dir):
+        items = []
+        for fn in os.listdir(pages_dir):
+            if not fn.endswith(".py"):
+                continue
+            order = 9999
+            m = re.match(r"^(\d+)_", fn)
+            if m:
+                try:
+                    order = int(m.group(1))
+                except Exception:
+                    order = 9999
+            # Label desde el nombre de archivo (conserva emojis si los hay)
+            base = os.path.splitext(fn)[0]
+            if "_" in base:
+                base = base.split("_", 1)[1]  # quita prefijo numérico
+            label = base.replace("_", " ")
+            items.append((order, os.path.join("pages", fn), label))
+        items.sort(key=lambda t: (t[0], t[2].lower()))
+        out.extend([(path, label) for _, path, label in items])
+
+    return out
+
+def _safe_page_link(path: str, label: str, key: str):
+    "Usa page_link; si no está disponible (versiones antiguas), cae a button + switch_page."
+    try:
+        st.sidebar.page_link(path, label=label, key=key)
+    except Exception:
+        if st.sidebar.button(label, key="btn_"+key, use_container_width=True):
+            try:
+                st.switch_page(path)
+            except Exception:
+                st.warning("No se pudo cambiar de página automáticamente. Usa la barra lateral por defecto.")
+
+def sidebar_title_and_nav(
     text: str | None = None,
     extras: bool = True,
-    hide_nav_header: bool = True,
-    pull_up_px: int = 14,  # cuánto “subir” la nav para cerrar el hueco
-) -> None:
+    items: list[tuple[str, str]] | None = None,
+):
     """
-    Cabecera compacta en la barra lateral + navegación automática justo debajo.
-    - hide_nav_header=True  -> oculta el título 'app' de la nav
-    - hide_nav_header=False -> lo muestra pero compacto
-    - pull_up_px: tras compactar, desplaza la nav hacia arriba para cerrar
-      cualquier espacio residual (por si hay wrappers con padding no controlable).
+    Barra lateral compacta + NAV personalizada (oculta la nav automática de Streamlit).
+
+    - text: título (si None, se usa cfg['titulo'])
+    - extras: muestra bajo el título: '🎓 nivel · 📅 año' si existen en config.json
+    - items: lista opcional [(path, label), ...]. Si None, se autodetecta desde 'pages/' y 'app.py'.
+             Ejemplo de items manual:
+               [("app.py","🏠 Inicio"),
+                ("pages/10_Rondas.py","🧩 Rondas"),
+                ("pages/20_Clasificacion.py","🏆 Clasificación"),
+                ("pages/99_Admin.py","🛠️ Administración")]
     """
-    # Cargar cfg (sirve lib/ o raíz)
+    # Ocultar navegación automática (para no duplicar)
+    st.sidebar.markdown(
+        "<style>[data-testid='stSidebarNav']{display:none!important;}</style>",
+        unsafe_allow_html=True,
+    )
+
+    # Cargar cfg perezosamente
     try:
         from lib.tournament import load_config
+        cfg = load_config()
     except Exception:
         try:
             from tournament import load_config
+            cfg = load_config()
         except Exception:
-            load_config = None
-    cfg = load_config() if load_config else {}
+            cfg = {}
 
     if text is None:
         text = (cfg.get("titulo") or "Ajedrez en los recreos").strip()
     nivel = (cfg.get("nivel") or "").strip()
     anio  = (cfg.get("anio")  or "").strip()
 
-    nav_header_rule = (
-        """
-        /* Ocultar encabezado de nav */
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] > div:first-child { display: none !important; }
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] :is(h1,h2,h3,p,div[role="heading"]) { display: none !important; }
-        """
-        if hide_nav_header else
-        """
-        /* Mostrar encabezado de nav pero MUY compacto */
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] > div:first-child {
-          display: block !important; margin: .05rem 0 !important; padding: 0 !important;
-        }
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] :is(h1,h2,h3,p,div[role="heading"]) {
-          display: block !important; margin: .05rem 0 !important; padding: 0 !important;
-          line-height: 1.1 !important; font-size: .90rem !important; opacity: .75;
-        }
-        """
-    )
-
+    # CSS: compactar espacios en la sidebar y estilizar los enlaces custom
     st.sidebar.markdown(
-        f"""
+        """
         <style>
-        /* --- Compactar TODAS las capas conocidas de la sidebar --- */
-        section[data-testid="stSidebar"] {{
-          padding-top: 0 !important; margin-top: 0 !important;
-        }}
-        section[data-testid="stSidebar"] > div:first-child {{
-          display: flex !important; flex-direction: column !important;
-          gap: 0 !important; padding-top: 0 !important; margin-top: 0 !important;
-        }}
-        section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
-          margin-top: 0 !important; padding-top: 0 !important;
-        }}
-        section[data-testid="stSidebar"] .block-container {{
-          padding-top: 0 !important; margin-top: 0 !important;
-        }}
-        section[data-testid="stSidebar"] .stVerticalBlock {{
-          margin-top: 0 !important; padding-top: 0 !important;
-        }}
+        section[data-testid="stSidebar"] { padding-top: 0 !important; }
+        section[data-testid="stSidebar"] > div:first-child {
+          display: flex; flex-direction: column; gap: .1rem !important; padding-top: .1rem !important;
+        }
+        ._csb_title { margin: .05rem 0 0 0 !important; font-weight: 800; font-size: 1.05rem; line-height: 1.2; }
+        ._csb_meta  { margin: 0 0 .15rem 0 !important; color: var(--muted); }
+        ._csb_sep   { border: none; border-top: 1px solid rgba(36,32,36,.25);
+                      margin: .10rem 0 .10rem 0 !important; opacity: 1; }
 
-        /* --- Navegación automática --- */
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {{
-          order: 2;
-          margin: 0 !important; padding: 0 !important;
-          transform: translateY(-{pull_up_px}px) !important;  /* << empuja hacia arriba */
-        }}
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] ul {{
-          margin: .05rem 0 0 0 !important; padding-left: .35rem !important;
-        }}
-
-        {nav_header_rule}
-
-        /* --- Nuestra cabecera (título + meta + separador) --- */
-        ._csb_title {{ margin: 0 0 .10rem 0 !important; font-weight: 800; font-size: 1.05rem; line-height: 1.2; }}
-        ._csb_meta  {{ margin: 0 0 .10rem 0 !important; color: var(--muted); }}
-        ._csb_sep   {{ border: none; border-top: 1px solid rgba(36,32,36,.25);
-                       margin: .05rem 0 .10rem 0 !important; opacity: 1; }}
+        /* Enlaces de la nav propia: aspecto consistente con tu estilo */
+        ._nav_list a, ._nav_list button {
+          display: block !important;
+          width: 100% !important;
+          text-align: left !important;
+          text-decoration: none !important;
+          color: var(--text) !important;
+          background: transparent !important;
+          border: none !important;
+          padding: .35rem .2rem !important;
+          border-radius: 8px !important;
+          font-weight: 600 !important;
+        }
+        ._nav_list a:hover, ._nav_list button:hover {
+          background: rgba(36,32,36,.06) !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    # Render cabecera
+    # Cabecera
     st.sidebar.markdown(f'<div class="_csb_title">{text}</div>', unsafe_allow_html=True)
     if extras and (nivel or anio):
         meta = " · ".join([p for p in [f"🎓 {nivel}" if nivel else "", f"📅 {anio}" if anio else ""] if p])
         st.sidebar.markdown(f'<div class="_csb_meta">{meta}</div>', unsafe_allow_html=True)
     st.sidebar.markdown('<hr class="_csb_sep" />', unsafe_allow_html=True)
+
+    # Navegación propia
+    st.sidebar.markdown("<div class=\"_nav_list\">", unsafe_allow_html=True)
+    if items is None:
+        items = _autodiscover_pages()
+    # Evitar duplicados triviales y respetar orden
+    seen = set()
+    for i, (path, label) in enumerate(items):
+        if (path, label) in seen:
+            continue
+        seen.add((path, label))
+        _safe_page_link(path, label, key=f"nav_{i}")
+    st.sidebar.markdown("</div>", unsafe_allow_html=True)

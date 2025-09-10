@@ -17,7 +17,8 @@ from lib.tournament import (
 st.set_page_config(page_title="Inicio", page_icon="♟️", layout="wide")
 inject_base_style()  # ← NUEVO: aplica el bg_color de config.json en la raíz
 
-sidebar_title(extras=True, hide_nav_header=False, pull_up_px=14)  # prueba 10–18 px según veas
+# NAV personalizada debajo de la cabecera (título + nivel/año)
+sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
 
 # Config y contexto
 cfg = load_config()
