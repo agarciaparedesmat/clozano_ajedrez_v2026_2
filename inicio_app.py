@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 
-from lib.ui import hero_portada, inject_base_style, sidebar_title
+from lib.ui import hero_portada, inject_base_style, sidebar_title_and_nav
 from lib.tournament import (
     DATA_DIR,
     load_config,
