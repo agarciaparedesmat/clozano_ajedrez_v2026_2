@@ -172,7 +172,6 @@ st.divider()
 
 # ---------- PDF builder ----------
 
-
 def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: bool = True) -> bytes | None:
     """
     PDF estilo 'Genially':
@@ -394,7 +393,8 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             return bytes(pdf.output(dest="S"))
         except Exception:
             return None
---------- render de UNA sola ronda (la seleccionada) ----------
+
+#--------- render de UNA sola ronda (la seleccionada) ----------
 def render_round(i: int):
     path = round_file(i)
     df = read_csv_safe(path)
