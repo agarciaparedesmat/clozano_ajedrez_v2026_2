@@ -1,10 +1,13 @@
 
 import streamlit as st
-from lib.tournament import load_config
-from lib.ui import inject_base_style  # ← NUEVO
+from lib.tournament import load_config, format_with_cfg
+from lib.ui import inject_base_style, hero_portada, sidebar_title  # ← añade sidebar_title
 
 st.set_page_config(page_title="Ajedrez en los recreos", page_icon="♟️", layout="wide")
 
+
+# ← NUEVO: título en la barra lateral
+sidebar_title()
 inject_base_style()  # ← NUEVO: aplica el bg_color de config.json en la raíz
 
 cfg = load_config()

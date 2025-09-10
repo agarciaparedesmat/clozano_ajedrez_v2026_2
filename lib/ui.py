@@ -168,3 +168,28 @@ def hero_portada(title: str, subtitle: str = ""):
 def chip(text: str, kind: str = "green"):
     kind = kind if kind in ("green","yellow","red") else "green"
     st.markdown(f"<span class='app-chip {kind}'>{text}</span>", unsafe_allow_html=True)
+
+
+
+def sidebar_title(text: str | None = None) -> None:
+    """
+    Muestra un título en la barra lateral. Si no se pasa texto,
+    usa cfg['titulo'] desde config.json.
+    """
+    if text is None:
+        try:
+            from lib.tournament import load_config
+            cfg = load_config()
+            text = (cfg.get("titulo") or "Ajedrez en los recreos").strip()
+        except Exception:
+            text = "Ajedrez en los recreos"
+    # Estilo compacto y consistente
+    st.sidebar.markdown(
+        f"""
+        <div style="font-weight:800; font-size:1.05rem; line-height:1.2; margin:.25rem 0 .6rem 0;">
+          {text}
+        </div>
+        <hr style="margin:.2rem 0 .9rem 0; border:none; border-top:1px solid var(--border);" />
+        """,
+        unsafe_allow_html=True,
+    )
