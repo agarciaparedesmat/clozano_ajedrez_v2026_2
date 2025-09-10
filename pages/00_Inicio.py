@@ -83,8 +83,8 @@ st.markdown(
   <thead>
     <tr>
       <th>⭐ Ronda ACTUAL</th>
-      <th>🕒 Última actualización</th>
       <th>🧭 Plan de rondas</th>
+      <th>🕒 Última actualización</th>
       <th>🎓 Nivel</th>
       <th>📅 Año</th>
     </tr>
@@ -92,8 +92,8 @@ st.markdown(
   <tbody>
     <tr>
       <td>{ronda_actual if ronda_actual is not None else "—"}</td>
-      <td>{last_mod}</td>
       <td>{n_plan}</td>
+      <td>{last_mod}</td>
       <td>{nivel}</td>
       <td>{anio}</td>
     </tr>
