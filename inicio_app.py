@@ -16,7 +16,7 @@ from lib.tournament import (
 
 st.set_page_config(page_title="Inicio", page_icon="♟️", layout="wide")
 inject_base_style()  # ← NUEVO: aplica el bg_color de config.json en la raíz
-sidebar_title(extras=True)  
+sidebar_title(extras=True, hide_nav_header=True)  # ← así quitas de raíz el hueco del “app”
 
 # Config y contexto
 cfg = load_config()
