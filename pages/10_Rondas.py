@@ -58,7 +58,7 @@ with c1:
     else:
         st.warning("Sin rondas publicadas.")
 with c2:
-    st.info(f"📣 Publicadas: **{len(publicadas)} / {total_plan}**  ·  🗂️ Generadas: **{generadas}**")
+    st.info(f"📣 Publicadas: **{len(publicadas)} / {total_plan}**")
 with c3:
     try:
         st.page_link("pages/20_Clasificacion.py", label="Abrir Clasificación", icon="🏆")
