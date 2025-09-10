@@ -26,7 +26,7 @@ sidebar_title(extras=True)
 
 # Cabecera con nivel/año
 cfg = load_config()
-page_header(format_with_cfg("Clasificación — {nivel}", cfg), format_with_cfg("Curso {anio} · Solo rondas publicadas", cfg))
+page_header(format_with_cfg("🏆 Clasificación — {nivel}", cfg), format_with_cfg("Curso {anio} · Solo rondas publicadas", cfg))
 
 # Helpers
 def slugify(s: str) -> str:
