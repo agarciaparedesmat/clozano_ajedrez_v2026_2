@@ -71,12 +71,17 @@ st.markdown(TABLE_CSS, unsafe_allow_html=True)
 
 st.markdown(
     f"""
+    
+# dentro de <tr> se pueden añadir 
+#      <th>📣 Publicadas</th>
+#      <th>🗂️ Generadas</th>
+#      <td>{pub_cnt}</td>
+#      <td>{generadas}</td>
+
 <div class="state-wrap">
 <table class="state-table">
   <thead>
     <tr>
-#      <th>📣 Publicadas</th>
-#      <th>🗂️ Generadas</th>
       <th>⭐ Ronda ACTUAL</th>
       <th>🕒 Última actualización</th>
       <th>🧭 Plan de rondas</th>
@@ -86,8 +91,6 @@ st.markdown(
   </thead>
   <tbody>
     <tr>
-#      <td>{pub_cnt}</td>
-#      <td>{generadas}</td>
       <td>{ronda_actual if ronda_actual is not None else "—"}</td>
       <td>{last_mod}</td>
       <td>{n_plan}</td>
