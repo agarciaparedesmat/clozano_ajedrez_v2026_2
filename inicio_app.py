@@ -18,7 +18,16 @@ st.set_page_config(page_title="Inicio", page_icon="♟️", layout="wide")
 inject_base_style()  # ← NUEVO: aplica el bg_color de config.json en la raíz
 
 # NAV personalizada debajo de la cabecera (título + nivel/año)
-sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
+#sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
+sidebar_title_and_nav(
+    extras=True,
+    items=[
+        ("Inicio_app.py", "♟️ Inicio"),
+        ("pages/10_Rondas.py", "🧩 Rondas"),
+        ("pages/20_Clasificacion.py", "🏆 Clasificación"),
+        ("pages/99_Administración.py", "🛠️ Administración")
+    ]
+)
 
 # Config y contexto
 cfg = load_config()
