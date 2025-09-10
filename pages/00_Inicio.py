@@ -14,7 +14,7 @@ from lib.tournament import (
     format_with_cfg,
 )
 
-st.set_page_config(page_title="Inicio", page_icon="🏠", layout="wide")
+st.set_page_config(page_title="Inicio", page_icon="♟️", layout="wide")
 inject_base_style()  # ← NUEVO: aplica el bg_color de config.json en la raíz
 sidebar_title(extras=True)  
 
@@ -28,7 +28,7 @@ n_plan = planned_rounds(cfg, JUG_PATH)
 
 # Portada (hero con nivel/año)
 hero_portada(
-    format_with_cfg("{titulo} — {nivel}", cfg),
+    format_with_cfg("♟️ {titulo} — {nivel}", cfg),
     format_with_cfg("Curso {anio} — Consulta rondas, resultados y clasificación en tiempo real.", cfg)
 )
 
