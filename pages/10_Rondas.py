@@ -69,34 +69,49 @@ if not publicadas:
 
 ronda_actual = max(publicadas)
 
-# valor por defecto del selector = ronda actual (o lo que hubiera en session_state si es válida)
-default_round = st.session_state.get("rondas_view_select", ronda_actual)
-if default_round not in publicadas:
-    default_round = ronda_actual
-st.session_state["rondas_view_select"] = default_round
+# ---------- estado inicial seguro ----------
+if "rondas_view_select" not in st.session_state:
+    st.session_state["rondas_view_select"] = ronda_actual
+
+# Si algún botón ha pedido salto, aplícalo ANTES de crear el selectbox
+jump_to = st.session_state.pop("rondas_jump_to", None)
+if isinstance(jump_to, int) and jump_to in publicadas:
+    st.session_state["rondas_view_select"] = jump_to
+
+# Si el valor guardado ya no es válido (p.ej., cambios en publicadas), corrígelo
+if st.session_state["rondas_view_select"] not in publicadas:
+    st.session_state["rondas_view_select"] = ronda_actual
 
 # ---------- selector + botonera numérica ----------
-sel_col = st.columns([1])[0]
-sel = sel_col.selectbox(
+current_round = st.session_state["rondas_view_select"]
+sel = st.selectbox(
     "Ver ronda publicada",
     options=publicadas,
-    index=publicadas.index(default_round),
+    index=publicadas.index(current_round),
     format_func=lambda i: f"Ronda {i}",
     key="rondas_view_select",
 )
 
-# Botonera con números de ronda (chips). Al pulsar, cambia la ronda y rerun.
 st.caption("Ir directo a…")
 per_row = min(len(publicadas), 10)  # hasta 10 por fila
 cols = st.columns(per_row)
+
+def _request_jump(i: int):
+    # Callback seguro: no toca el key del widget directamente
+    st.session_state["rondas_jump_to"] = int(i)
+
 for idx, i in enumerate(publicadas):
     c = cols[idx % per_row]
     label = f"{i}"
     is_active = (i == sel)
-    # estilo simple con ancho completo en la columna
-    if c.button(label if not is_active else f"✓ {label}", key=f"chip_R{i}", use_container_width=True):
-        st.session_state["rondas_view_select"] = i
-        st.experimental_rerun()
+    # Chip: si es la seleccionada, marca ✓
+    c.button(
+        label if not is_active else f"✓ {label}",
+        key=f"chip_R{i}",
+        use_container_width=True,
+        on_click=_request_jump,
+        args=(i,),
+    )
     # nueva fila cada 'per_row' elementos
     if (idx + 1) % per_row == 0 and (idx + 1) < len(publicadas):
         cols = st.columns(min(per_row, len(publicadas) - (idx + 1)))
