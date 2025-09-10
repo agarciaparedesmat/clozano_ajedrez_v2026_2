@@ -21,26 +21,50 @@ from lib.tournament import (
 st.set_page_config(page_title="Rondas", page_icon="🧩", layout="wide")
 inject_base_style()
 
-st.markdown("""
+# —— Selector de ronda con color fuerte (elige tema: "blue" | "green" | "amber")
+THEME = "amber"  # ← cámbialo aquí si quieres
+
+_palette = {
+    "blue": {
+        "bg": "#DCEBFF", "hover": "#E9F2FF",
+        "border": "#1D4ED8", "border_hover": "#1743BD",
+        "icon": "#1743BD", "ring": "rgba(29,78,216,.25)", "text": "#0B3B8F"
+    },
+    "green": {
+        "bg": "#E6F6EA", "hover": "#EEF9F1",
+        "border": "#16A34A", "border_hover": "#14833F",
+        "icon": "#14833F", "ring": "rgba(22,163,74,.25)", "text": "#0F5132"
+    },
+    "amber": {
+        "bg": "#FFF1D6", "hover": "#FFF6E6",
+        "border": "#D97706", "border_hover": "#B75E03",
+        "icon": "#B75E03", "ring": "rgba(217,119,6,.25)", "text": "#8A4B00"
+    },
+}
+c = _palette.get(THEME, _palette["blue"])
+
+st.markdown(f"""
 <style>
-/* Rondas: estilizar TODOS los selectbox de esta página */
-[data-testid="stSelectbox"] div[role="combobox"] {
-  background: #EAF3FF !important;          /* azul suave */
-  border: 1.5px solid #5AA7E6 !important;   /* borde azul */
+/* SOLO selectbox de esta página */
+[data-testid="stSelectbox"] div[role="combobox"] {{
+  background: {c['bg']} !important;
+  border: 2px solid {c['border']} !important;
   border-radius: 12px !important;
-  padding: 2px 6px !important;
+  padding: 2px 8px !important;
   transition: all .15s ease-in-out;
-}
-[data-testid="stSelectbox"] div[role="combobox"]:hover {
-  background: #F4F9FF !important;
-  border-color: #1D6FD1 !important;
-}
-[data-testid="stSelectbox"] div[role="combobox"]:focus-within {
-  box-shadow: 0 0 0 3px rgba(29,111,209,.18) !important; /* anillo de foco */
-}
-[data-testid="stSelectbox"] svg {
-  color: #1D6FD1 !important;  /* color de la flecha */
-}
+  color: {c['text']} !important;
+  font-weight: 700 !important;
+}}
+[data-testid="stSelectbox"] div[role="combobox"]:hover {{
+  background: {c['hover']} !important;
+  border-color: {c['border_hover']} !important;
+}}
+[data-testid="stSelectbox"] div[role="combobox"]:focus-within {{
+  box-shadow: 0 0 0 3px {c['ring']} !important;
+}}
+[data-testid="stSelectbox"] svg {{
+  color: {c['icon']} !important;
+}}
 </style>
 """, unsafe_allow_html=True)
 
