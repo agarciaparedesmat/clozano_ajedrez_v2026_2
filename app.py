@@ -1,6 +1,7 @@
 
 import streamlit as st
 from lib.tournament import load_config
+from lib.ui import hero_portada, inject_base_style
 
 st.set_page_config(page_title="Ajedrez en los recreos", page_icon="♟️", layout="wide")
 
