@@ -23,23 +23,23 @@ inject_base_style()
 
 st.markdown("""
 <style>
-/* Estilo del select de rondas (solo el que está dentro de .rondas-select) */
-.rondas-select [data-testid="stSelectbox"] > div > div {
-  background: #EAF3FF !important;          /* azul muy suave */
+/* Rondas: estilizar TODOS los selectbox de esta página */
+[data-testid="stSelectbox"] div[role="combobox"] {
+  background: #EAF3FF !important;          /* azul suave */
   border: 1.5px solid #5AA7E6 !important;   /* borde azul */
   border-radius: 12px !important;
   padding: 2px 6px !important;
   transition: all .15s ease-in-out;
 }
-.rondas-select [data-testid="stSelectbox"] svg {
-  color: #1D6FD1 !important;                /* color del icono (flecha) */
-}
-.rondas-select [data-testid="stSelectbox"] > div > div:hover {
+[data-testid="stSelectbox"] div[role="combobox"]:hover {
   background: #F4F9FF !important;
   border-color: #1D6FD1 !important;
 }
-.rondas-select [data-testid="stSelectbox"] > div > div:focus-within {
-  box-shadow: 0 0 0 3px rgba(29, 111, 209, .18) !important; /* anillo de foco */
+[data-testid="stSelectbox"] div[role="combobox"]:focus-within {
+  box-shadow: 0 0 0 3px rgba(29,111,209,.18) !important; /* anillo de foco */
+}
+[data-testid="stSelectbox"] svg {
+  color: #1D6FD1 !important;  /* color de la flecha */
 }
 </style>
 """, unsafe_allow_html=True)
