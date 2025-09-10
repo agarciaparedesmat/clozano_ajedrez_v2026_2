@@ -30,7 +30,7 @@ def _slugify(s: str) -> str:
 sidebar_title_and_nav(
     extras=True,
     items=[
-        ("Inicio_app.py", "♟️ Inicio"),
+        ("app.py", "♟️ Inicio"),
         ("pages/10_Rondas.py", "🧩 Rondas"),
         ("pages/20_Clasificacion.py", "🏆 Clasificación"),
         ("pages/99_Administracion.py", "🛠️ Administración")
