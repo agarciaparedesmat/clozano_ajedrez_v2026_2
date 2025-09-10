@@ -69,14 +69,14 @@ TABLE_CSS = """
 """
 st.markdown(TABLE_CSS, unsafe_allow_html=True)
 
-st.markdown(
-    f"""
-    
-# dentro de <tr> se pueden añadir 
+# dentro de la siguiente tabla se pueden añadir 
 #      <th>📣 Publicadas</th>
 #      <th>🗂️ Generadas</th>
 #      <td>{pub_cnt}</td>
 #      <td>{generadas}</td>
+
+st.markdown(
+    f"""
 
 <div class="state-wrap">
 <table class="state-table">
