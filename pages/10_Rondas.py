@@ -33,7 +33,7 @@ sidebar_title_and_nav(
         ("Inicio_app.py", "♟️ Inicio"),
         ("pages/10_Rondas.py", "🧩 Rondas"),
         ("pages/20_Clasificacion.py", "🏆 Clasificación"),
-        ("pages/99_Administración.py", "🛠️ Administración")
+        ("pages/99_Administracion.py", "🛠️ Administración")
     ]
 )
 
