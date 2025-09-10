@@ -156,4 +156,4 @@ with c1:
 with c2:
     card_page("🏆", "Clasificación — {nivel}", "Clasificación actual del torneo .", "pages/20_Clasificacion.py", "clas")
 with c3:
-    card_page("🛠️", "Administración — {nivel}", "Generar rondas, publicar, despublicar, eliminar y editar resultados y .", "pages/99_Admin.py", "admin")
+    card_page("🛠️", "Administración — {nivel}", "Gestión de rondas (generar, publicar, despublicar, eliminar) y editar resultados.", "pages/99_Admin.py", "admin")
