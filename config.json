@@ -14,5 +14,6 @@
     "1ESO": "",
     "2-3ESO": "",
     "4ESO-BACH": ""
-  }
+  },
+  "bg_color": "linear-gradient(180deg,#f9f7f3,#f1efe8)"
 }

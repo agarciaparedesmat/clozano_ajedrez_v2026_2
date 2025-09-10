@@ -107,8 +107,47 @@ h1, h2, h3 {
 </style>
 """
 
-def inject_base_style():
-    st.markdown(_BASE_CSS, unsafe_allow_html=True)
+def inject_base_style(bg_color: str | None = None) -> None:
+    """
+    Inyecta CSS base para toda la app, incluyendo:
+      - color de fondo global (o gradient) tomado de config.json (clave 'bg_color')
+      - header con leve degradado y blur
+      - pequeños ajustes de padding
+    Puedes forzar un color pasando bg_color="...".
+    """
+    if bg_color is None:
+        try:
+            # Importamos aquí para evitar dependencias circulares a nivel de módulo
+            from lib.tournament import load_config
+            cfg = load_config()
+            bg_color = (cfg.get("bg_color") or "#F7F5F0").strip()
+        except Exception:
+            bg_color = "#F7F5F0"
+
+    css = f"""
+    <style>
+    :root {{
+      --app-bg: {bg_color};
+    }}
+    /* Área principal */
+    [data-testid="stAppViewContainer"] {{
+      background: var(--app-bg) !important;
+    }}
+    /* Header translúcido */
+    [data-testid="stHeader"] {{
+      background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0)) !important;
+      backdrop-filter: blur(6px);
+    }}
+    /* Un poco de aire en el contenido */
+    .block-container {{
+      padding-top: 1.2rem;
+      padding-bottom: 2rem;
+    }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+
 
 def page_header(title: str, subtitle: str = ""):
     inject_base_style()
