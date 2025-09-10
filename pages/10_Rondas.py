@@ -21,7 +21,7 @@ from lib.tournament import (
 st.set_page_config(page_title="Rondas", page_icon="🧩", layout="wide")
 inject_base_style()
 
-# NAV personalizada (debajo del título lateral)
+# NAV (personalizada) bajo cabecera lateral
 sidebar_title_and_nav(
     extras=True,
     items=[
@@ -69,33 +69,37 @@ if not publicadas:
 
 ronda_actual = max(publicadas)
 
-# ---------- selector: solo publicadas ----------
-opt = publicadas
-# índice por defecto = ronda actual
-try:
-    default_idx = opt.index(ronda_actual)
-except ValueError:
-    default_idx = len(opt) - 1
+# valor por defecto del selector = ronda actual (o lo que hubiera en session_state si es válida)
+default_round = st.session_state.get("rondas_view_select", ronda_actual)
+if default_round not in publicadas:
+    default_round = ronda_actual
+st.session_state["rondas_view_select"] = default_round
 
-sel_col, prev_col, next_col = st.columns([3, 1, 1])
-with sel_col:
-    sel = st.selectbox(
-        "Ver ronda publicada",
-        options=opt,
-        index=default_idx,
-        format_func=lambda i: f"Ronda {i}",
-        key="rondas_view_select",
-    )
-with prev_col:
-    if st.button("◀︎ Anterior", use_container_width=True, disabled=(sel == opt[0])):
-        new_idx = max(0, opt.index(sel) - 1)
-        st.session_state["rondas_view_select"] = opt[new_idx]
+# ---------- selector + botonera numérica ----------
+sel_col = st.columns([1])[0]
+sel = sel_col.selectbox(
+    "Ver ronda publicada",
+    options=publicadas,
+    index=publicadas.index(default_round),
+    format_func=lambda i: f"Ronda {i}",
+    key="rondas_view_select",
+)
+
+# Botonera con números de ronda (chips). Al pulsar, cambia la ronda y rerun.
+st.caption("Ir directo a…")
+per_row = min(len(publicadas), 10)  # hasta 10 por fila
+cols = st.columns(per_row)
+for idx, i in enumerate(publicadas):
+    c = cols[idx % per_row]
+    label = f"{i}"
+    is_active = (i == sel)
+    # estilo simple con ancho completo en la columna
+    if c.button(label if not is_active else f"✓ {label}", key=f"chip_R{i}", use_container_width=True):
+        st.session_state["rondas_view_select"] = i
         st.experimental_rerun()
-with next_col:
-    if st.button("Siguiente ▶︎", use_container_width=True, disabled=(sel == opt[-1])):
-        new_idx = min(len(opt) - 1, opt.index(sel) + 1)
-        st.session_state["rondas_view_select"] = opt[new_idx]
-        st.experimental_rerun()
+    # nueva fila cada 'per_row' elementos
+    if (idx + 1) % per_row == 0 and (idx + 1) < len(publicadas):
+        cols = st.columns(min(per_row, len(publicadas) - (idx + 1)))
 
 st.divider()
 
@@ -177,6 +181,5 @@ def render_round(i: int):
 # pinta solo la ronda seleccionada
 render_round(sel)
 
-# pie
 st.divider()
 st.caption(format_with_cfg("Vista pública de emparejamientos y resultados — {nivel} ({anio})", cfg))
