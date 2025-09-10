@@ -20,72 +20,68 @@ from lib.tournament import (
     format_with_cfg,
 )
 
-# --- helper para nombres de archivo ---
+# --- helper para nombres de archivo en descargas ---
 def _slugify(s: str) -> str:
     s = re.sub(r"\s+", "_", str(s or "").strip())
     return re.sub(r"[^A-Za-z0-9_\-]+", "", s) or "torneo"
 
 # NAV personalizada debajo de la cabecera (título + nivel/año)
-#sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
 sidebar_title_and_nav(
     extras=True,
     items=[
         ("app.py", "♟️ Inicio"),
         ("pages/10_Rondas.py", "🧩 Rondas"),
         ("pages/20_Clasificacion.py", "🏆 Clasificación"),
-        ("pages/99_Administracion.py", "🛠️ Administración")
-    ]
+        ("pages/99_Administracion.py", "🛠️ Administración"),
+    ],
 )
 
 # Cabecera con nivel/año
 cfg = load_config()
 page_header(
     format_with_cfg("🧩 Rondas — {nivel}", cfg),
-    format_with_cfg("Curso {anio} · Emparejamientos y resultados", cfg)
+    format_with_cfg("Curso {anio} · Emparejamientos y resultados (solo PUBLICADAS)", cfg),
 )
 
 # Nº de rondas planificado (auto o fijo)
 JUG_PATH = f"{DATA_DIR}/jugadores.csv"
-n = planned_rounds(cfg, JUG_PATH)
+n_plan = planned_rounds(cfg, JUG_PATH)
 
 # Cargar rondas existentes
-round_nums = list_round_files(n)
-if not round_nums:
-    st.info("Aún no hay rondas generadas.")
-    st.stop()
-round_nums = sorted(round_nums)
+round_nums = sorted(list_round_files(n_plan))
 
+# Filtrar SOLO publicadas
 publicadas = [i for i in round_nums if is_published(i)]
-ronda_actual = max(publicadas) if publicadas else None
-generadas = len(round_nums)
-total_plan = n
+if not publicadas:
+    st.info("Aún no hay **rondas publicadas**.")
+    st.stop()
 
-# Chips
+ronda_actual = max(publicadas)
+total_plan = n_plan
+
+# Chips de estado
 c1, c2 = st.columns([2, 2])
 with c1:
-    if ronda_actual is not None:
-        st.success(f"⭐ Ronda ACTUAL: **Ronda {ronda_actual}**")
-    else:
-        st.warning("Sin rondas publicadas.")
+    st.success(f"⭐ Ronda ACTUAL: **Ronda {ronda_actual}**")
 with c2:
     st.info(f"📣 Publicadas: **{len(publicadas)} / {total_plan}**")
 
-
 st.divider()
 
-# Filtro
-modo = st.radio("Mostrar", ["Todas", "Solo publicadas", "Solo no publicadas"], horizontal=True, index=0)
-
-# Navegación rápida
+# --- Navegación rápida SOLO sobre publicadas ---
 cols = st.columns([2, 3])
 with cols[0]:
-    goto = st.selectbox("Ir a la ronda…", ["(ninguna)"] + [f"Ronda {i}" for i in round_nums], index=0)
+    goto = st.selectbox(
+        "Ir a la ronda…",
+        ["(ninguna)"] + [f"Ronda {i}" for i in publicadas],
+        index=0,
+    )
 with cols[1]:
     st.caption("Atajos:")
-    btn_cols = st.columns(min(len(round_nums), 10))
-    for idx, i in enumerate(round_nums):
+    btn_cols = st.columns(min(len(publicadas), 10))
+    for idx, i in enumerate(publicadas):
         if idx % 10 == 0 and idx > 0:
-            btn_cols = st.columns(min(len(round_nums) - idx, 10))
+            btn_cols = st.columns(min(len(publicadas) - idx, 10))
         if btn_cols[idx % 10].button(f"R{i}", key=f"btn_goto_R{i}"):
             st.session_state["goto_round"] = i
             st.experimental_rerun()
@@ -97,22 +93,24 @@ if goto != "(ninguna)":
         pass
 goto_round = st.session_state.get("goto_round")
 
-# Helpers de normalización
+# --- Helpers de normalización ---
 def _normalize_result_series(s: pd.Series) -> pd.Series:
     return (
-        s.astype(str).str.strip()
-         .replace({"None": "", "none": "", "NaN": "", "nan": "", "N/A": "", "n/a": ""})
+        s.astype(str)
+        .str.strip()
+        .replace({"None": "", "none": "", "NaN": "", "nan": "", "N/A": "", "n/a": ""})
     )
+
 def _results_empty_count(df: pd.DataFrame) -> int:
     if df is None or df.empty or "resultado" not in df.columns:
         return 0
     res = _normalize_result_series(df["resultado"])
     return int((res == "").sum())
 
+# --- Render de una ronda publicada ---
 def render_round(i: int, etiqueta_extra: str = ""):
     path = round_file(i)
     df = read_csv_safe(path)
-    pub = is_published(i)
     if df is None or df.empty:
         return
 
@@ -126,15 +124,16 @@ def render_round(i: int, etiqueta_extra: str = ""):
             safe_df[col] = ""
 
     empties = _results_empty_count(safe_df)
-    estado = "✅ Cerrada" if (pub and empties == 0) else ("📣 Publicada" if pub else "📝 Borrador")
+    estado = "✅ Cerrada" if empties == 0 else "📣 Publicada"
     lm = last_modified(path)
+
     titulo = f"### Ronda {i} — {estado}"
     if etiqueta_extra:
         titulo += f" — {etiqueta_extra}"
     st.markdown(titulo)
     st.caption(f"Archivo: `{path}` · Última modificación: {lm} · Resultados vacíos: {empties}")
 
-    # Badge BYE (solo para vista)
+    # Badge BYE (solo visual)
     bye_mask = (
         safe_df["negras_id"].astype(str).str.upper().eq("BYE")
         | safe_df["negras_nombre"].astype(str).str.upper().eq("BYE")
@@ -154,7 +153,8 @@ def render_round(i: int, etiqueta_extra: str = ""):
     show_df.loc[show_df["resultado"] == "", "resultado"] = "—"
     st.dataframe(
         show_df[["mesa", "blancas_nombre", "negras_nombre", "resultado", "BYE"]],
-        use_container_width=True, hide_index=True,
+        use_container_width=True,
+        hide_index=True,
         column_config={
             "mesa": st.column_config.NumberColumn("Mesa", help="Número de mesa"),
             "blancas_nombre": st.column_config.TextColumn("Blancas"),
@@ -164,17 +164,13 @@ def render_round(i: int, etiqueta_extra: str = ""):
         },
     )
 
-    # --- Botón de descarga del CSV de la ronda (sin columnas internas/visuales) ---
+    # --- Descargar CSV de la ronda ---
     export_cols = ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]
-    df_export = safe_df.copy()
-    for c in export_cols:
-        if c not in df_export.columns:
-            df_export[c] = ""
-    df_export = df_export[export_cols]
+    df_export = safe_df[export_cols].copy()
 
     nivel_slug = _slugify(cfg.get("nivel", ""))
-    anio_slug  = _slugify(cfg.get("anio", ""))
-    file_name  = f"ronda_{i}_{nivel_slug}_{anio_slug}.csv" if (nivel_slug or anio_slug) else f"ronda_{i}.csv"
+    anio_slug = _slugify(cfg.get("anio", ""))
+    file_name = f"ronda_{i}_{nivel_slug}_{anio_slug}.csv" if (nivel_slug or anio_slug) else f"ronda_{i}.csv"
 
     buf = io.StringIO()
     df_export.to_csv(buf, index=False, encoding="utf-8")
@@ -184,36 +180,30 @@ def render_round(i: int, etiqueta_extra: str = ""):
         file_name=file_name,
         mime="text/csv",
         use_container_width=True,
-        key=f"dl_ronda_{i}"
+        key=f"dl_ronda_{i}",
     )
 
-def filtro_permite(i: int) -> bool:
-    pub = is_published(i)
-    if modo == "Solo publicadas" and not pub:
-        return False
-    if modo == "Solo no publicadas" and pub:
-        return False
-    return True
-
+# --- Pintado de rondas publicadas ---
 pintadas = set()
-if goto_round is not None:
-    if filtro_permite(goto_round):
-        st.info(f"🔎 Vista prioritaria: Ronda {goto_round}")
-        render_round(goto_round, etiqueta_extra="⤴️ Seleccionada")
-        pintadas.add(goto_round)
-        st.divider()
-    else:
-        st.warning(f"La Ronda {goto_round} no encaja con el filtro “{modo}”.")
 
-if ronda_actual is not None and filtro_permite(ronda_actual) and ronda_actual not in pintadas:
+# 1) Prioridad al “Ir a la ronda…”
+if goto_round is not None and goto_round in publicadas:
+    st.info(f"🔎 Vista prioritaria: Ronda {goto_round}")
+    render_round(goto_round, etiqueta_extra="⤴️ Seleccionada")
+    pintadas.add(goto_round)
+    st.divider()
+
+# 2) Luego la actual (si no se ha pintado ya)
+if ronda_actual not in pintadas:
     st.success(f"⭐ Ronda ACTUAL: Ronda {ronda_actual}")
     render_round(ronda_actual, etiqueta_extra="⭐ Ronda ACTUAL")
     pintadas.add(ronda_actual)
     st.divider()
 
-for i in round_nums:
-    if i in pintadas: continue
-    if not filtro_permite(i): continue
+# 3) El resto de publicadas
+for i in publicadas:
+    if i in pintadas:
+        continue
     render_round(i)
 
 st.divider()
