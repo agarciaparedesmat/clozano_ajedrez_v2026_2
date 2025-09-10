@@ -23,13 +23,15 @@ cfg = load_config()
 titulo = cfg.get("titulo", "Ajedrez en los recreos")
 nivel = cfg.get("nivel", "Todos")
 anio = cfg.get("anio", "")
+version  = cfg.get("version", "")
 JUG_PATH = f"{DATA_DIR}/jugadores.csv"
 n_plan = planned_rounds(cfg, JUG_PATH)
 
 # Portada (hero con nivel/año)
 hero_portada(
     format_with_cfg("♟️ {titulo} — {nivel}", cfg),
-    format_with_cfg("Curso {anio} — Consulta rondas, resultados y clasificación en tiempo real.", cfg)
+    format_with_cfg("♟️ {titulo} — {nivel}", cfg),
+    format_with_cfg("Curso {anio} — Consulta rondas, resultados y clasificación en tiempo real.     {version}", cfg)
 )
 
 # Estado (tabla 1 línea)
