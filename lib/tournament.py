@@ -14,16 +14,26 @@ import pandas as pd
 # ============================================================
 # Rutas y utilidades básicas
 # ============================================================
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+
+CURRENT_DIR = os.path.abspath(os.path.dirname(__file__))
+# Si estamos en lib/, BASE_DIR es el padre; si no, es el propio directorio
+if os.path.basename(CURRENT_DIR) in ("lib",):
+    BASE_DIR = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+else:
+    BASE_DIR = CURRENT_DIR
+
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
-def _ensure_data_dir() -> None:
+def _ensure_data_dir():
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
     except Exception:
         pass
 
 _ensure_data_dir()
+
+
 
 # ============================================================
 # Config / Meta / Log
@@ -40,9 +50,11 @@ _LAST_CONFIG_RAW: Optional[str] = None
 def _config_candidates() -> list[str]:
     # Preferimos data/config.json; si no existe, ./config.json (raíz del proyecto)
     return [
-        os.path.join(DATA_DIR, "config.json"),
-        os.path.join(BASE_DIR, "config.json"),
+        os.path.join(DATA_DIR, "config.json"),   # data/config.json
+        os.path.join(BASE_DIR, "config.json"),   # ./config.json (raíz del proyecto)
+        os.path.join(CURRENT_DIR, "config.json") # por si se ejecuta con cwd extraño
     ]
+
 
 def find_config_file() -> Optional[str]:
     for p in _config_candidates():

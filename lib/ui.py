@@ -171,41 +171,52 @@ def chip(text: str, kind: str = "green"):
 
 
 
+# ui.py
+import streamlit as st
+
 def sidebar_title(text: str | None = None, extras: bool = True) -> None:
     """
-    Dibuja en la barra lateral:
-      1) Título del torneo (de config.json -> "titulo")
+    Barra lateral:
+      1) Título del torneo (config.json -> "titulo")
       2) Línea gris: 🎓 {nivel} · 📅 {anio} (si existen)
-      3) Una línea divisoria
-    Y posiciona la navegación automática de Streamlit DEBAJO de esta cabecera.
+      3) Separador
+      4) Debajo queda la navegación automática de Streamlit
     """
-    # Cargar configuración (perezosa para evitar ciclos de import)
+    # Cargar configuración (tolerante a estructura del proyecto)
     try:
         from tournament import load_config
-        cfg = load_config()
     except Exception:
-        cfg = {}
+        try:
+            from lib.tournament import load_config
+        except Exception:
+            load_config = None
+
+    cfg = load_config() if load_config else {}
 
     if text is None:
         text = (cfg.get("titulo") or "Ajedrez en los recreos").strip()
     nivel = (cfg.get("nivel") or "").strip()
     anio  = (cfg.get("anio")  or "").strip()
 
-    # CSS: convierte el contenedor de la sidebar en flex-column y reordena:
-    # - nuestra cabecera con clase ._csb_header -> order:1
-    # - la navegación automática [data-testid="stSidebarNav"] -> order:2
+    # CSS: reordenar y recortar espacios en la sidebar
     st.sidebar.markdown(
         """
         <style>
+        /* Colocar nuestra cabecera arriba y la nav auto debajo */
         [data-testid="stSidebar"] > div:first-child {
-          display: flex; 
+          display: flex;
           flex-direction: column;
         }
         ._csb_header { order: 1; }
-        [data-testid="stSidebarNav"] { 
-          order: 2; 
-          margin-top: .4rem; 
-        }
+        [data-testid="stSidebarNav"] { order: 2; margin-top: .25rem; }
+
+        /* Reducir huecos verticales por defecto en la sidebar */
+        [data-testid="stSidebar"] .block-container { padding-top: .5rem !important; }
+        [data-testid="stSidebar"] hr { margin: .25rem 0 .5rem 0 !important; }
+
+        /* Márgenes más compactos para nuestros bloques */
+        ._csb_title { margin: .15rem 0 .25rem 0; }
+        ._csb_meta  { margin: -.2rem 0 .35rem 0; color: var(--muted); }
         </style>
         """,
         unsafe_allow_html=True,
@@ -214,7 +225,7 @@ def sidebar_title(text: str | None = None, extras: bool = True) -> None:
     # Cabecera (título)
     st.sidebar.markdown(
         f"""
-        <div class="_csb_header" style="font-weight:800; font-size:1.05rem; line-height:1.2; margin:.25rem 0 .6rem 0;">
+        <div class="_csb_header _csb_title" style="font-weight:800; font-size:1.05rem; line-height:1.2;">
           {text}
         </div>
         """,
@@ -225,12 +236,12 @@ def sidebar_title(text: str | None = None, extras: bool = True) -> None:
     if extras and (nivel or anio):
         meta = " · ".join([p for p in [f"🎓 {nivel}" if nivel else "", f"📅 {anio}" if anio else ""] if p])
         st.sidebar.markdown(
-            f"""<div class="_csb_header" style="color: var(--muted); margin:-.4rem 0 .7rem 0;">{meta}</div>""",
+            f"""<div class="_csb_header _csb_meta">{meta}</div>""",
             unsafe_allow_html=True,
         )
 
-    # Separador
+    # Separador compacto
     st.sidebar.markdown(
-        """<hr class="_csb_header" style="margin:.2rem 0 .9rem 0; border:none; border-top:1px solid var(--border);" />""",
+        """<hr class="_csb_header" style="border:none; border-top:1px solid var(--border);" />""",
         unsafe_allow_html=True,
     )
