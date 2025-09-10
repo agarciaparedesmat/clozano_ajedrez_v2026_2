@@ -171,18 +171,44 @@ with c_chips:
 st.divider()
 
 # ---------- PDF builder ----------
-
 def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: bool = True) -> bytes | None:
     """
-    PDF estilo 'Genially':
+    PDF estilo Genially:
     - Cabeceras centradas (todas hasta 'Lista de emparejamientos' incluida)
     - Resultado entre Blancas y Negras
     - Línea doble real entre cabecera y cuerpo
-    - Marco y numeración de páginas
+    - SIN numeración de páginas
+    - Nombres con (curso/grupo) si hay columnas disponibles
     """
-    tbl = table_df.copy()
-    # columnas en el orden pedido: Mesa, Blancas, Resultado, Negras
-    tbl = tbl[["mesa", "blancas_nombre", "resultado_mostrar", "negras_nombre"]].copy().fillna("")
+    import os, io
+    from typing import Optional
+
+    def _get_curso_grupo(row: pd.Series, side: str) -> str:
+        # busca combinadas primero
+        for k in [f"{side}_curso_grupo", f"{side}_nivel_grupo"]:
+            val = row.get(k, "")
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        # compone con piezas sueltas
+        curso = str(row.get(f"{side}_curso", "") or row.get(f"{side}_nivel", "")).strip()
+        grupo = str(row.get(f"{side}_grupo", "") or row.get(f"{side}_clase", "")).strip()
+        txt = " ".join([p for p in [curso, grupo] if p])
+        return txt
+
+    def _name_with_cg(row: pd.Series, side: str) -> str:
+        name = str(row.get(f"{side}_nombre", "")).strip()
+        if name.upper() == "BYE":
+            return name
+        cg = _get_curso_grupo(row, side)
+        return f"{name} ({cg})" if cg else name
+
+    # Reordenamos columnas para 'resultado en medio' y añadimos (curso/grupo)
+    base = table_df.copy()
+    base = base.fillna("")
+    base["blancas_nombre_pdf"] = base.apply(lambda r: _name_with_cg(r, "blancas"), axis=1)
+    base["negras_nombre_pdf"] = base.apply(lambda r: _name_with_cg(r, "negras"), axis=1)
+
+    tbl = base[["mesa", "blancas_nombre_pdf", "resultado_mostrar", "negras_nombre_pdf"]].copy()
     if not include_results:
         tbl["resultado_mostrar"] = ":"
 
@@ -191,37 +217,34 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.platypus import (
-            SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
-        )
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
         from reportlab.lib.units import mm
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
-        import io, os
 
-        # Paleta aproximada a tu ejemplo
+        # Paleta
         VERDE = colors.HexColor("#d9ead3")
         MELOCOTON = colors.HexColor("#f7e1d5")
         AZUL = colors.HexColor("#cfe2f3")
 
-        # Fuentes opcionales (si pones TTF en assets/fonts/)
+        # Fuentes opcionales en assets/fonts/
         def _register_fonts():
-            base = os.path.join("assets", "fonts")
+            basep = os.path.join("assets", "fonts")
             ok = False
             try:
-                if os.path.exists(os.path.join(base, "OldStandard-Regular.ttf")):
-                    pdfmetrics.registerFont(TTFont("Serif", os.path.join(base, "OldStandard-Regular.ttf")))
-                    pdfmetrics.registerFont(TTFont("Serif-Bold", os.path.join(base, "OldStandard-Bold.ttf")))
+                if os.path.exists(os.path.join(basep, "OldStandard-Regular.ttf")):
+                    pdfmetrics.registerFont(TTFont("Serif", os.path.join(basep, "OldStandard-Regular.ttf")))
+                    pdfmetrics.registerFont(TTFont("Serif-Bold", os.path.join(basep, "OldStandard-Bold.ttf")))
                     ok = True
-                if os.path.exists(os.path.join(base, "PlayfairDisplay-Regular.ttf")):
-                    pdfmetrics.registerFont(TTFont("Display", os.path.join(base, "PlayfairDisplay-Regular.ttf")))
+                if os.path.exists(os.path.join(basep, "PlayfairDisplay-Regular.ttf")):
+                    pdfmetrics.registerFont(TTFont("Display", os.path.join(basep, "PlayfairDisplay-Regular.ttf")))
                     ok = True
             except Exception:
                 pass
             return ok
 
         has_custom = _register_fonts()
-        SERIF = "Serif" if has_custom else "Times-Roman"
+        SERIF   = "Serif" if has_custom else "Times-Roman"
         SERIF_B = "Serif-Bold" if has_custom else "Times-Bold"
         DISPLAY = "Display" if has_custom else SERIF_B
 
@@ -232,9 +255,8 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             topMargin=15*mm, bottomMargin=15*mm
         )
 
-        # Pie de página (número de página) y marco
-        def _decorate(canvas, d):
-            # Marco
+        # Solo marco (SIN número de página)
+        def _draw_frame(canvas, d):
             canvas.saveState()
             canvas.setStrokeColor(colors.black)
             canvas.setLineWidth(1.0)
@@ -243,12 +265,6 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             w = doc.width + 10*mm
             h = doc.height + 10*mm
             canvas.rect(x, y, w, h)
-            canvas.restoreState()
-            # Nº de página centrado
-            canvas.saveState()
-            canvas.setFont("Helvetica", 10)
-            page_str = f"Página {canvas.getPageNumber()}"
-            canvas.drawCentredString(x + w/2, 10*mm, page_str)
             canvas.restoreState()
 
         styles = getSampleStyleSheet()
@@ -261,7 +277,6 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         linea_fecha = (cfg.get("pdf_fecha") or "").strip()
         linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-        # Bandas 1 y 2 (centradas)
         band1 = Table([[Paragraph(f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", H1)]],
                       colWidths=[doc.width])
         band1.setStyle(TableStyle([
@@ -270,6 +285,7 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             ("BOTTOMPADDING", (0,0), (-1,-1), 6),
             ("TOPPADDING", (0,0), (-1,-1), 6),
         ]))
+
         band2 = Table([[Paragraph(f"RONDA {i}", H2)]], colWidths=[doc.width])
         band2.setStyle(TableStyle([
             ("BACKGROUND", (0,0), (-1,-1), MELOCOTON),
@@ -278,9 +294,8 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             ("TOPPADDING", (0,0), (-1,-1), 12),
         ]))
 
-        # Cabecera “azul” ahora también centrada (nivel grande + fecha/hora debajo)
         cab_lines = []
-        if nivel: cab_lines.append(f"<b>{nivel}</b>")
+        if nivel:       cab_lines.append(f"<b>{nivel}</b>")
         if linea_fecha: cab_lines.append(linea_fecha)
         if linea_hora:  cab_lines.append(linea_hora)
         cab_text = "<br/>".join(cab_lines) if cab_lines else ""
@@ -303,53 +318,41 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             ("TOPPADDING", (0,0), (-1,-1), 6),
         ]))
 
-        # Tabla principal: doble línea real bajo cabecera + grid suave
+        # Cabecera + doble línea real + cuerpo
         data = [["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"], ["", "", "", ""]] + tbl.values.tolist()
-        # fila 0: cabecera; fila 1: separador fino; resto: cuerpo
         widths = [20*mm, 66*mm, 20*mm, 66*mm]
         t = Table(data, colWidths=widths)
         t.setStyle(TableStyle([
-            # cabecera (fila 0)
+            # cabecera
             ("FONT", (0,0), (-1,0), SERIF_B, 11),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("VALIGN", (0,0), (-1,0), "MIDDLE"),
-            # primera línea (gruesa) debajo de cabecera
+            # primera línea gruesa
             ("LINEBELOW", (0,0), (-1,0), 1.3, colors.black),
-
-            # fila separadora (1): muy bajita + segunda línea
+            # segunda línea (fila separadora)
             ("LINEBELOW", (0,1), (-1,1), 0.6, colors.black),
             ("TOPPADDING", (0,1), (-1,1), 0),
             ("BOTTOMPADDING", (0,1), (-1,1), 0),
             ("FONTSIZE", (0,1), (-1,1), 1),
             ("ROWHEIGHTS", (0,1), (-1,1), 2),
-
-            # cuerpo: alineaciones
-            ("ALIGN", (0,2), (0,-1), "CENTER"),     # mesa
-            ("ALIGN", (2,2), (2,-1), "CENTER"),     # resultado
+            # cuerpo
+            ("ALIGN", (0,2), (0,-1), "CENTER"),
+            ("ALIGN", (2,2), (2,-1), "CENTER"),
             ("VALIGN", (0,2), (-1,-1), "MIDDLE"),
-
-            # grid general (desde el cuerpo)
             ("GRID", (0,2), (-1,-1), 0.5, colors.lightgrey),
         ]))
 
         story = [band1, band2, cab, Spacer(1, 6), titulo_lista, t]
-        doc.build(story, onFirstPage=_decorate, onLaterPages=_decorate)
+        doc.build(story, onFirstPage=_draw_frame, onLaterPages=_draw_frame)
         return buf.getvalue()
 
     except Exception:
-        # ---------- FPDF (fallback) ----------
+        # ---------- FPDF fallback (sin numeración) ----------
         try:
             from fpdf import FPDF
-            class PDF(FPDF):
-                def footer(self):
-                    self.set_y(-12)
-                    self.set_font("Helvetica", "", 10)
-                    self.cell(0, 8, f"Página {self.page_no()}/{{nb}}", 0, 0, "C")
-
-            pdf = PDF(orientation="P", unit="mm", format="A4")
+            pdf = FPDF(orientation="P", unit="mm", format="A4")
             pdf.set_auto_page_break(auto=True, margin=15)
-            pdf.alias_nb_pages()
             pdf.add_page()
 
             anio = (cfg.get("anio") or "").strip()
@@ -357,19 +360,16 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             linea_fecha = (cfg.get("pdf_fecha") or "").strip()
             linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-            # Cabeceras centradas
+            # cabeceras centradas
             pdf.set_font("Helvetica", "B", 18); pdf.cell(0, 10, f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", ln=1, align="C")
             pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 10, f"RONDA {i}", ln=1, align="C")
             pdf.set_font("Helvetica", "B", 18)
-            cab_lines = [nivel] if nivel else []
-            if linea_fecha: cab_lines.append(linea_fecha)
-            if linea_hora:  cab_lines.append(linea_hora)
-            for ln in cab_lines:
-                pdf.cell(0, 8, ln, ln=1, align="C")
+            for ln in [nivel, linea_fecha, linea_hora]:
+                if ln: pdf.cell(0, 8, ln, ln=1, align="C")
             pdf.ln(2)
             pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
 
-            # Tabla
+            # tabla (cabecera + doble línea)
             headers = ["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"]
             widths = [20, 66, 20, 66]
             pdf.set_font("Helvetica", "B", 11)
@@ -377,22 +377,24 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             for h, w in zip(headers, widths):
                 pdf.cell(w, 8, h, border=1, align="C")
             pdf.ln(8)
-            # Doble línea real (segunda línea fina justo debajo)
+            # doble línea
             x1 = x0 + sum(widths); y1 = pdf.get_y()
-            pdf.set_draw_color(0, 0, 0); pdf.set_line_width(0.6); pdf.line(x0, y1, x1, y1)
+            pdf.set_draw_color(0,0,0); pdf.set_line_width(0.6); pdf.line(x0, y1, x1, y1)
             pdf.set_line_width(0.2); pdf.line(x0, y1 + 1.2, x1, y1 + 1.2)
 
-            # Filas
+            # filas
             pdf.set_font("Helvetica", "", 11)
             for _, row in tbl.iterrows():
-                cells = [str(row["mesa"]), str(row["blancas_nombre"]), str(row["resultado_mostrar"]), str(row["negras_nombre"])]
-                for c, w in zip(cells, widths):
-                    pdf.cell(w, 7, c[:60], border=1, align=("C" if w in (20, 20) else "L"))
+                cells = [str(row["mesa"]), str(row["blancas_nombre_pdf"]), str(row["resultado_mostrar"]), str(row["negras_nombre_pdf"])]
+                aligns = ["C", "L", "C", "L"]
+                for c, w, a in zip(cells, widths, aligns):
+                    pdf.cell(w, 7, c[:60], border=1, align=a)
                 pdf.ln(7)
 
             return bytes(pdf.output(dest="S"))
         except Exception:
             return None
+
 
 #--------- render de UNA sola ronda (la seleccionada) ----------
 def render_round(i: int):
