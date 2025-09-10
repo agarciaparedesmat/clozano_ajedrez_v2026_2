@@ -360,7 +360,7 @@ def render_round(i: int):
         },
     )
 
-    # ---- DESCARGAS CSV + PDF ----
+    # ---- DESCARGAS CSV + PDF (misma línea) ----
     export_cols = ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]
     df_export = safe_df[export_cols].copy()
 
@@ -373,31 +373,32 @@ def render_round(i: int):
     # CSV
     buf_csv = io.StringIO()
     df_export.to_csv(buf_csv, index=False, encoding="utf-8")
-    st.download_button(
-        label=f"⬇️ Descargar CSV · Ronda {i}",
-        data=buf_csv.getvalue().encode("utf-8"),
-        file_name=f"{base}.csv",
-        mime="text/csv",
-        use_container_width=True,
-        key=f"dl_csv_ronda_{i}",
-    )
 
-    # PDF
+    # PDF (ya calculado arriba con build_round_pdf)
     pdf_bytes = build_round_pdf(i, show_df, cfg)
-    if pdf_bytes:
+
+    col_csv, col_pdf = st.columns(2)
+    with col_csv:
         st.download_button(
-            label=f"📄 Descargar PDF · Ronda {i}",
-            data=pdf_bytes,
-            file_name=f"{base}.pdf",
-            mime="application/pdf",
+            label=f"⬇️ CSV · Ronda {i}",
+            data=buf_csv.getvalue().encode("utf-8"),
+            file_name=f"{base}.csv",
+            mime="text/csv",
             use_container_width=True,
-            key=f"dl_pdf_ronda_{i}",
+            key=f"dl_csv_ronda_{i}",
         )
-    else:
-        st.info(
-            "Para generar PDF instala **reportlab** o **fpdf2** en `requirements.txt`.\n"
-            "Ejemplo: `reportlab==4.2.2`"
-        )
+    with col_pdf:
+        if pdf_bytes:
+            st.download_button(
+                label=f"📄 PDF · Ronda {i}",
+                data=pdf_bytes,
+                file_name=f"{base}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key=f"dl_pdf_ronda_{i}",
+            )
+        else:
+            st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
 
 # pinta solo la ronda seleccionada
 render_round(sel)
