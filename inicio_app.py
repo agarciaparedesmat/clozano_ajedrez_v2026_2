@@ -161,5 +161,4 @@ with c2:
 with c3:
     card_page("🛠️", "Administración — {nivel}", "Gestión de rondas (generar, publicar, despublicar, eliminar) y editar resultados.", "pages/99_Admin.py", "admin")
 
-import lib.ui as UI
-st.caption(f"UI path: {UI.__file__}")
+
