@@ -7,8 +7,9 @@ st.set_page_config(page_title="Ajedrez en los recreos", page_icon="♟️", layo
 
 
 # ← NUEVO: título en la barra lateral
-sidebar_title()
+
 inject_base_style()  # ← NUEVO: aplica el bg_color de config.json en la raíz
+sidebar_title(extras=True)  
 
 cfg = load_config()
 

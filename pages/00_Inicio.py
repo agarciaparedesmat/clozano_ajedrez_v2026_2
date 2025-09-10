@@ -151,8 +151,8 @@ def card_page(title_emoji: str, title: str, desc: str, target_py: str, key: str)
 
 c1, c2, c3 = st.columns(3)
 with c1:
-    card_page("🧩", "Rondas — {nivel}", "Emparejamientos y resultados, con BYEs y estado por ronda.", "pages/10_Rondas.py", "rondas")
+    card_page("🧩", "Rondas — {nivel}", "Emparejamientos y resultados de rondas.", "pages/10_Rondas.py", "rondas")
 with c2:
-    card_page("🏆", "Clasificación — {nivel}", "Tabla en vivo (solo rondas publicadas), con Buchholz.", "pages/20_Clasificacion.py", "clas")
+    card_page("🏆", "Clasificación — {nivel}", "Clasificación actual del torneo .", "pages/20_Clasificacion.py", "clas")
 with c3:
-    card_page("🛠️", "Administración — {nivel}", "Publicar, despublicar, editar resultados y generar rondas.", "pages/99_Admin.py", "admin")
+    card_page("🛠️", "Administración — {nivel}", "Generar rondas, publicar, despublicar, eliminar y editar resultados y .", "pages/99_Admin.py", "admin")

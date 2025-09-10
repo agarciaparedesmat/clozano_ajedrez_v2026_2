@@ -171,25 +171,49 @@ def chip(text: str, kind: str = "green"):
 
 
 
-def sidebar_title(text: str | None = None) -> None:
+# ui.py  (o lib/ui.py)
+import streamlit as st
+
+def sidebar_title(text: str | None = None, extras: bool = False) -> None:
     """
-    Muestra un título en la barra lateral. Si no se pasa texto,
-    usa cfg['titulo'] desde config.json.
+    Muestra un título en la barra lateral. Si extras=True, debajo añade
+    '🎓 {nivel} · 📅 {anio}' usando valores de config.json.
     """
-    if text is None:
+    nivel = anio = ""
+    if text is None or extras:
         try:
-            from lib.tournament import load_config
-            cfg = load_config()
-            text = (cfg.get("titulo") or "Ajedrez en los recreos").strip()
+            # Carga perezosa para evitar bucles de importación
+            from lib.tournament import load_config  # usa 'from ui import ...' si tu módulo está en raíz
         except Exception:
-            text = "Ajedrez en los recreos"
-    # Estilo compacto y consistente
+            # Si el módulo está en raíz (ui.py y tournament.py también en raíz),
+            # descomenta la línea siguiente y comenta la anterior:
+            # from tournament import load_config
+            load_config = None
+
+        cfg = load_config() if load_config else {}
+        if text is None:
+            text = (cfg.get("titulo") or "Ajedrez en los recreos").strip()
+        nivel = (cfg.get("nivel") or "").strip()
+        anio  = (cfg.get("anio")  or "").strip()
+
+    # Render
     st.sidebar.markdown(
         f"""
         <div style="font-weight:800; font-size:1.05rem; line-height:1.2; margin:.25rem 0 .6rem 0;">
           {text}
         </div>
-        <hr style="margin:.2rem 0 .9rem 0; border:none; border-top:1px solid var(--border);" />
         """,
+        unsafe_allow_html=True,
+    )
+
+    if extras and (nivel or anio):
+        meta = " · ".join([p for p in [f"🎓 {nivel}" if nivel else "", f"📅 {anio}" if anio else ""] if p])
+        st.sidebar.markdown(
+            f"""<div style="color: var(--muted); margin:-.4rem 0 .75rem 0;">{meta}</div>""",
+            unsafe_allow_html=True,
+        )
+
+    st.sidebar.markdown(
+        """<hr style="margin:.2rem 0 .9rem 0; border:none; border-top:1px solid var(--border);" />""",
         unsafe_allow_html=True,
     )
