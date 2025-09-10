@@ -173,17 +173,17 @@ def chip(text: str, kind: str = "green"):
 def sidebar_title(text: str | None = None, extras: bool = True) -> None:
     """
     Barra lateral compacta:
-      1) Título (config['titulo'])
+      1) Título del torneo (config['titulo'])
       2) Línea gris: 🎓 nivel · 📅 año (si existen)
-      3) Separador fino
+      3) Separador fino visible
       4) Debajo la navegación automática de Streamlit (sin huecos)
     """
-    # Cargar config (tolerante a estructura del proyecto)
+    # Cargar config (funciona tanto si tournament está en lib/ como en raíz)
     try:
-        from tournament import load_config
+        from lib.tournament import load_config  # <- si usas paquete lib
     except Exception:
         try:
-            from lib.tournament import load_config
+            from tournament import load_config  # <- fallback si está en raíz
         except Exception:
             load_config = None
     cfg = load_config() if load_config else {}
@@ -193,47 +193,47 @@ def sidebar_title(text: str | None = None, extras: bool = True) -> None:
     nivel = (cfg.get("nivel") or "").strip()
     anio  = (cfg.get("anio")  or "").strip()
 
-    # CSS: reordenar y COMPACTAR al máximo
+    # CSS: reordena y COMPACTA márgenes/padding de la sidebar y la nav
     st.sidebar.markdown(
         """
         <style>
-        /* Contenedor principal de la sidebar en columna y con muy poco gap */
+        /* Contenedor de la sidebar en columna, con casi nada de separación */
         [data-testid="stSidebar"] > div:first-child {
           display: flex;
           flex-direction: column;
-          gap: .10rem !important;              /* << reduce separación general */
-          padding-top: .25rem !important;
+          gap: .05rem !important;
+          padding-top: .15rem !important;
         }
+        /* Contenido interno */
+        [data-testid="stSidebarContent"] { padding-top: .15rem !important; }
 
-        /* Contenido interno de la sidebar: menos padding superior */
-        [data-testid="stSidebarContent"] {
-          padding-top: .25rem !important;
-        }
-
-        /* Navegación automática: SIN margen/ padding arriba */
+        /* Navegación automática justo debajo, sin márgenes extra */
         [data-testid="stSidebarNav"] {
           order: 2;
           margin: 0 !important;
           padding: 0 !important;
         }
-        [data-testid="stSidebarNav"] ul {
+        [data-testid="stSidebarNav"] > div:first-child {  /* cabecera "app" */
           margin: 0 !important;
-          padding-left: .25rem !important;
+          padding: 0 !important;
         }
-        /* Cabecera del bloque (p.ej. “app”): muy compacta */
         [data-testid="stSidebarNav"] h2,
         [data-testid="stSidebarNav"] h3,
         [data-testid="stSidebarNav"] p {
           margin: .05rem 0 !important;
           padding: 0 !important;
-          font-size: .85rem !important;
           line-height: 1.1 !important;
+          font-size: .90rem !important;
           opacity: .75;
         }
+        [data-testid="stSidebarNav"] ul {
+          margin: .15rem 0 0 0 !important;
+          padding-left: .25rem !important;
+        }
 
-        /* Nuestros bloques: márgenes mini */
-        ._csb_title { margin: .05rem 0 0 0; font-weight: 800; font-size: 1.05rem; line-height: 1.2; }
-        ._csb_meta  { margin: .05rem 0 .05rem 0; color: var(--muted); }
+        /* Nuestros bloques */
+        ._csb_title { margin: .05rem 0 0 0 !important; font-weight: 800; font-size: 1.05rem; line-height: 1.2; }
+        ._csb_meta  { margin: .05rem 0 .05rem 0 !important; color: var(--muted); }
         ._csb_sep   { border: none; border-top: 1px solid rgba(36,32,36,.25);
                       margin: .10rem 0 .10rem 0 !important; opacity: 1; }
         </style>
@@ -241,19 +241,9 @@ def sidebar_title(text: str | None = None, extras: bool = True) -> None:
         unsafe_allow_html=True,
     )
 
-    # Cabecera (título)
-    st.sidebar.markdown(
-        f'<div class="_csb_title">{text}</div>',
-        unsafe_allow_html=True,
-    )
-
-    # Línea 2 (gris) con nivel/año
+    # Cabecera
+    st.sidebar.markdown(f'<div class="_csb_title">{text}</div>', unsafe_allow_html=True)
     if extras and (nivel or anio):
         meta = " · ".join([p for p in [f"🎓 {nivel}" if nivel else "", f"📅 {anio}" if anio else ""] if p])
-        st.sidebar.markdown(
-            f'<div class="_csb_meta">{meta}</div>',
-            unsafe_allow_html=True,
-        )
-
-    # Separador compacto
+        st.sidebar.markdown(f'<div class="_csb_meta">{meta}</div>', unsafe_allow_html=True)
     st.sidebar.markdown('<hr class="_csb_sep" />', unsafe_allow_html=True)
