@@ -1,8 +1,11 @@
 
 import streamlit as st
 from lib.tournament import load_config
+from lib.ui import inject_base_style  # ← NUEVO
 
 st.set_page_config(page_title="Ajedrez en los recreos", page_icon="♟️", layout="wide")
+
+inject_base_style()  # ← NUEVO: aplica el bg_color de config.json en la raíz
 
 cfg = load_config()
 
@@ -13,18 +16,16 @@ subtitulo  = cfg.get("subtitulo", "Torneo de Ajedrez. Emparejamientos y clasific
 st.caption(subtitulo)
 
 nivel     = cfg.get("nivel", "Todos")
-st.title(nivel)
+st.title(nivel)  # <- si no quieres duplicar títulos, quita esta línea
 
-# si quieres mostrar el curso debajo del título principal:
 anio       = cfg.get("anio", "actual")
-
 if anio:
     st.subheader(f"Curso {anio}")
 
-# texto auxiliar
-
 version  = cfg.get("version", "")
 st.caption(version)
+
+
 
 # Ruta de la imagen en tu sistema
 #ruta_imagen = "portada.png"
