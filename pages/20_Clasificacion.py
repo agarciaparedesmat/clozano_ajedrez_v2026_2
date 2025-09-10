@@ -5,6 +5,8 @@ import streamlit as st
 import pandas as pd
 
 from lib.ui import page_header
+from lib.ui import hero_portada, inject_base_style, sidebar_title
+
 from lib.tournament import (
     DATA_DIR,
     load_config,

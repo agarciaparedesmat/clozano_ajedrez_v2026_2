@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 
-from lib.ui import hero_portada, inject_base_style
+from lib.ui import hero_portada, inject_base_style, sidebar_title
 from lib.tournament import (
     DATA_DIR,
     load_config,
@@ -15,7 +15,8 @@ from lib.tournament import (
 )
 
 st.set_page_config(page_title="Inicio", page_icon="🏠", layout="wide")
-inject_base_style()
+inject_base_style()  # ← NUEVO: aplica el bg_color de config.json en la raíz
+sidebar_title(extras=True)  
 
 # Config y contexto
 cfg = load_config()
