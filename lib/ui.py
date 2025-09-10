@@ -170,19 +170,15 @@ def chip(text: str, kind: str = "green"):
     st.markdown(f"<span class='app-chip {kind}'>{text}</span>", unsafe_allow_html=True)
 
 
-
-# ui.py
-import streamlit as st
-
 def sidebar_title(text: str | None = None, extras: bool = True) -> None:
     """
-    Barra lateral:
+    Barra lateral compacta:
       1) Título del torneo (config.json -> "titulo")
       2) Línea gris: 🎓 {nivel} · 📅 {anio} (si existen)
-      3) Separador
-      4) Debajo queda la navegación automática de Streamlit
+      3) Separador fino y visible
+      4) Debajo la navegación automática de Streamlit
     """
-    # Cargar configuración (tolerante a estructura del proyecto)
+    # Cargar configuración (robusto a lib/ o raíz)
     try:
         from tournament import load_config
     except Exception:
@@ -190,7 +186,6 @@ def sidebar_title(text: str | None = None, extras: bool = True) -> None:
             from lib.tournament import load_config
         except Exception:
             load_config = None
-
     cfg = load_config() if load_config else {}
 
     if text is None:
@@ -198,25 +193,39 @@ def sidebar_title(text: str | None = None, extras: bool = True) -> None:
     nivel = (cfg.get("nivel") or "").strip()
     anio  = (cfg.get("anio")  or "").strip()
 
-    # CSS: reordenar y recortar espacios en la sidebar
+    # CSS: reordenar y COMPACTAR espacios + separador más oscuro
     st.sidebar.markdown(
         """
         <style>
-        /* Colocar nuestra cabecera arriba y la nav auto debajo */
+        /* Estructura y orden */
         [data-testid="stSidebar"] > div:first-child {
           display: flex;
           flex-direction: column;
         }
         ._csb_header { order: 1; }
-        [data-testid="stSidebarNav"] { order: 2; margin-top: .25rem; }
+        [data-testid="stSidebarNav"] { order: 2; margin-top: .10rem !important; }
 
-        /* Reducir huecos verticales por defecto en la sidebar */
-        [data-testid="stSidebar"] .block-container { padding-top: .5rem !important; }
-        [data-testid="stSidebar"] hr { margin: .25rem 0 .5rem 0 !important; }
+        /* Compactar padding/márgenes en la propia sidebar */
+        [data-testid="stSidebar"] .block-container { padding-top: .35rem !important; }
+        [data-testid="stSidebar"] h1, 
+        [data-testid="stSidebar"] h2, 
+        [data-testid="stSidebar"] h3, 
+        [data-testid="stSidebar"] p {
+          margin-top: .10rem !important;
+          margin-bottom: .10rem !important;
+        }
 
-        /* Márgenes más compactos para nuestros bloques */
-        ._csb_title { margin: .15rem 0 .25rem 0; }
-        ._csb_meta  { margin: -.2rem 0 .35rem 0; color: var(--muted); }
+        /* Estilo de nuestros bloques */
+        ._csb_title { margin: .05rem 0 .10rem 0; font-weight: 800; font-size: 1.05rem; line-height: 1.2; }
+        ._csb_meta  { margin: .00rem 0 .15rem 0; color: var(--muted); }
+
+        /* Separador más visible sobre fondo claro */
+        ._csb_sep {
+          border: none; 
+          border-top: 1px solid rgba(36,32,36,.25); /* un poco más oscuro que var(--border) */
+          margin: .10rem 0 .15rem 0 !important;
+          opacity: 1;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -224,24 +233,17 @@ def sidebar_title(text: str | None = None, extras: bool = True) -> None:
 
     # Cabecera (título)
     st.sidebar.markdown(
-        f"""
-        <div class="_csb_header _csb_title" style="font-weight:800; font-size:1.05rem; line-height:1.2;">
-          {text}
-        </div>
-        """,
+        f'<div class="_csb_header _csb_title">{text}</div>',
         unsafe_allow_html=True,
     )
 
-    # Línea 2 (gris) con nivel/año (si existen)
+    # Línea 2 (gris) con nivel/año
     if extras and (nivel or anio):
         meta = " · ".join([p for p in [f"🎓 {nivel}" if nivel else "", f"📅 {anio}" if anio else ""] if p])
         st.sidebar.markdown(
-            f"""<div class="_csb_header _csb_meta">{meta}</div>""",
+            f'<div class="_csb_header _csb_meta">{meta}</div>',
             unsafe_allow_html=True,
         )
 
-    # Separador compacto
-    st.sidebar.markdown(
-        """<hr class="_csb_header" style="border:none; border-top:1px solid var(--border);" />""",
-        unsafe_allow_html=True,
-    )
+    # Separador
+    st.sidebar.markdown('<hr class="_csb_header _csb_sep" />', unsafe_allow_html=True)
