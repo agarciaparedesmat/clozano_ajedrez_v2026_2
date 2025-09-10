@@ -95,20 +95,11 @@ if isinstance(jump_to, int) and jump_to in publicadas:
 if st.session_state["rondas_view_select"] not in publicadas:
     st.session_state["rondas_view_select"] = ronda_actual
 
-# ---------- selector + botonera numérica ----------
-current_round = st.session_state["rondas_view_select"]
-sel = st.selectbox(
-    "Ver ronda publicada",
-    options=publicadas,
-    index=publicadas.index(current_round),
-    format_func=lambda i: f"Ronda {i}",
-    key="rondas_view_select",
-)
-
-# === Estilo “pill” para la botonera (sin afectar a st.download_button) ===
+# ---------- selector + botonera numérica EN UNA SOLA LÍNEA ----------
+# CSS “pill” (no afecta a st.download_button)
 PILLS_CSS = """
 <style>
-.stButton > button {
+._chips_row .stButton > button {
   border-radius: 9999px !important;
   padding: .28rem .75rem !important;
   border: 1px solid var(--border) !important;
@@ -116,34 +107,48 @@ PILLS_CSS = """
   color: var(--text) !important;
   font-weight: 700 !important;
 }
-.stButton > button:hover {
+._chips_row .stButton > button:hover {
   background: rgba(36,32,36,.06) !important;
 }
 </style>
 """
 st.markdown(PILLS_CSS, unsafe_allow_html=True)
 
-st.caption("Ir directo a…")
-per_row = min(len(publicadas), 10)  # hasta 10 por fila
-cols = st.columns(per_row)
+# Fila con 3 columnas: [etiqueta] [selector] [chips]
+c_lbl, c_sel, c_chips = st.columns([1.1, 1.8, 5.1])
+with c_lbl:
+    st.markdown("**Ver ronda publicada**")
 
-def _request_jump(i: int):
-    # Callback seguro: no toca la clave del widget directamente
-    st.session_state["rondas_jump_to"] = int(i)
-
-for idx, i in enumerate(publicadas):
-    c = cols[idx % per_row]
-    is_active = (i == sel)
-    label = f"✓ {i}" if is_active else f"{i}"
-    c.button(
-        label,
-        key=f"chip_R{i}",
-        use_container_width=True,
-        on_click=_request_jump,
-        args=(i,),
+current_round = st.session_state["rondas_view_select"]
+with c_sel:
+    sel = st.selectbox(
+        label="Ver ronda publicada",
+        options=publicadas,
+        index=publicadas.index(current_round),
+        format_func=lambda i: f"Ronda {i}",
+        key="rondas_view_select",
+        label_visibility="collapsed",  # ← oculta etiqueta para que todo quede en una línea
     )
-    if (idx + 1) % per_row == 0 and (idx + 1) < len(publicadas):
-        cols = st.columns(min(per_row, len(publicadas) - (idx + 1)))
+
+with c_chips:
+    st.markdown("**Ir directo a…**")
+    per_row = min(len(publicadas), 12)
+    chip_cols = st.columns(per_row, gap="small")
+
+    def _request_jump(i: int):
+        st.session_state["rondas_jump_to"] = int(i)
+
+    for idx, i in enumerate(publicadas):
+        col = chip_cols[idx % per_row]
+        is_active = (i == sel)
+        label = f"✓ {i}" if is_active else f"{i}"
+        col.button(
+            label,
+            key=f"chip_R{i}",
+            use_container_width=True,
+            on_click=_request_jump,
+            args=(i,),
+        )
 
 st.divider()
 
