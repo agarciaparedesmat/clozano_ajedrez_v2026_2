@@ -2,21 +2,21 @@
 import streamlit as st
 from lib.tournament import load_config
 
-st.set_page_config(page_title="Ajedrez en los recreos — IESCL", page_icon="♟️", layout="wide")
+st.set_page_config(page_title="Ajedrez en los recreos", page_icon="♟️", layout="wide")
 
 cfg = load_config()
 
-titulo     = cfg.get("titulo", "")
+titulo     = cfg.get("titulo", "Ajedrez en los recreos")
 st.title(titulo)
 
-subtitulo  = cfg.get("subtitulo", "")
+subtitulo  = cfg.get("subtitulo", "Torneo de Ajedrez. Emparejamientos y clasificación")
 st.caption(subtitulo)
 
-titulo     = cfg.get("nivel", "")
-st.title(titulo)
+nivel     = cfg.get("nivel", "Todos")
+st.title(nivel)
 
 # si quieres mostrar el curso debajo del título principal:
-anio       = cfg.get("anio", "")
+anio       = cfg.get("anio", "actual")
 
 if anio:
     st.subheader(f"Curso {anio}")
