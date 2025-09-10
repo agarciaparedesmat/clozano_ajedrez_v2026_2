@@ -78,7 +78,7 @@ jump_to = st.session_state.pop("rondas_jump_to", None)
 if isinstance(jump_to, int) and jump_to in publicadas:
     st.session_state["rondas_view_select"] = jump_to
 
-# Si el valor guardado ya no es válido (p.ej., cambios en publicadas), corrígelo
+# Si el valor guardado ya no es válido, corrígelo
 if st.session_state["rondas_view_select"] not in publicadas:
     st.session_state["rondas_view_select"] = ronda_actual
 
@@ -92,27 +92,44 @@ sel = st.selectbox(
     key="rondas_view_select",
 )
 
+# === Estilo “pill” para la botonera ===
+PILLS_CSS = """
+<style>
+/* Estilo pill para los botones de la botonera (sin afectar a st.download_button) */
+.stButton > button {
+  border-radius: 9999px !important;
+  padding: .28rem .75rem !important;
+  border: 1px solid var(--border) !important;
+  background: #fff !important;
+  color: var(--text) !important;
+  font-weight: 700 !important;
+}
+.stButton > button:hover {
+  background: rgba(36,32,36,.06) !important;
+}
+</style>
+"""
+st.markdown(PILLS_CSS, unsafe_allow_html=True)
+
 st.caption("Ir directo a…")
 per_row = min(len(publicadas), 10)  # hasta 10 por fila
 cols = st.columns(per_row)
 
 def _request_jump(i: int):
-    # Callback seguro: no toca el key del widget directamente
+    # Callback seguro: no toca la clave del widget directamente
     st.session_state["rondas_jump_to"] = int(i)
 
 for idx, i in enumerate(publicadas):
     c = cols[idx % per_row]
-    label = f"{i}"
     is_active = (i == sel)
-    # Chip: si es la seleccionada, marca ✓
+    label = f"✓ {i}" if is_active else f"{i}"
     c.button(
-        label if not is_active else f"✓ {label}",
+        label,
         key=f"chip_R{i}",
         use_container_width=True,
         on_click=_request_jump,
         args=(i,),
     )
-    # nueva fila cada 'per_row' elementos
     if (idx + 1) % per_row == 0 and (idx + 1) < len(publicadas):
         cols = st.columns(min(per_row, len(publicadas) - (idx + 1)))
 
@@ -143,35 +160,38 @@ def render_round(i: int):
     st.markdown(f"### Ronda {i} — {estado}")
     st.caption(f"Archivo: `{path}` · Última modificación: {lm} · Resultados vacíos: {empties}")
 
-    # marcar BYEs
+    # BYE: badge en línea, sin columna extra
     bye_mask = (
         safe_df["negras_id"].astype(str).str.upper().eq("BYE")
         | safe_df["negras_nombre"].astype(str).str.upper().eq("BYE")
     )
-    safe_df["BYE"] = bye_mask.map({True: "🟨 BYE", False: ""})
+    show_df = safe_df.copy()
+    show_df["negras_nombre_show"] = show_df["negras_nombre"].astype(str)
+    show_df.loc[bye_mask, "negras_nombre_show"] = show_df["negras_nombre_show"].replace(
+        {"": "BYE"}
+    )
+    show_df.loc[bye_mask, "negras_nombre_show"] = show_df["negras_nombre_show"] + "  🟨 BYE"
 
     # ordenar por mesa
     try:
-        safe_df["mesa"] = pd.to_numeric(safe_df["mesa"], errors="coerce")
+        show_df["mesa"] = pd.to_numeric(show_df["mesa"], errors="coerce")
     except Exception:
         pass
-    safe_df = safe_df.sort_values(by=["mesa"], na_position="last")
+    show_df = show_df.sort_values(by=["mesa"], na_position="last")
 
     # normalizar resultados para vista
-    safe_df["resultado"] = _normalize_result_series(safe_df["resultado"])
-    show_df = safe_df.copy()
+    show_df["resultado"] = _normalize_result_series(show_df["resultado"])
     show_df.loc[show_df["resultado"] == "", "resultado"] = "—"
 
     st.dataframe(
-        show_df[["mesa", "blancas_nombre", "negras_nombre", "resultado", "BYE"]],
+        show_df[["mesa", "blancas_nombre", "negras_nombre_show", "resultado"]],
         use_container_width=True,
         hide_index=True,
         column_config={
             "mesa": st.column_config.NumberColumn("Mesa", help="Número de mesa"),
             "blancas_nombre": st.column_config.TextColumn("Blancas"),
-            "negras_nombre": st.column_config.TextColumn("Negras"),
+            "negras_nombre_show": st.column_config.TextColumn("Negras"),
             "resultado": st.column_config.TextColumn("Resultado"),
-            "BYE": st.column_config.TextColumn(""),
         },
     )
 
