@@ -22,7 +22,7 @@ inject_base_style()  # ← NUEVO: aplica el bg_color de config.json en la raíz
 sidebar_title_and_nav(
     extras=True,
     items=[
-        ("inicio_app.py", "♟️ Inicio"),
+        ("Inicio_app.py", "♟️ Inicio"),
         ("pages/10_Rondas.py", "🧩 Rondas"),
         ("pages/20_Clasificacion.py", "🏆 Clasificación"),
         ("pages/99_Administracion.py", "🛠️ Administración")
