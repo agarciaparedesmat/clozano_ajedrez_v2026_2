@@ -172,15 +172,23 @@ def chip(text: str, kind: str = "green"):
 
 
 
-def sidebar_title(text: str | None = None, extras: bool = True, hide_nav_header: bool = True) -> None:
+# lib/ui.py
+import streamlit as st
+
+def sidebar_title(
+    text: str | None = None,
+    extras: bool = True,
+    hide_nav_header: bool = True,
+    pull_up_px: int = 14,  # cuánto “subir” la nav para cerrar el hueco
+) -> None:
     """
-    Cabecera compacta en la barra lateral:
-      1) Título del torneo (config['titulo'])
-      2) Línea gris: 🎓 nivel · 📅 año (si existen)
-      3) Separador fino
-      4) Navegación automática justo debajo (sin huecos)
+    Cabecera compacta en la barra lateral + navegación automática justo debajo.
+    - hide_nav_header=True  -> oculta el título 'app' de la nav
+    - hide_nav_header=False -> lo muestra pero compacto
+    - pull_up_px: tras compactar, desplaza la nav hacia arriba para cerrar
+      cualquier espacio residual (por si hay wrappers con padding no controlable).
     """
-    # cargar cfg (sirve si tournament está en lib/ o en raíz)
+    # Cargar cfg (sirve lib/ o raíz)
     try:
         from lib.tournament import load_config
     except Exception:
@@ -195,48 +203,59 @@ def sidebar_title(text: str | None = None, extras: bool = True, hide_nav_header:
     nivel = (cfg.get("nivel") or "").strip()
     anio  = (cfg.get("anio")  or "").strip()
 
-    # CSS ULTRA robusto (usa solo data-testid y !important)
+    nav_header_rule = (
+        """
+        /* Ocultar encabezado de nav */
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] > div:first-child { display: none !important; }
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] :is(h1,h2,h3,p,div[role="heading"]) { display: none !important; }
+        """
+        if hide_nav_header else
+        """
+        /* Mostrar encabezado de nav pero MUY compacto */
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] > div:first-child {
+          display: block !important; margin: .05rem 0 !important; padding: 0 !important;
+        }
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] :is(h1,h2,h3,p,div[role="heading"]) {
+          display: block !important; margin: .05rem 0 !important; padding: 0 !important;
+          line-height: 1.1 !important; font-size: .90rem !important; opacity: .75;
+        }
+        """
+    )
+
     st.sidebar.markdown(
         f"""
         <style>
-        /* 1) Compactar al máximo el stack de la sidebar */
+        /* --- Compactar TODAS las capas conocidas de la sidebar --- */
         section[data-testid="stSidebar"] {{
-          padding-top: 0 !important;
+          padding-top: 0 !important; margin-top: 0 !important;
         }}
         section[data-testid="stSidebar"] > div:first-child {{
-          display: flex !important;
-          flex-direction: column !important;
-          gap: 0 !important;
-          padding-top: 0 !important;
-          margin-top: 0 !important;
+          display: flex !important; flex-direction: column !important;
+          gap: 0 !important; padding-top: 0 !important; margin-top: 0 !important;
         }}
-        /* Contenido de usuario en sidebar */
         section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
-          margin-top: 0 !important;
-          padding-top: 0.1rem !important;
+          margin-top: 0 !important; padding-top: 0 !important;
         }}
-        /* Bloque de navegación automática */
+        section[data-testid="stSidebar"] .block-container {{
+          padding-top: 0 !important; margin-top: 0 !important;
+        }}
+        section[data-testid="stSidebar"] .stVerticalBlock {{
+          margin-top: 0 !important; padding-top: 0 !important;
+        }}
+
+        /* --- Navegación automática --- */
         section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {{
           order: 2;
-          margin-top: 0.2rem !important;
-          padding-top: 0 !important;
+          margin: 0 !important; padding: 0 !important;
+          transform: translateY(-{pull_up_px}px) !important;  /* << empuja hacia arriba */
         }}
         section[data-testid="stSidebar"] [data-testid="stSidebarNav"] ul {{
-          margin: 0.1rem 0 0 0 !important;
-          padding-left: .35rem !important;
+          margin: .05rem 0 0 0 !important; padding-left: .35rem !important;
         }}
 
-        /* 2) Encabezado del bloque de navegación (“app”):
-              - lo ocultamos si hide_nav_header=True
-              - si no, lo forzamos a mostrarse pero compacto */
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] > div:first-child {{
-          {"display:none !important;" if hide_nav_header else "display:block !important; margin:.1rem 0 !important; padding:0 !important;"}
-        }}
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] :is(h1,h2,h3,p,div[role="heading"]) {{
-          {"display:none !important;" if hide_nav_header else "display:block !important; margin:.1rem 0 .1rem 0 !important; padding:0 !important; line-height:1.1 !important; font-size:.90rem !important; opacity:.75;"}
-        }}
+        {nav_header_rule}
 
-        /* 3) Nuestros bloques (título/meta/separador) super compactos */
+        /* --- Nuestra cabecera (título + meta + separador) --- */
         ._csb_title {{ margin: 0 0 .10rem 0 !important; font-weight: 800; font-size: 1.05rem; line-height: 1.2; }}
         ._csb_meta  {{ margin: 0 0 .10rem 0 !important; color: var(--muted); }}
         ._csb_sep   {{ border: none; border-top: 1px solid rgba(36,32,36,.25);
@@ -246,7 +265,7 @@ def sidebar_title(text: str | None = None, extras: bool = True, hide_nav_header:
         unsafe_allow_html=True,
     )
 
-    # 4) Render cabecera
+    # Render cabecera
     st.sidebar.markdown(f'<div class="_csb_title">{text}</div>', unsafe_allow_html=True)
     if extras and (nivel or anio):
         meta = " · ".join([p for p in [f"🎓 {nivel}" if nivel else "", f"📅 {anio}" if anio else ""] if p])
