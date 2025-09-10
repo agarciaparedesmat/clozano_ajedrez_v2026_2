@@ -22,6 +22,8 @@ from lib.tournament import (
     format_with_cfg,
 )
 
+sidebar_title(extras=True)  
+
 # Cabecera con nivel/año
 cfg = load_config()
 page_header(format_with_cfg("Clasificación — {nivel}", cfg), format_with_cfg("Curso {anio} · Solo rondas publicadas", cfg))

@@ -25,6 +25,8 @@ def _slugify(s: str) -> str:
     s = re.sub(r"\s+", "_", str(s or "").strip())
     return re.sub(r"[^A-Za-z0-9_\-]+", "", s) or "torneo"
 
+sidebar_title(extras=True)  
+
 # Cabecera con nivel/año
 cfg = load_config()
 page_header(

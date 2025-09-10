@@ -19,8 +19,10 @@ from lib.tournament import (
 from lib.ui import page_header
 from lib.ui import hero_portada, inject_base_style, sidebar_title
 
-page_header("🛠️ Panel de Administración", "Gestión de rondas, publicación y resultados")
+sidebar_title(extras=True) 
 
+page_header("🛠️ Panel de Administración", "Gestión de rondas, publicación y resultados")
+ 
 # =========================
 # Acceso (simple)
 # =========================
