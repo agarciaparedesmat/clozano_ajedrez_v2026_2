@@ -330,11 +330,10 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
 
         cab_lines = []
         if nivel:       cab_lines.append(f"<b>{nivel}</b>")
-        if not include_results:
-            if linea_fecha: cab_lines.append(linea_fecha)
-            if linea_hora:  cab_lines.append(linea_hora)
+        if linea_fecha: cab_lines.append(linea_fecha)
+        if linea_hora:  cab_lines.append(linea_hora)
         cab_text = "<br/>".join(cab_lines) if cab_lines else ""
-        cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=20, leading=24, alignment=1))]],
+        cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=13, leading=16, alignment=1))]],
                     colWidths=[doc.width])
         cab.setStyle(TableStyle([
             ("BACKGROUND", (0,0), (-1,-1), AZUL),
@@ -346,7 +345,7 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             ("BOTTOMPADDING", (0,0), (-1,-1), 10),
         ]))
 
-        titulo_lista = Table([[Paragraph("RESULTADOS" if include_results else "RESULTADOS" if include_results else "Lista de emparejamientos", H3)]], colWidths=[doc.width])
+        titulo_lista = Table([[Paragraph("Lista de emparejamientos", H3)]], colWidths=[doc.width])
         titulo_lista.setStyle(TableStyle([
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
             ("BOTTOMPADDING", (0,0), (-1,-1), 6),
@@ -417,10 +416,10 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             pdf.set_font("Helvetica", "B", 18); pdf.cell(0, 10, f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", ln=1, align="C")
             pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 10, f"RONDA {i}", ln=1, align="C")
             pdf.set_font("Helvetica", "B", 18)
-            for ln in ([nivel] + ([] if include_results else [linea_fecha, linea_hora])):
+            for ln in [nivel, linea_fecha, linea_hora]:
                 if ln: pdf.cell(0, 8, ln, ln=1, align="C")
             pdf.ln(2)
-            pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "RESULTADOS" if include_results else "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
+            pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
 
             headers = ["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"]
             widths = [20, 85, 20, 85]  # un poco más anchas las columnas de nombres
@@ -494,7 +493,7 @@ def render_round(i: int):
 
     # ---- TABLA EN PANTALLA (4 columnas limpias) ----
     st.dataframe(
-        show_df[["mesa", "blancas_nombre", "resultado_mostrar", "negras_nombre"]],
+        show_df[["mesa", "blancas_nombre", "negras_nombre", "resultado_mostrar"]],
         use_container_width=True,
         hide_index=True,
         column_config={
