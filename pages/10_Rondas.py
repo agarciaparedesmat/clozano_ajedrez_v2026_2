@@ -253,12 +253,6 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         MELOCOTON = colors.HexColor("#f7e1d5")
         AZUL      = colors.HexColor("#cfe2f3")
 
-        # Colores sobrios y parametrizables (solo cabeceras PDF)
-        HEADER_BG     = colors.HexColor((cfg.get("pdf_header_bg") or "#F3F3F0"))
-        HEADER_BORDER = colors.HexColor((cfg.get("pdf_header_border") or "#C9C9C9"))
-        META_BG       = colors.HexColor((cfg.get("pdf_meta_bg") or "#FAFAFA"))
-
-
         # Registrar fuentes si existen
         def _register_fonts():
             basep = os.path.join("assets", "fonts")
@@ -316,12 +310,16 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         linea_fecha = (cfg.get("pdf_fecha") or "").strip()
         linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-        # Bandas
-        hdr_tbl = Table(
-            [[Paragraph(f"{titulo} {anio}" if titulo and anio else "TORNEO DE AJEDREZ", H1)],
-             [Paragraph(f"RONDA {i}", H1)]],
-            colWidths=[doc.width]
-        )
+        
+        # === Cabecera nueva: caja única (Título + Ronda) y meta en una sola línea ===
+        # Paleta sobria (parametrizable vía config.json)
+        HEADER_BG     = colors.HexColor((cfg.get("pdf_header_bg") or "#F3F3F0"))
+        HEADER_BORDER = colors.HexColor((cfg.get("pdf_header_border") or "#C9C9C9"))
+        META_BG       = colors.HexColor((cfg.get("pdf_meta_bg") or "#FAFAFA"))
+
+        # Caja superior con 2 filas: [TÍTULO AÑO] / [RONDA N]
+        tline = f"{titulo} {anio}" if (titulo and anio) else (titulo or "TORNEO DE AJEDREZ")
+        hdr_tbl = Table([[Paragraph(tline, H1)], [Paragraph(f"RONDA {i}", H1)]], colWidths=[doc.width])
         hdr_tbl.setStyle(TableStyle([
             ("BACKGROUND", (0,0), (-1,-1), HEADER_BG),
             ("BOX",       (0,0), (-1,-1), 0.8, HEADER_BORDER),
@@ -333,75 +331,25 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             ("BOTTOMPADDING", (0,1), (-1,1), 10),
         ]))
 
-                cab_parts = []
-        if nivel:       cab_parts.append(f"<b>{nivel}</b>")
-        # une fecha y hora/lugar en una sola línea
+        # Línea meta en una sola línea (nivel · fecha — hora/lugar) con tamaño algo menor
+        cab_parts = []
+        if nivel:
+            cab_parts.append(f"<b>{nivel}</b>")
         if linea_fecha and linea_hora:
             cab_parts.append(f"{linea_fecha} — {linea_hora}")
         elif linea_fecha or linea_hora:
             cab_parts.append(linea_fecha or linea_hora)
-        cab_text = " · ".join([p for p in cab_parts if p]) if cab_parts else ""
+        cab_text = " · ".join(cab_parts) if cab_parts else ""
 
-cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=14, leading=18, alignment=1))]],
+        cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=14, leading=18, alignment=1))]],
                     colWidths=[doc.width])
         cab.setStyle(TableStyle([
             ("BACKGROUND", (0,0), (-1,-1), META_BG),
-            ("BOX", (0,0), (-1,-1), 0.5, HEADER_BORDER),
-            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
-            ("LEFTPADDING", (0,0), (-1,-1), 10),
-            ("RIGHTPADDING", (0,0), (-1,-1), 10),
-            ("TOPPADDING", (0,0), (-1,-1), 10),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 10),
-        ]))
-
-        titulo_lista = Table([[Paragraph("Lista de emparejamientos", H3)]], colWidths=[doc.width])
-        titulo_lista.setStyle(TableStyle([
-            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOX",        (0,0), (-1,-1), 0.5, HEADER_BORDER),
+            ("ALIGN",      (0,0), (-1,-1), "CENTER"),
+            ("VALIGN",     (0,0), (-1,-1), "MIDDLE"),
+            ("TOPPADDING",    (0,0), (-1,-1), 6),
             ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-            ("TOPPADDING", (0,0), (-1,-1), 6),
-        ]))
-
-        # Construir filas: usar Paragraph en nombres para buena ruptura de línea + sangría/padding
-        rows = []
-        for _, r in tbl.iterrows():
-            mesa = str(r["mesa"])
-            b = Paragraph(str(r["blancas_nombre_pdf"]), BODY)
-            res = Paragraph(str(r["resultado_mostrar"]), ParagraphStyle("RES", parent=BODY, alignment=1))  # centrado
-            n = Paragraph(str(r["negras_nombre_pdf"]), BODY)
-            rows.append([mesa, b, res, n])
-
-        data = [["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"], ["", "", "", ""]] + rows
-        widths = [20*mm, (doc.width - 40*mm)/2, 20*mm, (doc.width - 40*mm)/2]
-
-        t = Table(data, colWidths=widths, repeatRows=2)  # repite cabecera si salta de página
-        t.setStyle(TableStyle([
-            # cabecera
-            ("FONT", (0,0), (-1,0), SERIF_B, 11.5),
-            ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            ("ALIGN", (0,0), (-1,0), "CENTER"),
-            ("VALIGN", (0,0), (-1,0), "MIDDLE"),
-            ("BOTTOMPADDING", (0,0), (-1,0), 6),
-            ("TOPPADDING", (0,0), (-1,0), 6),
-
-            # doble línea real (cabecera → cuerpo)
-            ("LINEBELOW", (0,0), (-1,0), 1.3, colors.black),  # 1ª
-            ("LINEBELOW", (0,1), (-1,1), 0.6, colors.black),  # 2ª fina
-
-            # fila separadora “fantasma”
-            ("TOPPADDING", (0,1), (-1,1), 0),
-            ("BOTTOMPADDING", (0,1), (-1,1), 0),
-            ("FONTSIZE", (0,1), (-1,1), 1),
-            ("ROWHEIGHTS", (0,1), (-1,1), 2),
-
-            # cuerpo: padding y alineaciones
-            ("LEFTPADDING", (0,2), (-1,-1), 6),
-            ("RIGHTPADDING", (0,2), (-1,-1), 6),
-            ("ALIGN", (0,2), (0,-1), "CENTER"),
-            ("ALIGN", (2,2), (2,-1), "CENTER"),
-            ("VALIGN", (0,2), (-1,-1), "MIDDLE"),
-
-            # rejilla suave
-            ("GRID", (0,2), (-1,-1), 0.4, colors.lightgrey),
         ]))
 
         story = [hdr_tbl, cab, Spacer(1, 6), titulo_lista, t]
@@ -421,19 +369,31 @@ cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSi
             linea_fecha = (cfg.get("pdf_fecha") or "").strip()
             linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-            # cabeceras centradas
-                        # Caja superior (Título + Ronda)
+            
+            # Caja superior (Título + Ronda) con rectángulo fino
             x, y, w, h = 15, 10, 180, 26
             pdf.set_draw_color(200, 200, 200)
             pdf.rect(x, y, w, h)
 
             pdf.set_xy(x, y + 3)
-            pdf.set_font("Helvetica", "B", 18); pdf.cell(w, 8, f"{'TORNEO DE AJEDREZ ' + anio if anio and not (titulo or '').strip() else (titulo or 'TORNEO DE AJEDREZ')} {anio if anio and (titulo or '').strip() else ''}".strip(), ln=1, align="C")
-            pdf.set_x(x); pdf.set_font("Helvetica", "B", 22); pdf.cell(w, 10, f"RONDA {i}", ln=1, align="C")
+            pdf.set_font("Helvetica", "B", 18)
+            title_txt = (cfg.get("titulo") or "TORNEO DE AJEDREZ").strip()
+            anio = (cfg.get("anio") or "").strip()
+            if anio:
+                title_txt = f"{title_txt} {anio}"
+            pdf.cell(w, 8, title_txt, ln=1, align="C")
 
-            # Línea meta en una sola línea (nivel · fecha — hora)
+            pdf.set_x(x)
+            pdf.set_font("Helvetica", "B", 22)
+            pdf.cell(w, 10, f"RONDA {i}", ln=1, align="C")
+
+            # Meta en una sola línea y tamaño menor
+            nivel = (cfg.get("nivel") or "").strip()
+            linea_fecha = (cfg.get("pdf_fecha") or "").strip()
+            linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
             meta_parts = []
-            if nivel: meta_parts.append(nivel)
+            if nivel:
+                meta_parts.append(nivel)
             if linea_fecha and linea_hora:
                 meta_parts.append(f"{linea_fecha} — {linea_hora}")
             elif linea_fecha or linea_hora:
@@ -441,8 +401,10 @@ cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSi
             meta_text = " · ".join(meta_parts)
 
             pdf.ln(1)
-            pdf.set_font("Helvetica", "B", 12); pdf.cell(0, 7, meta_text, ln=1, align="C")
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.cell(0, 7, meta_text, ln=1, align="C")
             pdf.ln(2)
+    
             pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
 
             headers = ["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"]
