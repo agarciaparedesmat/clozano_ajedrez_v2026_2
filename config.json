@@ -21,10 +21,9 @@
   "pdf_header_bg": "#F3F3F0",
   "pdf_header_border": "#C9C9C9",
   "pdf_meta_bg": "#FAFAFA",
-
   "pdf_title_size": 22,
   "pdf_round_size": 20,
   "pdf_meta_size": 13,
   "pdf_font": "Helvetica" 
-  // Opciones admitidas: "Helvetica", "Times", "Inter", "Atkinson", "Lexend", "NotoSans"
+
 }
