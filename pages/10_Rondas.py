@@ -341,7 +341,7 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             cab_lines.append(second_line)
 
         cab_text = "<br/>".join(cab_lines) if cab_lines else ""
-        cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=22, leading=18, alignment=1))]],
+        cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=14, leading=18, alignment=1))]],
                     colWidths=[doc.width])
         cab.setStyle(TableStyle([
             ("BACKGROUND", (0,0), (-1,-1), AZUL),
