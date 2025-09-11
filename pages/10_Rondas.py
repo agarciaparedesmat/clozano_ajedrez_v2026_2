@@ -273,9 +273,12 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             return ok
 
         has_custom = _register_fonts()
-        SERIF    = "OldStd"   if has_custom else "Times-Roman"
-        SERIF_B  = "OldStd-B" if has_custom else "Times-Bold"
-        DISPLAY  = "Playfair-B" if has_custom else SERIF_B
+        # Usar sans serif de alta legibilidad por defecto
+        SANS    = "Helvetica"
+        SANS_B  = "Helvetica-Bold"
+        SERIF   = SANS
+        SERIF_B = SANS_B
+        DISPLAY = SANS_B
 
         buf = io.BytesIO()
         # Márgenes algo más “editoriales”
@@ -310,38 +313,30 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         linea_fecha = (cfg.get("pdf_fecha") or "").strip()
         linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-        # Bandas → sustituido por un único recuadro (Título + RONDA)
-        hdr_tbl = Table(
-            [[Paragraph(f"{titulo} {anio}" if titulo and anio else "TORNEO DE AJEDREZ", H1)],
-             [Paragraph(f"RONDA {i}", H1)]],
-            colWidths=[doc.width]
-        )
-        hdr_tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,0), VERDE),
-            ("BACKGROUND", (0,1), (-1,1), MELOCOTON),
-            ("BOX",       (0,0), (-1,-1), 0.8, colors.black),
-            ("ALIGN",     (0,0), (-1,-1), "CENTER"),
-            ("VALIGN",    (0,0), (-1,-1), "MIDDLE"),
-            ("BOTTOMPADDING", (0,0), (-1,0), 6),
-            ("TOPPADDING",    (0,0), (-1,0), 6),
-            ("BOTTOMPADDING", (0,1), (-1,1), 12),
-            ("TOPPADDING",    (0,1), (-1,1), 12),
+        # Bandas
+        band1 = Table([[Paragraph(f"{titulo} {anio}" if titulo and anio else "TORNEO DE AJEDREZ", H1)]],
+                      colWidths=[doc.width])
+        band1.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), VERDE),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING", (0,0), (-1,-1), 6),
         ]))
 
-        # Cabecera secundaria (dos líneas): [NIVEL] y [FECHA — HORA/LUGAR en una sola línea y menor]
-        cab_lines = []
-        if nivel:
-            cab_lines.append(f"<b>{nivel}</b>")
-        second_line = ""
-        if linea_fecha and linea_hora:
-            second_line = f"{linea_fecha} — {linea_hora}"
-        elif linea_fecha or linea_hora:
-            second_line = linea_fecha or linea_hora
-        if second_line:
-            cab_lines.append(second_line)
+        band2 = Table([[Paragraph(f"RONDA {i}", H1)]], colWidths=[doc.width])
+        band2.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), MELOCOTON),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 12),
+            ("TOPPADDING", (0,0), (-1,-1), 12),
+        ]))
 
+        cab_lines = []
+        if nivel:       cab_lines.append(f"<b>{nivel}</b>")
+        if linea_fecha: cab_lines.append(linea_fecha)
+        if linea_hora:  cab_lines.append(linea_hora)
         cab_text = "<br/>".join(cab_lines) if cab_lines else ""
-        cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=14, leading=18, alignment=1))]],
+        cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=20, leading=24, alignment=1))]],
                     colWidths=[doc.width])
         cab.setStyle(TableStyle([
             ("BACKGROUND", (0,0), (-1,-1), AZUL),
@@ -352,7 +347,7 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             ("TOPPADDING", (0,0), (-1,-1), 10),
             ("BOTTOMPADDING", (0,0), (-1,-1), 10),
         ]))
-        
+
         titulo_lista = Table([[Paragraph("Lista de emparejamientos", H3)]], colWidths=[doc.width])
         titulo_lista.setStyle(TableStyle([
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
@@ -403,7 +398,7 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             ("GRID", (0,2), (-1,-1), 0.4, colors.lightgrey),
         ]))
 
-        story = [hdr_tbl, cab, Spacer(1, 6), titulo_lista, t]
+        story = [band1, band2, cab, Spacer(1, 6), titulo_lista, t]
         doc.build(story, onFirstPage=_draw_frame, onLaterPages=_draw_frame)
         return buf.getvalue()
 
@@ -420,36 +415,13 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             linea_fecha = (cfg.get("pdf_fecha") or "").strip()
             linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-            # cabeceras con recuadro (Título + RONDA) y meta en una sola línea (fecha — hora/lugar)
-            x, y, w, h = 15, 10, 180, 26
-            pdf.set_draw_color(200, 200, 200)
-            pdf.rect(x, y, w, h)
-
-            pdf.set_xy(x, y + 3)
+            # cabeceras centradas
+            pdf.set_font("Helvetica", "B", 18); pdf.cell(0, 10, f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", ln=1, align="C")
+            pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 10, f"RONDA {i}", ln=1, align="C")
             pdf.set_font("Helvetica", "B", 18)
-            title_txt = f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ"
-            pdf.cell(w, 8, title_txt, ln=1, align="C")
-
-            pdf.set_x(x)
-            pdf.set_font("Helvetica", "B", 22)
-            pdf.cell(w, 10, f"RONDA {i}", ln=1, align="C")
-
-            # Meta en dos líneas: [NIVEL] y [FECHA — HORA/LUGAR en una]
-            meta_line = ""
-            if linea_fecha and linea_hora:
-                meta_line = f"{linea_fecha} — {linea_hora}"
-            elif linea_fecha or linea_hora:
-                meta_line = linea_fecha or linea_hora
-
-            if nivel:
-                pdf.set_font("Helvetica", "B", 13)
-                pdf.cell(0, 7, nivel, ln=1, align="C")
-            if meta_line:
-                pdf.set_font("Helvetica", "B", 12)
-                pdf.cell(0, 7, meta_line, ln=1, align="C")
-
+            for ln in [nivel, linea_fecha, linea_hora]:
+                if ln: pdf.cell(0, 8, ln, ln=1, align="C")
             pdf.ln(2)
-            pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
             pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
 
             headers = ["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"]
