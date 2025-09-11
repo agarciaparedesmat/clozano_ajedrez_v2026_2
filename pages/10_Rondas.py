@@ -273,9 +273,16 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             return ok
 
         has_custom = _register_fonts()
-        SERIF    = "OldStd"   if has_custom else "Times-Roman"
-        SERIF_B  = "OldStd-B" if has_custom else "Times-Bold"
-        DISPLAY  = "Playfair-B" if has_custom else SERIF_B
+        #SERIF    = "OldStd"   if has_custom else "Times-Roman"
+        #SERIF_B  = "OldStd-B" if has_custom else "Times-Bold"
+        #DISPLAY  = "Playfair-B" if has_custom else SERIF_B
+        
+# Usar sans serif de alta legibilidad por defecto
+        SANS    = "Helvetica"
+        SANS_B  = "Helvetica-Bold"
+        SERIF   = SANS
+        SERIF_B = SANS_B
+        DISPLAY = SANS_B
 
         buf = io.BytesIO()
         # Márgenes algo más “editoriales”
