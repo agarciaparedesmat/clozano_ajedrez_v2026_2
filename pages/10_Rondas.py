@@ -450,7 +450,7 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
 
             pdf.ln(2)
             pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
-                       pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
+            pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
 
             headers = ["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"]
             widths = [20, 85, 20, 85]  # un poco más anchas las columnas de nombres
