@@ -253,36 +253,84 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         MELOCOTON = colors.HexColor("#f7e1d5")
         AZUL      = colors.HexColor("#cfe2f3")
 
-        # Registrar fuentes si existen
-        def _register_fonts():
-            basep = os.path.join("assets", "fonts")
-            ok = False
-            try:
-                if os.path.exists(os.path.join(basep, "OldStandard-Regular.ttf")):
-                    pdfmetrics.registerFont(TTFont("OldStd", os.path.join(basep, "OldStandard-Regular.ttf")))
-                    if os.path.exists(os.path.join(basep, "OldStandard-Bold.ttf")):
-                        pdfmetrics.registerFont(TTFont("OldStd-B", os.path.join(basep, "OldStandard-Bold.ttf")))
-                    ok = True
-                if os.path.exists(os.path.join(basep, "PlayfairDisplay-Regular.ttf")):
-                    pdfmetrics.registerFont(TTFont("Playfair", os.path.join(basep, "PlayfairDisplay-Regular.ttf")))
-                    if os.path.exists(os.path.join(basep, "PlayfairDisplay-Bold.ttf")):
-                        pdfmetrics.registerFont(TTFont("Playfair-B", os.path.join(basep, "PlayfairDisplay-Bold.ttf")))
-                    ok = True
-            except Exception:
-                pass
-            return ok
 
-        has_custom = _register_fonts()
-        #SERIF    = "OldStd"   if has_custom else "Times-Roman"
-        #SERIF_B  = "OldStd-B" if has_custom else "Times-Bold"
-        #DISPLAY  = "Playfair-B" if has_custom else SERIF_B
-        
-# Usar sans serif de alta legibilidad por defecto
-        SANS    = "Helvetica"
-        SANS_B  = "Helvetica-Bold"
-        SERIF   = SANS
-        SERIF_B = SANS_B
-        DISPLAY = SANS_B
+        # === Selección de fuente desde config.json (con fallback seguro) ===
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+
+        def _try_register_font(name_ui: str, regular_path: str, bold_path: str):
+            """
+            Registra TTF si existen; devuelve (regular_name, bold_name) registrables en ParagraphStyle.
+            Si no existen, lanza excepción para que el caller haga fallback.
+            """
+            if not (os.path.exists(regular_path) and os.path.exists(bold_path)):
+                raise FileNotFoundError("TTF faltantes")
+            reg_name = f"{name_ui}-Reg"
+            bld_name = f"{name_ui}-Bold"
+            if reg_name not in pdfmetrics.getRegisteredFontNames():
+                pdfmetrics.registerFont(TTFont(reg_name, regular_path))
+            if bld_name not in pdfmetrics.getRegisteredFontNames():
+                pdfmetrics.registerFont(TTFont(bld_name, bold_path))
+            return reg_name, bld_name
+
+        # Mapa de familias → archivos esperados en assets/fonts/
+        base_fonts_dir = os.path.join(os.path.dirname(__file__), "..", "assets", "fonts")
+        family = (cfg.get("pdf_font") or "Helvetica").strip().lower()
+
+        SERIF   = "Helvetica"
+        SERIF_B = "Helvetica-Bold"
+        DISPLAY = SERIF_B
+
+        try:
+            if family in ("helvetica", "sans", "default"):
+                SERIF, SERIF_B, DISPLAY = "Helvetica", "Helvetica-Bold", "Helvetica-Bold"
+
+            elif family in ("times", "serif"):
+                SERIF, SERIF_B, DISPLAY = "Times-Roman", "Times-Bold", "Times-Bold"
+
+            elif family == "inter":
+                r, b = _try_register_font(
+                    "Inter",
+                    os.path.join(base_fonts_dir, "Inter-Regular.ttf"),
+                    os.path.join(base_fonts_dir, "Inter-Bold.ttf"),
+                )
+                SERIF, SERIF_B, DISPLAY = r, b, b
+
+            elif family == "atkinson":
+                r, b = _try_register_font(
+                    "Atkinson",
+                    os.path.join(base_fonts_dir, "Atkinson-Hyperlegible-Regular.ttf"),
+                    os.path.join(base_fonts_dir, "Atkinson-Hyperlegible-Bold.ttf"),
+                )
+                SERIF, SERIF_B, DISPLAY = r, b, b
+
+            elif family == "lexend":
+                r, b = _try_register_font(
+                    "Lexend",
+                    os.path.join(base_fonts_dir, "Lexend-Regular.ttf"),
+                    os.path.join(base_fonts_dir, "Lexend-Bold.ttf"),
+                )
+                SERIF, SERIF_B, DISPLAY = r, b, b
+
+            elif family in ("notosans", "noto-sans"):
+                r, b = _try_register_font(
+                    "NotoSans",
+                    os.path.join(base_fonts_dir, "NotoSans-Regular.ttf"),
+                    os.path.join(base_fonts_dir, "NotoSans-Bold.ttf"),
+                )
+                SERIF, SERIF_B, DISPLAY = r, b, b
+
+            # Si ‘family’ no coincide con nada de lo anterior, se queda Helvetica
+        except Exception:
+            # Fallo registrando TTF → usa Helvetica
+            SERIF, SERIF_B, DISPLAY = "Helvetica", "Helvetica-Bold", "Helvetica-Bold"
+
+        # A partir de aquí, tus estilos deben usar SERIF / SERIF_B / DISPLAY como antes
+        H1 = ParagraphStyle("H1", parent=styles["Heading1"], fontName=SERIF_B, fontSize=22, leading=26, alignment=1, spaceAfter=0)
+        H2 = ParagraphStyle("H2", parent=styles["Heading2"], fontName=SERIF_B, fontSize=18, leading=22, alignment=1, spaceAfter=0)
+        H3 = ParagraphStyle("H3", parent=styles["Heading3"], fontName=SERIF_B, fontSize=14, leading=18, alignment=1, spaceAfter=6)
+        BODY = ParagraphStyle("BODY", parent=styles["Normal"], fontName=SERIF, fontSize=11, leading=14)
+
 
         buf = io.BytesIO()
         # Márgenes algo más “editoriales”
