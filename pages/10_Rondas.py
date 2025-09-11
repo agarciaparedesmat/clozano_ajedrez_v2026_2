@@ -304,13 +304,14 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         H3 = ParagraphStyle("H3", parent=styles["Normal"], fontName=SERIF_B, fontSize=16, leading=20, alignment=1, spaceBefore=2, spaceAfter=4)
         BODY = ParagraphStyle("BODY", parent=styles["Normal"], fontName=SERIF, fontSize=11.5, leading=14.2, leftIndent=0)
 
+        titulo = (cfg.get("titulo") or "").strip() 
         anio = (cfg.get("anio") or "").strip()
         nivel = (cfg.get("nivel") or "").strip()
         linea_fecha = (cfg.get("pdf_fecha") or "").strip()
         linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
         # Bandas
-        band1 = Table([[Paragraph(f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", H1)]],
+        band1 = Table([[Paragraph(f"{titulo} {anio}" if titulo and anio else "TORNEO DE AJEDREZ", H1)]],
                       colWidths=[doc.width])
         band1.setStyle(TableStyle([
             ("BACKGROUND", (0,0), (-1,-1), VERDE),
@@ -319,7 +320,7 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             ("TOPPADDING", (0,0), (-1,-1), 6),
         ]))
 
-        band2 = Table([[Paragraph(f"RONDA {i}", H2)]], colWidths=[doc.width])
+        band2 = Table([[Paragraph(f"RONDA {i}", H1)]], colWidths=[doc.width])
         band2.setStyle(TableStyle([
             ("BACKGROUND", (0,0), (-1,-1), MELOCOTON),
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
