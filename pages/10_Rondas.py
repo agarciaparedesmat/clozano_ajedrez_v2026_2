@@ -1,27 +1,7 @@
 # pages/10_Rondas.py
 # -*- coding: utf-8 -*-
-"""
-Rondas — Vista pública + descarga PDF/CSV.
-
-Cambios solicitados:
-- Fecha y hora/lugar en **una sola línea** y con **tamaño menor**.
-- **Recuadro único** que agrupa Título y RONDA.
-- **Colores de cabecera parametrizables** vía `config.json`:
-    - pdf_header_bg       (fondo de caja Título+Ronda)        — por defecto "#F3F3F0"
-    - pdf_header_border   (borde de caja Título+Ronda)         — por defecto "#C9C9C9"
-    - pdf_meta_bg         (fondo de línea meta bajo la caja)   — por defecto "#FAFAFA"
-Opcionales (si quieres afinar tamaños sin tocar código):
-    - pdf_title_size      (por defecto 22)
-    - pdf_round_size      (por defecto 20)
-    - pdf_meta_size       (por defecto 13)
-"""
-from __future__ import annotations
-
 import io
-import os
-import math
-import datetime as _dt
-
+import re
 import streamlit as st
 import pandas as pd
 
@@ -38,323 +18,561 @@ from lib.tournament import (
     format_with_cfg,
 )
 
-# ------------------------------------------------------------
-# Utilidades
-# ------------------------------------------------------------
-def _cfg_colors(cfg: dict) -> dict:
-    return {
-        "header_bg":    cfg.get("pdf_header_bg", "#F3F3F0"),
-        "header_border":cfg.get("pdf_header_border", "#C9C9C9"),
-        "meta_bg":      cfg.get("pdf_meta_bg", "#FAFAFA"),
-        "title_size":   int(cfg.get("pdf_title_size", 22)),
-        "round_size":   int(cfg.get("pdf_round_size", 20)),
-        "meta_size":    int(cfg.get("pdf_meta_size", 13)),
-    }
+st.set_page_config(page_title="Rondas", page_icon="🧩", layout="wide")
+inject_base_style()
 
-def _meta_line(cfg: dict) -> str:
-    fecha = (cfg.get("pdf_fecha") or "").strip()
-    hl    = (cfg.get("pdf_hora_lugar") or "").strip()
-    parts = []
-    if cfg.get("nivel"):
-        parts.append(f"<b>{cfg.get('nivel')}</b>")
-    if fecha and hl:
-        parts.append(f"{fecha} — {hl}")
-    elif fecha or hl:
-        parts.append(fecha or hl)
-    return " · ".join(parts)
-
-def _missing_results(df_pairs: pd.DataFrame) -> int:
-    if "resultado" not in df_pairs.columns:
-        return 0
-    series = df_pairs["resultado"].fillna("").astype(str).str.strip()
-    return int((series == "").sum())
-
-def _format_names(df_pairs: pd.DataFrame) -> pd.DataFrame:
-    # Asegura columnas mínimas esperadas por el motor
-    cols_min = ["mesa","blancas_nombre","negras_nombre","resultado"]
-    for c in cols_min:
-        if c not in df_pairs.columns:
-            df_pairs[c] = ""  # crea si faltan
-    
-    out = df_pairs.copy()
-    out = out.sort_values("mesa", ascending=True)
-    # Nombre ya viene pre-formateado por tournament.py, lo respetamos.
-    out["Mesa"]        = out["mesa"]
-    out["Blancas"]     = out["blancas_nombre"]
-    out["Resultado"]   = out["resultado"].fillna("")
-    out["Negras"]      = out["negras_nombre"]
-    return out[["Mesa","Blancas","Resultado","Negras"]]
-
-# ------------------------------------------------------------
-# Generación de PDF (ReportLab + fallback fpdf2)
-# ------------------------------------------------------------
-def _pdf_reportlab(i: int, cfg: dict, df_pairs: pd.DataFrame) -> bytes | None:
-    try:
-        # Import pesado aquí
-        from reportlab.lib import colors
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.units import mm
-    except Exception:
-        return None
-
-    buf = io.BytesIO()
-
-    # Documento
-    doc = SimpleDocTemplate(
-        buf,
-        pagesize=A4,
-        leftMargin=16*mm, rightMargin=16*mm, topMargin=16*mm, bottomMargin=16*mm
-    )
-
-    styles = getSampleStyleSheet()
-    SERIF   = "Times-Roman"
-    SERIF_B = "Times-Bold"
-
-    # Estilos base (títulos)
-    H1 = ParagraphStyle("H1", parent=styles["Heading1"], fontName=SERIF_B, fontSize=22, leading=26, alignment=1, spaceAfter=0)
-    H2 = ParagraphStyle("H2", parent=styles["Heading2"], fontName=SERIF_B, fontSize=18, leading=22, alignment=1, spaceAfter=0)
-    H3 = ParagraphStyle("H3", parent=styles["Heading3"], fontName=SERIF_B, fontSize=14, leading=18, alignment=1, spaceAfter=6)
-    BODY = ParagraphStyle("BODY", parent=styles["Normal"], fontName=SERIF, fontSize=11, leading=14)
-
-    # Paleta y tamaños desde config
-    C = _cfg_colors(cfg)
-    try:
-        HEADER_BG     = colors.HexColor(C["header_bg"])
-        HEADER_BORDER = colors.HexColor(C["header_border"])
-        META_BG       = colors.HexColor(C["meta_bg"])
-    except Exception:
-        HEADER_BG     = colors.HexColor("#F3F3F0")
-        HEADER_BORDER = colors.HexColor("#C9C9C9")
-        META_BG       = colors.HexColor("#FAFAFA")
-
-    H_TITLE = ParagraphStyle("HTITLE", parent=H1, fontSize=C["title_size"], leading=int(C["title_size"]*1.2), alignment=1)
-    H_RND   = ParagraphStyle("HRND",   parent=H1, fontSize=C["round_size"], leading=int(C["round_size"]*1.2), alignment=1)
-    H_META  = ParagraphStyle("HMETA",  parent=styles["Normal"], fontName=SERIF_B,
-                             fontSize=C["meta_size"], leading=int(C["meta_size"]*1.3), alignment=1)
-
-    # Cabeceras
-    titulo = (cfg.get("titulo") or "TORNEO DE AJEDREZ").strip()
-    anio   = (cfg.get("anio") or "").strip()
-    tline  = f"{titulo} {anio}".strip()
-    meta   = _meta_line(cfg)
-
-    # Caja superior Título + Ronda
-    hdr_tbl = Table(
-        [[Paragraph(tline, H_TITLE)],
-         [Paragraph(f"RONDA {i}", H_RND)]],
-        colWidths=[doc.width]
-    )
-    hdr_tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,-1), HEADER_BG),
-        ("BOX",       (0,0), (-1,-1), 0.9, HEADER_BORDER),
-        ("ALIGN",     (0,0), (-1,-1), "CENTER"),
-        ("VALIGN",    (0,0), (-1,-1), "MIDDLE"),
-        ("TOPPADDING",    (0,0), (-1,0), 8),
-        ("BOTTOMPADDING", (0,0), (-1,0), 6),
-        ("TOPPADDING",    (0,1), (-1,1), 10),
-        ("BOTTOMPADDING", (0,1), (-1,1), 10),
-    ]))
-
-    # Línea meta en una sola línea
-    cab = Table([[Paragraph(meta, H_META)]], colWidths=[doc.width])
-    cab.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,-1), META_BG),
-        ("BOX",        (0,0), (-1,-1), 0.5, HEADER_BORDER),
-        ("ALIGN",      (0,0), (-1,-1), "CENTER"),
-        ("VALIGN",     (0,0), (-1,-1), "MIDDLE"),
-        ("TOPPADDING",    (0,0), (-1,-1), 6),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-    ]))
-
-    # Título lista
-    titulo_lista = Paragraph("LISTA DE EMPAREJAMIENTOS", H3)
-
-    # Tabla de partidas
-    data = _format_names(df_pairs)
-    # Cabecera y cuerpo
-    tbl = Table([list(data.columns)] + data.values.tolist(), colWidths=[
-        18*mm, 70*mm, 22*mm, 70*mm
-    ])
-    tbl.setStyle(TableStyle([
-        # Cabecera
-        ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-        ("TEXTCOLOR",  (0,0), (-1,0), colors.black),
-        ("FONTNAME",   (0,0), (-1,0), SERIF_B),
-        ("FONTSIZE",   (0,0), (-1,0), 12),
-        ("ALIGN",      (0,0), (0,0), "CENTER"),
-        ("ALIGN",      (2,0), (2,0), "CENTER"),
-        ("LINEABOVE",  (0,0), (-1,0), 1.2, colors.black),   # doble línea visual: arriba y abajo
-        ("LINEBELOW",  (0,0), (-1,0), 1.2, colors.black),
-
-        # Cuerpo
-        ("FONTNAME",   (0,1), (-1,-1), SERIF),
-        ("FONTSIZE",   (0,1), (-1,-1), 11),
-        ("ALIGN",      (0,1), (0,-1), "CENTER"),
-        ("ALIGN",      (2,1), (2,-1), "CENTER"),
-        ("VALIGN",     (0,1), (-1,-1), "MIDDLE"),
-        ("GRID",       (0,1), (-1,-1), 0.3, colors.grey),
-    ]))
-
-    story = [hdr_tbl, cab, Spacer(1, 6), titulo_lista, tbl]
-
-    def _footer(canvas, doc):
-        # Pie simple con fecha de generación
-        canvas.saveState()
-        canvas.setFont(SERIF, 9)
-        ts = _dt.datetime.now().strftime("%d/%m/%Y %H:%M")
-        canvas.drawRightString(doc.pagesize[0]-16*mm, 10*mm, f"Generado {ts}")
-        canvas.restoreState()
-
-    doc.build(story, onFirstPage=_footer, onLaterPages=_footer)
-    return buf.getvalue()
-
-def _pdf_fpdf(i: int, cfg: dict, df_pairs: pd.DataFrame) -> bytes | None:
-    try:
-        from fpdf import FPDF
-    except Exception:
-        return None
-
-    pdf = FPDF(orientation="P", unit="mm", format="A4")
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
-
-    # Paleta y tamaños
-    C = _cfg_colors(cfg)
-    x, y, w, h = 15, 10, 180, 26
-
-    # Caja superior con rectángulo
-    pdf.set_draw_color(200, 200, 200)
-    pdf.rect(x, y, w, h)
-
-    pdf.set_xy(x, y+3)
-    titulo = (cfg.get("titulo") or "TORNEO DE AJEDREZ").strip()
-    anio   = (cfg.get("anio") or "").strip()
-    tline  = f"{titulo} {anio}".strip()
-
-    pdf.set_font("Helvetica", "B", C["title_size"])
-    pdf.cell(w, 8, tline, ln=1, align="C")
-
-    pdf.set_x(x)
-    pdf.set_font("Helvetica", "B", C["round_size"])
-    pdf.cell(w, 10, f"RONDA {i}", ln=1, align="C")
-
-    # Línea meta
-    pdf.ln(1)
-    pdf.set_font("Helvetica", "B", C["meta_size"])
-    meta_text = _meta_line(cfg)
-    pdf.cell(0, 7, meta_text, ln=1, align="C")
-    pdf.ln(2)
-
-    # Tabla
-    data = _format_names(df_pairs)
-    col_w = [18, 76, 22, 76]
-    # Cabecera
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(col_w[0], 8, "Mesa", border=1, align="C")
-    pdf.cell(col_w[1], 8, "Blancas", border=1, align="C")
-    pdf.cell(col_w[2], 8, "Res.", border=1, align="C")
-    pdf.cell(col_w[3], 8, "Negras", border=1, align="C")
-    pdf.ln(8)
-
-    # Cuerpo
-    pdf.set_font("Helvetica", "", 11)
-    for _, row in data.iterrows():
-        pdf.cell(col_w[0], 7, str(row["Mesa"]), border=1, align="C")
-        pdf.cell(col_w[1], 7, str(row["Blancas"]), border=1)
-        pdf.cell(col_w[2], 7, str(row["Resultado"]), border=1, align="C")
-        pdf.cell(col_w[3], 7, str(row["Negras"]), border=1)
-        pdf.ln(7)
-
-    # Footer
-    pdf.set_y(-15)
-    pdf.set_font("Helvetica", "", 9)
-    ts = _dt.datetime.now().strftime("%d/%m/%Y %H:%M")
-    pdf.cell(0, 10, f"Generado {ts}", 0, 0, "R")
-
-    return pdf.output(dest="S").encode("latin-1", errors="ignore")
-
-def build_round_pdf(i: int, cfg: dict, df_pairs: pd.DataFrame) -> bytes | None:
-    """
-    Intenta ReportLab; si no está disponible, usa fpdf2; si falla, None.
-    """
-    pdf = _pdf_reportlab(i, cfg, df_pairs)
-    if pdf:
-        return pdf
-    pdf = _pdf_fpdf(i, cfg, df_pairs)
-    return pdf
-
-# ------------------------------------------------------------
-# Página
-# ------------------------------------------------------------
-cfg = load_config()
-inject_base_style(cfg.get("bg_color"))
-
-page_header(
-    title=format_with_cfg("🧮 Emparejamientos — {nivel}", cfg) or "🧮 Emparejamientos",
-    subtitle=format_with_cfg("{subtitulo}", cfg),
+# NAV (personalizada) bajo cabecera lateral
+sidebar_title_and_nav(
+    extras=True,
+    items=[
+        ("app.py", "♟️ Inicio"),
+        ("pages/10_Rondas.py", "🧩 Rondas"),
+        ("pages/20_Clasificacion.py", "🏆 Clasificación"),
+        ("pages/99_Administracion.py", "🛠️ Administración"),
+    ],
 )
 
-sidebar_title_and_nav(active="rondas")
+cfg = load_config()
+page_header(
+    format_with_cfg("🧩 Rondas — {nivel}", cfg),
+    format_with_cfg("Curso {anio} · Emparejamientos y resultados (solo PUBLICADAS)", cfg),
+)
 
-# Determinar número de rondas planificado y rondas existentes
-JUG_PATH = os.path.join(DATA_DIR, "jugadores.csv")
-n_plan   = planned_rounds(cfg, JUG_PATH)
-rounds   = list_round_files(n_plan)
-publicas = [i for i in rounds if is_published(i)]
+# ---------- utilidades ----------
+def _slugify(s: str) -> str:
+    s = re.sub(r"\s+", "_", str(s or "").strip())
+    return re.sub(r"[^A-Za-z0-9_\-]+", "", s) or "torneo"
 
-if not publicas:
-    st.info("Aún no hay rondas publicadas.")
+def _normalize_result_series(s: pd.Series) -> pd.Series:
+    return (
+        s.astype(str)
+        .str.strip()
+        .replace({"None": "", "none": "", "NaN": "", "nan": "", "N/A": "", "n/a": ""})
+    )
+
+def _results_empty_count(df: pd.DataFrame) -> int:
+    if df is None or df.empty or "resultado" not in df.columns:
+        return 0
+    res = _normalize_result_series(df["resultado"])
+    return int((res == "").sum())
+
+# ---------- datos de rondas ----------
+JUG_PATH = f"{DATA_DIR}/jugadores.csv"
+n_plan = planned_rounds(cfg, JUG_PATH)          # plan de rondas (auto o fijo)
+
+round_nums = sorted(list_round_files(n_plan))   # generadas (publicadas o no)
+generadas = len(round_nums)
+publicadas = [i for i in round_nums if is_published(i)]
+ronda_actual = max(publicadas) if publicadas else None
+total_plan = n_plan
+
+# ---------- RESUMEN (chips) ----------
+c1, c2 = st.columns([2, 2])
+with c1:
+    if ronda_actual is not None:
+        st.success(f"⭐ Ronda ACTUAL: **Ronda {ronda_actual}**")
+    else:
+        st.warning("Sin rondas publicadas.")
+with c2:
+    st.info(f"📣 Publicadas: **{len(publicadas)} / {total_plan}**")
+
+st.divider()
+
+# Si no hay publicadas, terminar aquí (la vista pública no enseña borradores)
+if not publicadas:
     st.stop()
 
-# Estado seleccionado
-sel = st.session_state.get("rondas_view_select", max(publicas))
-sel = st.selectbox(
-    "Ronda publicada",
-    options=publicas,
-    index=publicas.index(sel) if sel in publicas else len(publicas)-1,
-    key="rondas_view_select",
-)
+# ---------- estado inicial seguro ----------
+if "rondas_view_select" not in st.session_state:
+    st.session_state["rondas_view_select"] = ronda_actual
 
-# Carga de datos de la ronda seleccionada
-csv_path = round_file(sel)
-df_pairs = read_csv_safe(csv_path)
-df_print = _format_names(df_pairs)
-faltan   = _missing_results(df_pairs)
+# Si algún botón ha pedido salto, aplícalo ANTES de crear el selectbox
+jump_to = st.session_state.pop("rondas_jump_to", None)
+if isinstance(jump_to, int) and jump_to in publicadas:
+    st.session_state["rondas_view_select"] = jump_to
 
-# Tarjetas resumen
-c1, c2, c3 = st.columns(3)
-c1.metric("Ronda", sel)
-c2.metric("Partidas", len(df_print))
-c3.metric("Resultados sin rellenar", faltan)
+# Si el valor guardado ya no es válido, corrígelo
+if st.session_state["rondas_view_select"] not in publicadas:
+    st.session_state["rondas_view_select"] = ronda_actual
 
-# Tabla vista
-st.dataframe(df_print, use_container_width=True, hide_index=True)
+# ---------- selector + botonera numérica EN UNA SOLA LÍNEA ----------
+# (colores del selector – cambia THEME si quieres)
+THEME = "amber"
+_palette = {
+    "blue":  {"bg": "#DCEBFF","hover": "#E9F2FF","border": "#1D4ED8","border_hover":"#1743BD","icon":"#1743BD","ring":"rgba(29,78,216,.25)","text":"#0B3B8F"},
+    "green": {"bg": "#E6F6EA","hover": "#EEF9F1","border": "#16A34A","border_hover":"#14833F","icon":"#14833F","ring":"rgba(22,163,74,.25)","text":"#0F5132"},
+    "amber": {"bg": "#FFF1D6","hover": "#FFF6E6","border": "#D97706","border_hover":"#B75E03","icon":"#B75E03","ring":"rgba(217,119,6,.25)","text":"#8A4B00"},
+}
+c = _palette.get(THEME, _palette["blue"])
+st.markdown(f"""
+<style>
+/* Selectbook estilizado SOLO en esta página */
+[data-testid="stSelectbox"] div[role="combobox"] {{
+  background: {c['bg']} !important; border: 2px solid {c['border']} !important;
+  border-radius: 12px !important; padding: 2px 8px !important;
+  color: {c['text']} !important; font-weight: 700 !important;
+}}
+[data-testid="stSelectbox"] div[role="combobox"]:hover {{
+  background: {c['hover']} !important; border-color: {c['border_hover']} !important;
+}}
+[data-testid="stSelectbox"] div[role="combobox"]:focus-within {{
+  box-shadow: 0 0 0 3px {c['ring']} !important;
+}}
+[data-testid="stSelectbox"] svg {{ color: {c['icon']} !important; }}
 
-# Descargas
-base = f"ronda_{sel:02d}"
-c4, c5 = st.columns(2)
-with c4:
-    st.download_button(
-        "⬇️ Descargar CSV",
-        data=df_pairs.to_csv(index=False).encode("utf-8"),
-        file_name=f"{base}.csv",
-        mime="text/csv",
-        use_container_width=True,
+/* Pills de la botonera (no afecta a download_button) */
+._chips_row .stButton > button {{
+  border-radius: 9999px !important; padding: .28rem .75rem !important;
+  border: 1px solid var(--border) !important; background: #fff !important;
+  color: var(--text) !important; font-weight: 700 !important;
+}}
+._chips_row .stButton > button:hover {{
+  background: rgba(36,32,36,.06) !important;
+}}
+</style>
+""", unsafe_allow_html=True)
+
+# Fila con 3 columnas: [etiqueta] [selector] [chips]
+c_lbl, c_sel, c_chips = st.columns([1.1, 1.8, 5.1])
+with c_lbl:
+    st.markdown("**Ver ronda publicada**")
+
+current_round = st.session_state["rondas_view_select"]
+with c_sel:
+    sel = st.selectbox(
+        label="Ver ronda publicada",
+        options=publicadas,
+        index=publicadas.index(current_round),
+        format_func=lambda i: f"Ronda {i}",
+        key="rondas_view_select",
+        label_visibility="collapsed",
     )
-with c5:
-    pdf_bytes = build_round_pdf(sel, cfg, df_pairs)
-    if pdf_bytes:
-        st.download_button(
-            "⬇️ Descargar PDF",
-            data=pdf_bytes,
-            file_name=f"{base}.pdf",
-            mime="application/pdf",
+
+with c_chips:
+    st.markdown("**Ir directo a…**")
+    per_row = min(len(publicadas), 12)
+    chip_cols = st.columns(per_row, gap="small")
+
+    def _request_jump(i: int):
+        st.session_state["rondas_jump_to"] = int(i)
+
+    for idx, i in enumerate(publicadas):
+        col = chip_cols[idx % per_row]
+        is_active = (i == sel)
+        label = f"✓ {i}" if is_active else f"{i}"
+        col.button(
+            label,
+            key=f"chip_R{i}",
             use_container_width=True,
+            on_click=_request_jump,
+            args=(i,),
         )
-    else:
-        st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
+
+st.divider()
+
+# ---------- PDF builder ----------
+def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: bool = True) -> bytes | None:
+    """
+    PDF con estética afinada:
+    - Old Standard / Playfair si hay TTFs (fallback a Times/Helvetica)
+    - Cabeceras centradas (hasta 'Lista de emparejamientos')
+    - Resultado en el centro (Mesa | Blancas | RESULTADO | Negras)
+    - Doble línea real bajo la cabecera de tabla
+    - Marco exterior, sin numeración
+    - Nombres con (curso grupo) enriqueciendo desde data/jugadores.csv
+    """
+    import os, io
+    import pandas as pd
+    from lib.tournament import DATA_DIR, read_csv_safe
+
+    # ---------- enriquecer (curso/grupo) desde jugadores.csv ----------
+    def _pick(cols, row):
+        for c in cols:
+            if c in row and str(row[c]).strip():
+                return str(row[c]).strip()
+        return ""
+
+    def _guess_id_col(df: pd.DataFrame):
+        for c in ["id", "ID", "Id", "jugador_id", "player_id", "n"]:
+            if c in df.columns:
+                return c
+        return None
+
+    cg_map = {}
+    jpath = f"{DATA_DIR}/jugadores.csv"
+    jdf = read_csv_safe(jpath)
+    if jdf is not None and not jdf.empty:
+        jdf = jdf.copy()
+        idcol = _guess_id_col(jdf)
+        if idcol:
+            for _, r in jdf.iterrows():
+                pid = str(r.get(idcol, "")).strip()
+                if not pid:
+                    continue
+                curso = _pick(["curso", "nivel", "grado", "anio_curso"], r)
+                grupo = _pick(["grupo", "clase", "seccion", "grupo_letra"], r)
+                cg_map[pid] = " ".join([p for p in [curso, grupo] if p]).strip()
+
+    base = table_df.copy().fillna("")
+    def _name_with_cg(side: str, row: pd.Series) -> str:
+        name = str(row.get(f"{side}_nombre", "")).strip()
+        if name.upper() == "BYE":
+            return name
+        # ronda -> columnas propias
+        cg_in_row = _pick([f"{side}_curso_grupo", f"{side}_nivel_grupo"], row)
+        if not cg_in_row:
+            curso = _pick([f"{side}_curso", f"{side}_nivel"], row)
+            grupo = _pick([f"{side}_grupo", f"{side}_clase"], row)
+            cg_in_row = " ".join([p for p in [curso, grupo] if p]).strip()
+        if not cg_in_row:
+            pid = str(row.get(f"{side}_id", "")).strip()
+            cg_in_row = cg_map.get(pid, "")
+        return f"{name} ({cg_in_row})" if cg_in_row else name
+
+    base["blancas_nombre_pdf"] = base.apply(lambda r: _name_with_cg("blancas", r), axis=1)
+    base["negras_nombre_pdf"]  = base.apply(lambda r: _name_with_cg("negras",  r), axis=1)
+
+    # Orden de columnas con resultado en el centro
+    tbl = base[["mesa", "blancas_nombre_pdf", "resultado_mostrar", "negras_nombre_pdf"]].copy()
+    tbl = tbl.fillna("")
+    if not include_results:
+        tbl["resultado_mostrar"] = ":"
+
+    # ---------- ReportLab principal ----------
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
+        from reportlab.lib.units import mm
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+
+        # Paleta (aprox. plantilla)
+        VERDE     = colors.HexColor("#d9ead3")
+        MELOCOTON = colors.HexColor("#f7e1d5")
+        AZUL      = colors.HexColor("#cfe2f3")
+
+        # Colores sobrios y parametrizables (solo cabeceras PDF)
+        HEADER_BG     = colors.HexColor((cfg.get("pdf_header_bg") or "#F3F3F0"))
+        HEADER_BORDER = colors.HexColor((cfg.get("pdf_header_border") or "#C9C9C9"))
+        META_BG       = colors.HexColor((cfg.get("pdf_meta_bg") or "#FAFAFA"))
+
+
+        # Registrar fuentes si existen
+        def _register_fonts():
+            basep = os.path.join("assets", "fonts")
+            ok = False
+            try:
+                if os.path.exists(os.path.join(basep, "OldStandard-Regular.ttf")):
+                    pdfmetrics.registerFont(TTFont("OldStd", os.path.join(basep, "OldStandard-Regular.ttf")))
+                    if os.path.exists(os.path.join(basep, "OldStandard-Bold.ttf")):
+                        pdfmetrics.registerFont(TTFont("OldStd-B", os.path.join(basep, "OldStandard-Bold.ttf")))
+                    ok = True
+                if os.path.exists(os.path.join(basep, "PlayfairDisplay-Regular.ttf")):
+                    pdfmetrics.registerFont(TTFont("Playfair", os.path.join(basep, "PlayfairDisplay-Regular.ttf")))
+                    if os.path.exists(os.path.join(basep, "PlayfairDisplay-Bold.ttf")):
+                        pdfmetrics.registerFont(TTFont("Playfair-B", os.path.join(basep, "PlayfairDisplay-Bold.ttf")))
+                    ok = True
+            except Exception:
+                pass
+            return ok
+
+        has_custom = _register_fonts()
+        SERIF    = "OldStd"   if has_custom else "Times-Roman"
+        SERIF_B  = "OldStd-B" if has_custom else "Times-Bold"
+        DISPLAY  = "Playfair-B" if has_custom else SERIF_B
+
+        buf = io.BytesIO()
+        # Márgenes algo más “editoriales”
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            leftMargin=17*mm, rightMargin=17*mm,
+            topMargin=14*mm, bottomMargin=14*mm
+        )
+
+        # Marco exterior (sin numeración)
+        def _draw_frame(canvas, d):
+            canvas.saveState()
+            canvas.setStrokeColor(colors.black)
+            canvas.setLineWidth(1.1)
+            x = doc.leftMargin - 5*mm
+            y = doc.bottomMargin - 5*mm
+            w = doc.width + 10*mm
+            h = doc.height + 10*mm
+            canvas.rect(x, y, w, h)
+            canvas.restoreState()
+
+        # Estilos con sangría/leading cuidados
+        styles = getSampleStyleSheet()
+        H1 = ParagraphStyle("H1", parent=styles["Normal"], fontName=SERIF_B, fontSize=18, leading=22, alignment=1, spaceAfter=2)
+        H2 = ParagraphStyle("H2", parent=styles["Normal"], fontName=DISPLAY,  fontSize=28, leading=32, alignment=1, spaceAfter=4)
+        H3 = ParagraphStyle("H3", parent=styles["Normal"], fontName=SERIF_B, fontSize=16, leading=20, alignment=1, spaceBefore=2, spaceAfter=4)
+        BODY = ParagraphStyle("BODY", parent=styles["Normal"], fontName=SERIF, fontSize=11.5, leading=14.2, leftIndent=0)
+
+        titulo = (cfg.get("titulo") or "").strip() 
+        anio = (cfg.get("anio") or "").strip()
+        nivel = (cfg.get("nivel") or "").strip()
+        linea_fecha = (cfg.get("pdf_fecha") or "").strip()
+        linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
+
+        # Bandas
+        hdr_tbl = Table(
+            [[Paragraph(f"{titulo} {anio}" if titulo and anio else "TORNEO DE AJEDREZ", H1)],
+             [Paragraph(f"RONDA {i}", H1)]],
+            colWidths=[doc.width]
+        )
+        hdr_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), HEADER_BG),
+            ("BOX",       (0,0), (-1,-1), 0.8, HEADER_BORDER),
+            ("ALIGN",     (0,0), (-1,-1), "CENTER"),
+            ("VALIGN",    (0,0), (-1,-1), "MIDDLE"),
+            ("TOPPADDING",    (0,0), (-1,0), 6),
+            ("BOTTOMPADDING", (0,0), (-1,0), 4),
+            ("TOPPADDING",    (0,1), (-1,1), 10),
+            ("BOTTOMPADDING", (0,1), (-1,1), 10),
+        ]))
+
+                cab_parts = []
+        if nivel:       cab_parts.append(f"<b>{nivel}</b>")
+        # une fecha y hora/lugar en una sola línea
+        if linea_fecha and linea_hora:
+            cab_parts.append(f"{linea_fecha} — {linea_hora}")
+        elif linea_fecha or linea_hora:
+            cab_parts.append(linea_fecha or linea_hora)
+        cab_text = " · ".join([p for p in cab_parts if p]) if cab_parts else ""
+
+cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=14, leading=18, alignment=1))]],
+                    colWidths=[doc.width])
+        cab.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), META_BG),
+            ("BOX", (0,0), (-1,-1), 0.5, HEADER_BORDER),
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+            ("LEFTPADDING", (0,0), (-1,-1), 10),
+            ("RIGHTPADDING", (0,0), (-1,-1), 10),
+            ("TOPPADDING", (0,0), (-1,-1), 10),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+        ]))
+
+        titulo_lista = Table([[Paragraph("Lista de emparejamientos", H3)]], colWidths=[doc.width])
+        titulo_lista.setStyle(TableStyle([
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING", (0,0), (-1,-1), 6),
+        ]))
+
+        # Construir filas: usar Paragraph en nombres para buena ruptura de línea + sangría/padding
+        rows = []
+        for _, r in tbl.iterrows():
+            mesa = str(r["mesa"])
+            b = Paragraph(str(r["blancas_nombre_pdf"]), BODY)
+            res = Paragraph(str(r["resultado_mostrar"]), ParagraphStyle("RES", parent=BODY, alignment=1))  # centrado
+            n = Paragraph(str(r["negras_nombre_pdf"]), BODY)
+            rows.append([mesa, b, res, n])
+
+        data = [["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"], ["", "", "", ""]] + rows
+        widths = [20*mm, (doc.width - 40*mm)/2, 20*mm, (doc.width - 40*mm)/2]
+
+        t = Table(data, colWidths=widths, repeatRows=2)  # repite cabecera si salta de página
+        t.setStyle(TableStyle([
+            # cabecera
+            ("FONT", (0,0), (-1,0), SERIF_B, 11.5),
+            ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
+            ("ALIGN", (0,0), (-1,0), "CENTER"),
+            ("VALIGN", (0,0), (-1,0), "MIDDLE"),
+            ("BOTTOMPADDING", (0,0), (-1,0), 6),
+            ("TOPPADDING", (0,0), (-1,0), 6),
+
+            # doble línea real (cabecera → cuerpo)
+            ("LINEBELOW", (0,0), (-1,0), 1.3, colors.black),  # 1ª
+            ("LINEBELOW", (0,1), (-1,1), 0.6, colors.black),  # 2ª fina
+
+            # fila separadora “fantasma”
+            ("TOPPADDING", (0,1), (-1,1), 0),
+            ("BOTTOMPADDING", (0,1), (-1,1), 0),
+            ("FONTSIZE", (0,1), (-1,1), 1),
+            ("ROWHEIGHTS", (0,1), (-1,1), 2),
+
+            # cuerpo: padding y alineaciones
+            ("LEFTPADDING", (0,2), (-1,-1), 6),
+            ("RIGHTPADDING", (0,2), (-1,-1), 6),
+            ("ALIGN", (0,2), (0,-1), "CENTER"),
+            ("ALIGN", (2,2), (2,-1), "CENTER"),
+            ("VALIGN", (0,2), (-1,-1), "MIDDLE"),
+
+            # rejilla suave
+            ("GRID", (0,2), (-1,-1), 0.4, colors.lightgrey),
+        ]))
+
+        story = [hdr_tbl, cab, Spacer(1, 6), titulo_lista, t]
+        doc.build(story, onFirstPage=_draw_frame, onLaterPages=_draw_frame)
+        return buf.getvalue()
+
+    except Exception:
+        # ---------- FPDF fallback (simple, sin números) ----------
+        try:
+            from fpdf import FPDF
+            pdf = FPDF(orientation="P", unit="mm", format="A4")
+            pdf.set_auto_page_break(auto=True, margin=15)
+            pdf.add_page()
+
+            anio = (cfg.get("anio") or "").strip()
+            nivel = (cfg.get("nivel") or "").strip()
+            linea_fecha = (cfg.get("pdf_fecha") or "").strip()
+            linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
+
+            # cabeceras centradas
+                        # Caja superior (Título + Ronda)
+            x, y, w, h = 15, 10, 180, 26
+            pdf.set_draw_color(200, 200, 200)
+            pdf.rect(x, y, w, h)
+
+            pdf.set_xy(x, y + 3)
+            pdf.set_font("Helvetica", "B", 18); pdf.cell(w, 8, f"{'TORNEO DE AJEDREZ ' + anio if anio and not (titulo or '').strip() else (titulo or 'TORNEO DE AJEDREZ')} {anio if anio and (titulo or '').strip() else ''}".strip(), ln=1, align="C")
+            pdf.set_x(x); pdf.set_font("Helvetica", "B", 22); pdf.cell(w, 10, f"RONDA {i}", ln=1, align="C")
+
+            # Línea meta en una sola línea (nivel · fecha — hora)
+            meta_parts = []
+            if nivel: meta_parts.append(nivel)
+            if linea_fecha and linea_hora:
+                meta_parts.append(f"{linea_fecha} — {linea_hora}")
+            elif linea_fecha or linea_hora:
+                meta_parts.append(linea_fecha or linea_hora)
+            meta_text = " · ".join(meta_parts)
+
+            pdf.ln(1)
+            pdf.set_font("Helvetica", "B", 12); pdf.cell(0, 7, meta_text, ln=1, align="C")
+            pdf.ln(2)
+            pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
+
+            headers = ["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"]
+            widths = [20, 85, 20, 85]  # un poco más anchas las columnas de nombres
+            pdf.set_font("Helvetica", "B", 11)
+            x0 = pdf.get_x()
+            for h, w in zip(headers, widths): pdf.cell(w, 8, h, border=1, align="C")
+            pdf.ln(8)
+            # doble línea
+            x1 = x0 + sum(widths); y1 = pdf.get_y()
+            pdf.set_draw_color(0,0,0); pdf.set_line_width(0.6); pdf.line(x0, y1, x1, y1)
+            pdf.set_line_width(0.2); pdf.line(x0, y1 + 1.2, x1, y1 + 1.2)
+
+            pdf.set_font("Helvetica", "", 11)
+            for _, r in tbl.iterrows():
+                cells = [str(r["mesa"]), str(r["blancas_nombre_pdf"]), str(r["resultado_mostrar"]), str(r["negras_nombre_pdf"])]
+                aligns = ["C", "L", "C", "L"]
+                for c, w, a in zip(cells, widths, aligns):
+                    pdf.cell(w, 7, c[:64], border=1, align=a)
+                pdf.ln(7)
+
+            return bytes(pdf.output(dest="S"))
+        except Exception:
+            return None
+
+#--------- render de UNA sola ronda (la seleccionada) ----------
+def render_round(i: int):
+    path = round_file(i)
+    df = read_csv_safe(path)
+    if df is None or df.empty:
+        st.warning(f"No hay datos para la Ronda {i}.")
+        return
+
+    safe_df = df.copy()
+    if "seleccionar" in safe_df.columns:  # columna solo usada en admin
+        safe_df = safe_df.drop(columns=["seleccionar"])
+
+    # asegurar columnas básicas
+    for col in ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]:
+        if col not in safe_df.columns:
+            safe_df[col] = ""
+
+    empties = _results_empty_count(safe_df)
+    estado = "✅ Cerrada" if empties == 0 else "📣 Publicada"
+    lm = last_modified(path)
+
+    st.markdown(f"### Ronda {i} — {estado}")
+    st.caption(f"Archivo: `{path}` · Última modificación: {lm} · Resultados vacíos: {empties}")
+
+    # ordenar por mesa (para vista y export)
+    try:
+        safe_df["mesa"] = pd.to_numeric(safe_df["mesa"], errors="coerce")
+    except Exception:
+        pass
+    safe_df = safe_df.sort_values(by=["mesa"], na_position="last")
+
+    # ---- BYE y resultado mostrado (badge en RESULTADO) ----
+    bye_mask = (
+        safe_df["blancas_id"].astype(str).str.upper().eq("BYE")
+        | safe_df["blancas_nombre"].astype(str).str.upper().eq("BYE")
+        | safe_df["negras_id"].astype(str).str.upper().eq("BYE")
+        | safe_df["negras_nombre"].astype(str).str.upper().eq("BYE")
+    )
+
+    show_df = safe_df.copy()
+    show_df["resultado_mostrar"] = _normalize_result_series(show_df["resultado"])
+    show_df.loc[show_df["resultado_mostrar"] == "", "resultado_mostrar"] = "—"
+    show_df.loc[bye_mask, "resultado_mostrar"] = show_df["resultado_mostrar"] + "  🟨 BYE"
+
+    # normalizar resultados crudos para export
+    safe_df["resultado"] = _normalize_result_series(safe_df["resultado"])
+
+    # ---- TABLA EN PANTALLA (4 columnas limpias) ----
+    st.dataframe(
+        show_df[["mesa", "blancas_nombre", "negras_nombre", "resultado_mostrar"]],
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "mesa": st.column_config.NumberColumn("Mesa", help="Número de mesa"),
+            "blancas_nombre": st.column_config.TextColumn("Blancas"),
+            "negras_nombre": st.column_config.TextColumn("Negras"),
+            "resultado_mostrar": st.column_config.TextColumn("Resultado"),
+        },
+    )
+
+    # ---- OPCIÓN PDF: incluir resultados o dejar hueco ----
+    include_results = st.checkbox("Incluir resultados en el PDF", value=True, key=f"pdf_include_results_R{i}")
+
+    # ---- DESCARGAS CSV + PDF (misma línea) ----
+    export_cols = ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]
+    df_export = safe_df[export_cols].copy()
+
+    nivel_slug = _slugify(cfg.get("nivel", ""))
+    anio_slug = _slugify(cfg.get("anio", ""))
+    base = f"ronda_{i}"
+    if nivel_slug or anio_slug:
+        base = f"{base}_{nivel_slug}_{anio_slug}"
+
+    # CSV
+    buf_csv = io.StringIO()
+    df_export.to_csv(buf_csv, index=False, encoding="utf-8")
+
+    # PDF
+    pdf_bytes = build_round_pdf(i, show_df, cfg, include_results=include_results)
+
+    col_csv, col_pdf = st.columns(2)
+    with col_csv:
+        st.download_button(
+            label=f"⬇️ CSV · Ronda {i}",
+            data=buf_csv.getvalue().encode("utf-8"),
+            file_name=f"{base}.csv",
+            mime="text/csv",
+            use_container_width=True,
+            key=f"dl_csv_ronda_{i}",
+        )
+    with col_pdf:
+        if pdf_bytes:
+            st.download_button(
+                label=f"📄 PDF · Ronda {i}",
+                data=pdf_bytes,
+                file_name=f"{base}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key=f"dl_pdf_ronda_{i}",
+            )
+        else:
+            st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
+
+# pinta solo la ronda seleccionada
+render_round(sel)
 
 st.divider()
 st.caption(format_with_cfg("Vista pública de emparejamientos y resultados — {nivel} ({anio})", cfg))
