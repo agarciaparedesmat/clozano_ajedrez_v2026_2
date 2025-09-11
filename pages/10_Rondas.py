@@ -253,16 +253,30 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         MELOCOTON = colors.HexColor("#f7e1d5")
         AZUL      = colors.HexColor("#cfe2f3")
 
+        # Registrar fuentes si existen
+        def _register_fonts():
+            basep = os.path.join("assets", "fonts")
+            ok = False
+            try:
+                if os.path.exists(os.path.join(basep, "OldStandard-Regular.ttf")):
+                    pdfmetrics.registerFont(TTFont("OldStd", os.path.join(basep, "OldStandard-Regular.ttf")))
+                    if os.path.exists(os.path.join(basep, "OldStandard-Bold.ttf")):
+                        pdfmetrics.registerFont(TTFont("OldStd-B", os.path.join(basep, "OldStandard-Bold.ttf")))
+                    ok = True
+                if os.path.exists(os.path.join(basep, "PlayfairDisplay-Regular.ttf")):
+                    pdfmetrics.registerFont(TTFont("Playfair", os.path.join(basep, "PlayfairDisplay-Regular.ttf")))
+                    if os.path.exists(os.path.join(basep, "PlayfairDisplay-Bold.ttf")):
+                        pdfmetrics.registerFont(TTFont("Playfair-B", os.path.join(basep, "PlayfairDisplay-Bold.ttf")))
+                    ok = True
+            except Exception:
+                pass
+            return ok
 
-        # === Selección de fuente desde config.json (con fallback seguro) ===
+        has_custom = _register_fonts()
+        # Selección de fuente desde config.json (pdf_font) con fallback seguro
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
-
         def _try_register_font(name_ui: str, regular_path: str, bold_path: str):
-            """
-            Registra TTF si existen; devuelve (regular_name, bold_name) registrables en ParagraphStyle.
-            Si no existen, lanza excepción para que el caller haga fallback.
-            """
             if not (os.path.exists(regular_path) and os.path.exists(bold_path)):
                 raise FileNotFoundError("TTF faltantes")
             reg_name = f"{name_ui}-Reg"
@@ -273,21 +287,19 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
                 pdfmetrics.registerFont(TTFont(bld_name, bold_path))
             return reg_name, bld_name
 
-        # Mapa de familias → archivos esperados en assets/fonts/
         base_fonts_dir = os.path.join(os.path.dirname(__file__), "..", "assets", "fonts")
         family = (cfg.get("pdf_font") or "Helvetica").strip().lower()
 
-        SERIF   = "Helvetica"
-        SERIF_B = "Helvetica-Bold"
-        DISPLAY = SERIF_B
+        # Defaults
+        SERIF    = "Helvetica"
+        SERIF_B  = "Helvetica-Bold"
+        DISPLAY  = SERIF_B
 
         try:
             if family in ("helvetica", "sans", "default"):
                 SERIF, SERIF_B, DISPLAY = "Helvetica", "Helvetica-Bold", "Helvetica-Bold"
-
             elif family in ("times", "serif"):
                 SERIF, SERIF_B, DISPLAY = "Times-Roman", "Times-Bold", "Times-Bold"
-
             elif family == "inter":
                 r, b = _try_register_font(
                     "Inter",
@@ -295,7 +307,6 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
                     os.path.join(base_fonts_dir, "Inter-Bold.ttf"),
                 )
                 SERIF, SERIF_B, DISPLAY = r, b, b
-
             elif family == "atkinson":
                 r, b = _try_register_font(
                     "Atkinson",
@@ -303,7 +314,6 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
                     os.path.join(base_fonts_dir, "Atkinson-Hyperlegible-Bold.ttf"),
                 )
                 SERIF, SERIF_B, DISPLAY = r, b, b
-
             elif family == "lexend":
                 r, b = _try_register_font(
                     "Lexend",
@@ -311,7 +321,6 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
                     os.path.join(base_fonts_dir, "Lexend-Bold.ttf"),
                 )
                 SERIF, SERIF_B, DISPLAY = r, b, b
-
             elif family in ("notosans", "noto-sans"):
                 r, b = _try_register_font(
                     "NotoSans",
@@ -319,18 +328,12 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
                     os.path.join(base_fonts_dir, "NotoSans-Bold.ttf"),
                 )
                 SERIF, SERIF_B, DISPLAY = r, b, b
-
-            # Si ‘family’ no coincide con nada de lo anterior, se queda Helvetica
+            elif family in ("oldstandard", "old-standard", "oldstd") and has_custom:
+                SERIF, SERIF_B, DISPLAY = "OldStd", "OldStd-B", "OldStd-B"
+            elif family in ("playfair", "playfairdisplay") and has_custom:
+                SERIF, SERIF_B, DISPLAY = "Playfair", "Playfair-B", "Playfair-B"
         except Exception:
-            # Fallo registrando TTF → usa Helvetica
             SERIF, SERIF_B, DISPLAY = "Helvetica", "Helvetica-Bold", "Helvetica-Bold"
-
-        # A partir de aquí, tus estilos deben usar SERIF / SERIF_B / DISPLAY como antes
-        H1 = ParagraphStyle("H1", parent=styles["Heading1"], fontName=SERIF_B, fontSize=22, leading=26, alignment=1, spaceAfter=0)
-        H2 = ParagraphStyle("H2", parent=styles["Heading2"], fontName=SERIF_B, fontSize=18, leading=22, alignment=1, spaceAfter=0)
-        H3 = ParagraphStyle("H3", parent=styles["Heading3"], fontName=SERIF_B, fontSize=14, leading=18, alignment=1, spaceAfter=6)
-        BODY = ParagraphStyle("BODY", parent=styles["Normal"], fontName=SERIF, fontSize=11, leading=14)
-
 
         buf = io.BytesIO()
         # Márgenes algo más “editoriales”
@@ -365,25 +368,31 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         linea_fecha = (cfg.get("pdf_fecha") or "").strip()
         linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-        # Bandas → sustituido por un único recuadro (Título + RONDA)
-        hdr_tbl = Table(
-            [[Paragraph(f"{titulo} {anio}" if titulo and anio else "TORNEO DE AJEDREZ", H1)],
-             [Paragraph(f"RONDA {i}", H1)]],
-            colWidths=[doc.width]
-        )
-        hdr_tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,0), VERDE),
-            ("BACKGROUND", (0,1), (-1,1), MELOCOTON),
-            ("BOX",       (0,0), (-1,-1), 0.8, colors.black),
-            ("ALIGN",     (0,0), (-1,-1), "CENTER"),
-            ("VALIGN",    (0,0), (-1,-1), "MIDDLE"),
-            ("BOTTOMPADDING", (0,0), (-1,0), 6),
-            ("TOPPADDING",    (0,0), (-1,0), 6),
-            ("BOTTOMPADDING", (0,1), (-1,1), 12),
-            ("TOPPADDING",    (0,1), (-1,1), 12),
+        # Bandas
+        band1 = Table([[Paragraph(f"{titulo} {anio}" if titulo and anio else "TORNEO DE AJEDREZ", H1)]],
+                      colWidths=[doc.width])
+        band1.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), VERDE),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING", (0,0), (-1,-1), 6),
         ]))
 
-        # Cabecera secundaria (dos líneas): [NIVEL] y [FECHA — HORA/LUGAR en una sola línea y menor]
+        band2 = Table([[Paragraph(f"RONDA {i}", H1)]], colWidths=[doc.width])
+        band2.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), MELOCOTON),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 12),
+            ("TOPPADDING", (0,0), (-1,-1), 12),
+        ]))
+        # Recuadro que agrupa TÍTULO + RONDA (band1+band2)
+        header_box = Table([[band1], [band2]], colWidths=[doc.width])
+        header_box.setStyle(TableStyle([
+            ("BOX", (0,0), (-1,-1), 0.8, colors.black),
+        ]))
+
+
+
         cab_lines = []
         if nivel:
             cab_lines.append(f"<b>{nivel}</b>")
@@ -394,7 +403,6 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             second_line = linea_fecha or linea_hora
         if second_line:
             cab_lines.append(second_line)
-
         cab_text = "<br/>".join(cab_lines) if cab_lines else ""
         cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=14, leading=18, alignment=1))]],
                     colWidths=[doc.width])
@@ -407,7 +415,7 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             ("TOPPADDING", (0,0), (-1,-1), 10),
             ("BOTTOMPADDING", (0,0), (-1,-1), 10),
         ]))
-        
+
         titulo_lista = Table([[Paragraph("Lista de emparejamientos", H3)]], colWidths=[doc.width])
         titulo_lista.setStyle(TableStyle([
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
@@ -458,7 +466,7 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             ("GRID", (0,2), (-1,-1), 0.4, colors.lightgrey),
         ]))
 
-        story = [hdr_tbl, cab, Spacer(1, 6), titulo_lista, t]
+        story = [header_box, cab, Spacer(1, 6), titulo_lista, t]
         doc.build(story, onFirstPage=_draw_frame, onLaterPages=_draw_frame)
         return buf.getvalue()
 
@@ -481,15 +489,18 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             pdf.rect(x, y, w, h)
 
             pdf.set_xy(x, y + 3)
-            pdf.set_font("Helvetica", "B", 18)
+            # Fuente base en fallback
+            fam = (cfg.get("pdf_font") or "Helvetica").strip().lower()
+            base_family = "Helvetica" if fam not in ("times","serif") else "Times"
+            pdf.set_font(base_family, "B", 18)
             title_txt = f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ"
             pdf.cell(w, 8, title_txt, ln=1, align="C")
 
             pdf.set_x(x)
-            pdf.set_font("Helvetica", "B", 22)
+            pdf.set_font(base_family, "B", 22)
             pdf.cell(w, 10, f"RONDA {i}", ln=1, align="C")
 
-            # Meta en dos líneas: [NIVEL] y [FECHA — HORA/LUGAR en una]
+            # Meta: nivel (si hay) y una única línea fecha — hora/lugar
             meta_line = ""
             if linea_fecha and linea_hora:
                 meta_line = f"{linea_fecha} — {linea_hora}"
@@ -497,15 +508,14 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
                 meta_line = linea_fecha or linea_hora
 
             if nivel:
-                pdf.set_font("Helvetica", "B", 13)
+                pdf.set_font(base_family, "B", 13)
                 pdf.cell(0, 7, nivel, ln=1, align="C")
             if meta_line:
-                pdf.set_font("Helvetica", "B", 12)
+                pdf.set_font(base_family, "B", 12)
                 pdf.cell(0, 7, meta_line, ln=1, align="C")
 
             pdf.ln(2)
-            pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
-            pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
+            pdf.set_font(base_family, "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
 
             headers = ["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"]
             widths = [20, 85, 20, 85]  # un poco más anchas las columnas de nombres
