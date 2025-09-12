@@ -44,6 +44,196 @@ def slugify(s: str) -> str:
     s = re.sub(r"[^A-Za-z0-9_\\-]+", "", s)
     return s or "torneo"
 
+def build_standings_pdf(df_st, cfg, ronda_actual):
+    """
+    Genera un PDF de CLASIFICACIÓN con la estética de Rondas:
+    - Bandas de color, tipografías (Old Standard / Playfair si existen), marco exterior
+    - Línea previa a la tabla: 'CLASIFICACIÓN DEL TORNEO (tras ronda N)'
+    """
+    try:
+        # ---------- ReportLab principal ----------
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+        from reportlab.lib.units import mm
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import io, os
+
+        # Paleta (como en Rondas)
+        VERDE     = colors.HexColor("#d9ead3")
+        MELOCOTON = colors.HexColor("#f7e1d5")
+        AZUL      = colors.HexColor("#cfe2f3")
+
+        # Registrar fuentes (igual que en Rondas)
+        def _register_fonts():
+            basep = os.path.join("assets", "fonts")
+            ok = False
+            try:
+                if os.path.exists(os.path.join(basep, "OldStandard-Regular.ttf")):
+                    pdfmetrics.registerFont(TTFont("OldStd",   os.path.join(basep, "OldStandard-Regular.ttf")))
+                    if os.path.exists(os.path.join(basep, "OldStandard-Bold.ttf")):
+                        pdfmetrics.registerFont(TTFont("OldStd-B", os.path.join(basep, "OldStandard-Bold.ttf")))
+                    ok = True
+                if os.path.exists(os.path.join(basep, "PlayfairDisplay-Regular.ttf")):
+                    pdfmetrics.registerFont(TTFont("Playfair",   os.path.join(basep, "PlayfairDisplay-Regular.ttf")))
+                    if os.path.exists(os.path.join(basep, "PlayfairDisplay-Bold.ttf")):
+                        pdfmetrics.registerFont(TTFont("Playfair-B", os.path.join(basep, "PlayfairDisplay-Bold.ttf")))
+                    ok = True
+            except Exception:
+                pass
+            return ok
+
+        has_custom = _register_fonts()
+        SERIF    = "OldStd"     if has_custom else "Times-Roman"
+        SERIF_B  = "OldStd-B"   if has_custom else "Times-Bold"
+        DISPLAY  = "Playfair-B" if has_custom else SERIF_B
+
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            leftMargin=17*mm, rightMargin=17*mm,
+            topMargin=14*mm, bottomMargin=14*mm
+        )
+
+        # Marco exterior (como en Rondas)
+        def _draw_frame(canvas, d):
+            canvas.saveState()
+            canvas.setStrokeColor(colors.black)
+            canvas.setLineWidth(1.1)
+            x = doc.leftMargin - 5*mm
+            y = doc.bottomMargin - 5*mm
+            w = doc.width + 10*mm
+            h = doc.height + 10*mm
+            canvas.rect(x, y, w, h)
+            canvas.restoreState()
+
+        styles = getSampleStyleSheet()
+        H1 = ParagraphStyle("H1", parent=styles["Normal"], fontName=SERIF_B, fontSize=18, leading=22, alignment=1, spaceAfter=2)
+        H3 = ParagraphStyle("H3", parent=styles["Normal"], fontName=SERIF_B, fontSize=16, leading=20, alignment=1, spaceBefore=2, spaceAfter=4)
+
+        titulo = (cfg.get("titulo") or "TORNEO DE AJEDREZ").strip()
+        anio   = (cfg.get("anio") or "").strip()
+        nivel  = (cfg.get("nivel") or "").strip()
+
+        # Bandas (como en Rondas)
+        band1 = Table([[Paragraph(f"{titulo} {anio}".strip(), H1)]], colWidths=[doc.width])
+        band1.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), VERDE),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING", (0,0), (-1,-1), 6),
+        ]))
+
+        band2 = Table([[Paragraph(nivel or "", H1)]], colWidths=[doc.width])
+        band2.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), MELOCOTON),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 12),
+            ("TOPPADDING", (0,0), (-1,-1), 12),
+        ]))
+
+        # Línea previa a la tabla
+        linea = f"CLASIFICACIÓN DEL TORNEO (tras ronda {ronda_actual})" if ronda_actual else "CLASIFICACIÓN DEL TORNEO"
+        titulo_lista = Table([[Paragraph(linea, H3)]], colWidths=[doc.width])
+        titulo_lista.setStyle(TableStyle([
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING", (0,0), (-1,-1), 6),
+        ]))
+
+        # Tabla de clasificación
+        head = ["POS", "JUGADOR/A", "CURSO", "GRUPO", "PTS", "BUCHHOLZ", "PJ"]
+        data = [head, ["", "", "", "", "", "", ""]]
+        for _, r in df_st.iterrows():
+            data.append([
+                str(r.get("pos","")), str(r.get("nombre","")), str(r.get("curso","")), str(r.get("grupo","")),
+                str(r.get("puntos","")), str(r.get("buchholz","")), str(r.get("pj",""))
+            ])
+
+        from reportlab.platypus import Table as RLTable
+        widths = [14*mm, 70*mm, 22*mm, 22*mm, 18*mm, 28*mm, 12*mm]
+        t = RLTable(data, colWidths=widths, repeatRows=2)
+        t.setStyle(TableStyle([
+            # cabecera
+            ("FONT", (0,0), (-1,0), SERIF_B, 11.5),
+            ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
+            ("ALIGN", (0,0), (-1,0), "CENTER"),
+            ("VALIGN", (0,0), (-1,0), "MIDDLE"),
+            ("BOTTOMPADDING", (0,0), (-1,0), 6),
+            ("TOPPADDING", (0,0), (-1,0), 6),
+
+            # doble línea real bajo cabecera
+            ("LINEBELOW", (0,0), (-1,0), 1.3, colors.black),
+            ("LINEBELOW", (0,1), (-1,1), 0.6, colors.black),
+            ("TOPPADDING", (0,1), (-1,1), 0),
+            ("BOTTOMPADDING", (0,1), (-1,1), 0),
+            ("FONTSIZE", (0,1), (-1,1), 1),
+            ("ROWHEIGHTS", (0,1), (-1,1), 2),
+
+            # cuerpo
+            ("LEFTPADDING", (0,2), (-1,-1), 6),
+            ("RIGHTPADDING", (0,2), (-1,-1), 6),
+            ("ALIGN", (0,2), (0,-1), "CENTER"),
+            ("ALIGN", (4,2), (4,-1), "CENTER"),
+            ("ALIGN", (5,2), (5,-1), "CENTER"),
+            ("ALIGN", (6,2), (6,-1), "CENTER"),
+            ("VALIGN", (0,2), (-1,-1), "MIDDLE"),
+            ("GRID", (0,2), (-1,-1), 0.4, colors.lightgrey),
+        ]))
+
+        story = [band1, band2, titulo_lista, t]
+        doc.build(story, onFirstPage=_draw_frame, onLaterPages=_draw_frame)
+        return buf.getvalue()
+
+    except Exception:
+        # ---------- FPDF fallback ----------
+        try:
+            from fpdf import FPDF
+            pdf = FPDF(orientation="P", unit="mm", format="A4")
+            pdf.set_auto_page_break(auto=True, margin=15)
+            pdf.add_page()
+
+            titulo = (cfg.get("titulo") or "TORNEO DE AJEDREZ").strip()
+            anio   = (cfg.get("anio") or "").strip()
+            nivel  = (cfg.get("nivel") or "").strip()
+
+            pdf.set_font("Helvetica", "B", 18)
+            pdf.cell(0, 10, f"{titulo} {anio}".strip(), ln=1, align="C")
+            pdf.set_font("Helvetica", "B", 20)
+            if nivel:
+                pdf.cell(0, 10, nivel, ln=1, align="C")
+
+            linea = f"CLASIFICACIÓN DEL TORNEO (tras ronda {ronda_actual})" if ronda_actual else "CLASIFICACIÓN DEL TORNEO"
+            pdf.set_font("Helvetica", "B", 16)
+            pdf.cell(0, 8, linea, ln=1, align="C")
+            pdf.ln(1)
+
+            headers = ["POS", "JUGADOR/A", "CURSO", "GRUPO", "PTS", "BUCHHOLZ", "PJ"]
+            widths  = [14, 70, 22, 22, 18, 28, 12]
+            pdf.set_font("Helvetica", "B", 11)
+            x0 = pdf.get_x()
+            for h, w in zip(headers, widths): pdf.cell(w, 8, h, border=1, align="C")
+            pdf.ln(8)
+            x1 = x0 + sum(widths); y1 = pdf.get_y()
+            pdf.set_draw_color(0,0,0); pdf.set_line_width(0.6); pdf.line(x0, y1, x1, y1)
+            pdf.set_line_width(0.2); pdf.line(x0, y1 + 1.2, x1, y1 + 1.2)
+
+            pdf.set_font("Helvetica", "", 11)
+            for _, r in df_st.iterrows():
+                cells = [str(r.get("pos","")), str(r.get("nombre","")), str(r.get("curso","")), str(r.get("grupo","")),
+                         str(r.get("puntos","")), str(r.get("buchholz","")), str(r.get("pj",""))]
+                aligns = ["C", "L", "C", "C", "C", "C", "C"]
+                for c, w, a in zip(cells, widths, aligns):
+                    pdf.cell(w, 7, (c or "")[:64], border=1, align=a)
+                pdf.ln(7)
+
+            return bytes(pdf.output(dest="S"))
+        except Exception:
+            return None
+
+
 # Nº de rondas planificado
 JUG_PATH = f"{DATA_DIR}/jugadores.csv"
 n = planned_rounds(cfg, JUG_PATH)
@@ -117,7 +307,19 @@ else:
         use_container_width=True,
     )
 
-
+    # PDF de clasificación (formato similar a Rondas)
+    pdf_bytes = build_standings_pdf(df_st, cfg, ronda_actual)
+    if pdf_bytes:
+        fn_pdf = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf"
+        st.download_button(
+            "📄 Descargar clasificación (PDF)",
+            data=pdf_bytes,
+            file_name=fn_pdf,
+            mime="application/pdf",
+            use_container_width=True,
+        )
+    else:
+        st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
 
     with st.expander("Desglose de Buchholz", expanded=False):
     # ——— Desglose de Buchholz ———
