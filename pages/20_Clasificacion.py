@@ -277,7 +277,8 @@ for i in publicadas:
 
 df_st = compute_standings(players)
 
-st.markdown("### Clasificación del torneo (tras ronda {ronda_actual}")
+st.markdown(f"### Clasificación del torneo (tras ronda {ronda_actual})")
+
 if df_st is None or df_st.empty:
     st.info("Sin datos de clasificación todavía.")
 else:
@@ -295,31 +296,33 @@ else:
         },
     )
 
-    # Descarga CSV con nivel/año en el nombre
-    csv_buf = io.StringIO()
-    df_st.to_csv(csv_buf, index=False, encoding="utf-8")
-    fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
-    st.download_button(
-        "⬇️ Descargar clasificación (CSV)",
-        data=csv_buf.getvalue().encode("utf-8"),
-        file_name=fn,
-        mime="text/csv",
-        use_container_width=True,
-    )
 
-    # PDF de clasificación (formato similar a Rondas)
-    pdf_bytes = build_standings_pdf(df_st, cfg, ronda_actual)
-    if pdf_bytes:
-        fn_pdf = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf"
+    # Descargas CSV + PDF en la misma línea
+    c_csv, c_pdf = st.columns(2)
+    with c_csv:
+        csv_buf = io.StringIO()
+        df_st.to_csv(csv_buf, index=False, encoding="utf-8")
+        fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
         st.download_button(
-            "📄 Descargar clasificación (PDF)",
-            data=pdf_bytes,
-            file_name=fn_pdf,
-            mime="application/pdf",
+            "⬇️ Descargar clasificación (CSV)",
+            data=csv_buf.getvalue().encode("utf-8"),
+            file_name=fn,
+            mime="text/csv",
             use_container_width=True,
         )
-    else:
-        st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
+    with c_pdf:
+        pdf_bytes = build_standings_pdf(df_st, cfg, ronda_actual)
+        if pdf_bytes:
+            fn_pdf = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf"
+            st.download_button(
+                "📄 Descargar clasificación (PDF)",
+                data=pdf_bytes,
+                file_name=fn_pdf,
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        else:
+            st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
 
     with st.expander("Desglose de Buchholz", expanded=False):
     # ——— Desglose de Buchholz ———
