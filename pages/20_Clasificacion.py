@@ -348,9 +348,13 @@ else:
     # Selector para mostrar/ocultar Buchholz
     show_bh = st.checkbox(
         "Mostrar BUCHHOLZ (para desempates)",
-        value=True,
+        value=st.session_state.get("show_bh", True),
+        key="show_bh",
         help="Muestra la columna Buchholz, el PDF con Buchholz y el desglose por rivales."
     )
+    show_bh = bool(st.session_state["show_bh"])
+
+    
 
     # Columnas a mostrar según preferencia
     cols = ["pos", "nombre", "curso", "grupo", "puntos", "pj"]
@@ -425,7 +429,8 @@ else:
                 st.dataframe(ct_df, use_container_width=True)
             except Exception as e:
                 st.error(f"No se pudo construir el cuadro: {e}")
-if show_bh:
+
+    if st.session_state.get("show_bh", True):
         with st.expander("Desglose de Buchholz", expanded=False):
             # ——— Desglose de Buchholz ———
             st.markdown("#### 🔎 Ver desglose de Buchholz")
