@@ -1,3 +1,4 @@
+import datetime as _dt
 # pages/99_Admin.py
 # -*- coding: utf-8 -*-
 import os
@@ -13,6 +14,7 @@ from lib.tournament import (
     swiss_pair_round, formatted_name_from_parts,
     is_published, set_published, r1_seed, add_log,
     planned_rounds, format_with_cfg,  # ya estaban
+    set_round_date, get_round_date, format_date_es,
     config_path, config_debug,        # <- añadidos
 )
 
@@ -309,6 +311,10 @@ if first_missing is None:
     st.success("✅ Todas las rondas están generadas.")
 else:
     next_round = first_missing
+
+    # Fecha de celebración para la nueva ronda
+    default_date = _dt.date.today()
+    fecha_ronda = st.date_input(f"📅 Fecha de celebración para Ronda {next_round}", value=default_date, key=f"fecha_ronda_R{next_round}")
     prev = next_round - 1
     allow_generate = True
 
@@ -361,6 +367,12 @@ else:
                     df_pairs = swiss_pair_round(players, next_round, forced_bye_id=None)
                     outp = round_file(next_round)
                     df_pairs.astype(str).to_csv(outp, index=False, encoding="utf-8")
+                    # Guardar fecha de celebración en meta.json
+                    try:
+                        set_round_date(next_round, fecha_ronda.isoformat())
+                    except Exception:
+                        pass
+
 
                     # Guardar semilla en meta si R1
                     if next_round == 1 and seed_used is not None:
@@ -384,6 +396,37 @@ st.divider()
 # =========================
 # Publicar / Despublicar
 # =========================
+
+st.divider()
+
+# =========================
+# 📅 Fecha de celebración por ronda (solo borradores)
+# =========================
+st.markdown("### 📅 Fecha de celebración (solo rondas en borrador)")
+draft_rounds = [i for i in existing_rounds if not is_pub(i)]
+if draft_rounds:
+    sel_draft = st.selectbox("Ronda en borrador a editar", draft_rounds, index=0, key="fecha_sel_round")
+    current_iso = ""
+    try:
+        current_iso = get_round_date(sel_draft)
+    except Exception:
+        current_iso = ""
+    default_date = _dt.date.today()
+    if current_iso:
+        try:
+            y,m,d = map(int, current_iso.split("-"))
+            default_date = _dt.date(y,m,d)
+        except Exception:
+            pass
+    new_date = st.date_input("Nueva fecha de celebración", value=default_date, key=f"fecha_edit_R{sel_draft}")
+    if st.button("💾 Guardar fecha de la ronda", use_container_width=True, key=f"save_fecha_R{sel_draft}"):
+        try:
+            set_round_date(sel_draft, new_date.isoformat())
+            st.success(f"Fecha guardada para Ronda {sel_draft}: {format_date_es(new_date.isoformat())}")
+        except Exception as e:
+            st.error(f"No se pudo guardar la fecha: {e}")
+else:
+    st.info("No hay rondas en borrador para editar fecha.")
 st.markdown("### 📣 Publicar / Despublicar rondas")
 
 if existing_rounds:

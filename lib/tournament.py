@@ -182,6 +182,41 @@ def add_log(action: str, round_no: Optional[int], actor: str, message: str) -> N
             df.to_csv(LOG_PATH, index=False, mode="a", header=False, encoding="utf-8")
     except Exception:
         pass
+# --------- Round date helpers (fecha de celebración por ronda) ---------
+def set_round_date(i: int, date_iso: str) -> None:
+    # Guarda la fecha de celebración (ISO 'YYYY-MM-DD') en meta.json para la ronda i.
+    try:
+        meta = load_meta()
+    except Exception:
+        meta = {}
+    rounds = meta.setdefault("rounds", {})
+    r = rounds.setdefault(str(i), {})
+    r["date"] = (date_iso or "").strip()
+    try:
+        save_meta(meta)
+    except Exception:
+        pass
+
+def get_round_date(i: int) -> str:
+    # Devuelve la fecha ISO 'YYYY-MM-DD' almacenada para la ronda i (o '' si no hay).
+    try:
+        meta = load_meta()
+        return str(meta.get("rounds", {}).get(str(i), {}).get("date", "") or "")
+    except Exception:
+        return ""
+
+def format_date_es(date_iso: str) -> str:
+    # Convierte 'YYYY-MM-DD' -> 'Miércoles 10/11/2025' (sin depender de locale).
+    try:
+        from datetime import date
+        y, m, d = map(int, date_iso.split("-"))
+        dt = date(y, m, d)
+        dias = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
+        nombre = dias[dt.weekday()]
+        return f"{nombre} {dt.day:02d}/{dt.month:02d}/{dt.year}"
+    except Exception:
+        return ""
+
 
 # ============================================================
 # Lectura/Escritura CSV segura
