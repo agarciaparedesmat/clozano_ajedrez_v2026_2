@@ -314,30 +314,39 @@ else:
         column_config=col_config,
     )
 
-    # Descarga CSV con nivel/año en el nombre
-    csv_buf = io.StringIO()
-    df_st[cols].to_csv(csv_buf, index=False, encoding="utf-8")
-    fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
-    st.download_button(
-        "⬇️ Descargar clasificación (CSV)",
-        data=csv_buf.getvalue().encode("utf-8"),
-        file_name=fn,
-        mime="text/csv",
-        use_container_width=True,
-    )
+    # Descargas CSV + PDF en la misma línea
+    import io  # <- asegúrate de tenerlo importado arriba
 
-    # PDF de clasificación (formato similar a Rondas)
-    pdf_bytes = build_standings_pdf(df_st[cols], cfg, ronda_actual, show_bh=show_bh)
-    if pdf_bytes:
-        fn_pdf = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf"
+    c_csv, c_pdf = st.columns([1, 1])   # Cambia proporciones si quieres: [3,2], [2,1], etc.
+
+    with c_csv:
+        csv_buf = io.StringIO()
+        # Si NO usas 'cols' (selección de columnas), cambia df_st[cols] -> df_st
+        df_st.to_csv(csv_buf, index=False, encoding="utf-8")
         st.download_button(
-            "📄 Descargar clasificación (PDF)",
-            data=pdf_bytes,
-            file_name=fn_pdf,
-            mime="application/pdf",
+            "⬇️ Descargar clasificación (CSV)",
+            data=csv_buf.getvalue().encode("utf-8"),
+            file_name=f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv",
+            mime="text/csv",
             use_container_width=True,
         )
-    else:
+
+    with c_pdf:
+        # Si tu build_standings_pdf espera show_bh/df_st[cols], ajústalo aquí;
+        # si no, deja df_st y sin show_bh:
+        pdf_bytes = build_standings_pdf(df_st, cfg, ronda_actual)
+        if pdf_bytes:
+            st.download_button(
+                "📄 Descargar clasificación (PDF)",
+                data=pdf_bytes,
+                file_name=f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        else:
+            st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
+   
+   
         st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
 
     if show_bh:
