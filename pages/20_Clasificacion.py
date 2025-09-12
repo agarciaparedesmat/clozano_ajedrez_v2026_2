@@ -315,13 +315,12 @@ else:
     )
 
     # Descargas CSV + PDF en la misma línea
-    import io  # <- asegúrate de tenerlo importado arriba
 
-    c_csv, c_pdf = st.columns([1, 1])   # Cambia proporciones si quieres: [3,2], [2,1], etc.
+    c_csv, c_pdf = st.columns([1, 1])
 
     with c_csv:
         csv_buf = io.StringIO()
-        # Si NO usas 'cols' (selección de columnas), cambia df_st[cols] -> df_st
+        # Si usas selector de columnas (p.ej. cols), usa df_st[cols]
         df_st.to_csv(csv_buf, index=False, encoding="utf-8")
         st.download_button(
             "⬇️ Descargar clasificación (CSV)",
@@ -332,10 +331,12 @@ else:
         )
 
     with c_pdf:
-        # Si tu build_standings_pdf espera show_bh/df_st[cols], ajústalo aquí;
-        # si no, deja df_st y sin show_bh:
+        # Si usas selector de columnas y/o show_bh, ajusta la llamada:
+        # pdf_bytes = build_standings_pdf(df_st[cols], cfg, ronda_actual, show_bh=show_bh)
         pdf_bytes = build_standings_pdf(df_st, cfg, ronda_actual)
-        if pdf_bytes:
+
+        # ✔️ Comprobación robusta (evita falsos negativos)
+        if isinstance(pdf_bytes, (bytes, bytearray)) and len(pdf_bytes) > 0:
             st.download_button(
                 "📄 Descargar clasificación (PDF)",
                 data=pdf_bytes,
@@ -345,9 +346,9 @@ else:
             )
         else:
             st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
+  
    
-   
-        st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
+
 
     if show_bh:
         with st.expander("Desglose de Buchholz", expanded=False):
