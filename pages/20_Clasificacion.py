@@ -381,7 +381,7 @@ else:
     with c_csv:
         csv_buf = io.StringIO()
         # Si usas selector de columnas (p.ej. cols), usa df_st[cols]
-        df_st.to_csv(csv_buf, index=False, encoding="utf-8")
+        df_st[cols].to_csv(csv_buf, index=False, encoding="utf-8")
         st.download_button(
             "⬇️ Descargar clasificación (CSV)",
             data=csv_buf.getvalue().encode("utf-8"),
@@ -393,7 +393,7 @@ else:
     with c_pdf:
         # Si usas selector de columnas y/o show_bh, ajusta la llamada:
         # pdf_bytes = build_standings_pdf(df_st[cols], cfg, ronda_actual, show_bh=show_bh)
-        pdf_bytes = build_standings_pdf(df_st, cfg, ronda_actual)
+        pdf_bytes = build_standings_pdf(df_st[cols], cfg, ronda_actual, show_bh=show_bh)
 
         # ✔️ Comprobación robusta (evita falsos negativos)
         if isinstance(pdf_bytes, (bytes, bytearray)) and len(pdf_bytes) > 0:
