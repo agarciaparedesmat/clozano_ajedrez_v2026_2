@@ -151,7 +151,7 @@ with c_sel:
     )
 
 with c_chips:
-    st.markdown("**Ir directo a…**")
+    st.markdown("**Ir directo a...**")
     per_row = min(len(publicadas), 12)
     chip_cols = st.columns(per_row, gap="small")
 
@@ -312,7 +312,8 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         linea_fecha = (cfg.get("pdf_fecha") or "").strip()
         linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-        # Fecha específica de la ronda si existe en meta.json
+
+        # ← fecha específica de la ronda (si existe en meta.json)
         try:
             _iso = get_round_date(i)
             if _iso:
@@ -423,15 +424,16 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             linea_fecha = (cfg.get("pdf_fecha") or "").strip()
             linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-        # Fecha específica de la ronda si existe en meta.json
-        try:
-            _iso = get_round_date(i)
-            if _iso:
-                _fmt = format_date_es(_iso)
-                if _fmt:
-                    linea_fecha = _fmt
-        except Exception:
-            pass
+
+            # ← fecha específica de la ronda (si existe en meta.json)
+            try:
+                _iso = get_round_date(i)
+                if _iso:
+                    _fmt = format_date_es(_iso)
+                    if _fmt:
+                        linea_fecha = _fmt
+            except Exception:
+                pass
             # cabeceras centradas
             pdf.set_font("Helvetica", "B", 18); pdf.cell(0, 10, f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", ln=1, align="C")
             pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 10, f"RONDA {i}", ln=1, align="C")
@@ -511,16 +513,20 @@ def render_round(i: int):
     # normalizar resultados crudos para export
     safe_df["resultado"] = _normalize_result_series(safe_df["resultado"])
 
-    
-    # Mostrar fecha de celebración de la ronda en la vista
+    # ---- TABLA EN PANTALLA (4 columnas limpias) ----
+    # Fecha de celebración (vista)
+    fecha_view = ""
     try:
         _iso_view = get_round_date(current_round)
-        _fecha_view = format_date_es(_iso_view) if _iso_view else (cfg.get("pdf_fecha") or "")
+        if _iso_view:
+            fecha_view = format_date_es(_iso_view)
     except Exception:
-        _fecha_view = (cfg.get("pdf_fecha") or "")
-    if _fecha_view:
-        st.caption(f"📅 Fecha de celebración: {_fecha_view}")
-# ---- TABLA EN PANTALLA (4 columnas limpias) ----
+        fecha_view = ""
+    if not fecha_view:
+        fecha_view = (cfg.get("pdf_fecha") or "").strip()
+    if fecha_view:
+        st.caption(f"📅 Fecha de celebración: {fecha_view}")
+
     st.dataframe(
         show_df[["mesa", "blancas_nombre", "negras_nombre", "resultado_mostrar"]],
         use_container_width=True,
