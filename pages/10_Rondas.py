@@ -498,7 +498,7 @@ def render_round(i: int):
     lm = last_modified(path)
 
     st.markdown(f"### Ronda {i} — {estado}")
-    st.caption(f"Archivo: `{path}` · Última modificación: {lm} · Resultados vacíos: {empties}")
+    st.caption(f"Última modificación: {lm} · Resultados vacíos: {empties}")
 
     # ordenar por mesa (para vista y export)
     try:
