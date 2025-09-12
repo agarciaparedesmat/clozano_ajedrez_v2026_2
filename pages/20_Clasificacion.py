@@ -423,7 +423,13 @@ else:
         with st.expander("Cuadro del torneo (doble entrada por posiciones)", expanded=True):
             try:
                 ct_df = build_crosstable_df_positions(df_st, publicadas)
-                st.dataframe(ct_df, use_container_width=True)
+                # Columnas estrechas para el cuadro (no estirar a todo el ancho)
+                col_config_ct = {c: st.column_config.TextColumn(str(c), width="small") for c in ct_df.columns}
+                st.dataframe(
+                    ct_df,
+                    use_container_width=False,
+                    column_config=col_config_ct,
+                )
             except Exception as e:
                 st.error(f"No se pudo construir el cuadro: {e}")
 
