@@ -566,7 +566,7 @@ def render_round(i: int):
             )
         else:
             st.caption("📄 PDF en blanco no disponible (instala reportlab o fpdf2).")
-")
+
 
 # pinta solo la ronda seleccionada
 render_round(sel)
