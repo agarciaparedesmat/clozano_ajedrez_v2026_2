@@ -355,27 +355,37 @@ else:
     csv_buf = io.StringIO()
     df_st.to_csv(csv_buf, index=False, encoding="utf-8")
     fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
-    st.download_button(
-        "⬇️ Descargar clasificación (CSV)",
-        data=csv_buf.getvalue().encode("utf-8"),
-        file_name=fn,
-        mime="text/csv",
-        use_container_width=True,
-    )
+    
+    # Descargas CSV + PDF en la misma línea
+    import io as _io_cols
+    c_csv, c_pdf = st.columns(2)
 
-    # PDF de clasificación (formato similar a Rondas)
-    pdf_bytes = build_standings_pdf(df_st, cfg, ronda_actual)
-    if pdf_bytes:
-        fn_pdf = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf"
+    with c_csv:
+        csv_buf = _io_cols.StringIO()
+        df_st.to_csv(csv_buf, index=False, encoding="utf-8")
+        fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
         st.download_button(
-            "📄 Descargar clasificación (PDF)",
-            data=pdf_bytes,
-            file_name=fn_pdf,
-            mime="application/pdf",
+            "⬇️ Descargar clasificación (CSV)",
+            data=csv_buf.getvalue().encode("utf-8"),
+            file_name=fn,
+            mime="text/csv",
             use_container_width=True,
         )
-    else:
-        st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
+
+    with c_pdf:
+        pdf_bytes = build_standings_pdf(df_st, cfg, ronda_actual)
+        if isinstance(pdf_bytes, (bytes, bytearray)) and len(pdf_bytes) > 0:
+            fn_pdf = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf"
+            st.download_button(
+                "📄 Descargar clasificación (PDF)",
+                data=pdf_bytes,
+                file_name=fn_pdf,
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        else:
+            st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
+
 
     
     # ——— Cuadro del torneo (doble entrada) ———
@@ -386,11 +396,11 @@ else:
     with col_ct1:
         st.caption("Resumen con todos los enfrentamientos y resultados (tabla de doble entrada)")
     with col_ct2:
-        if st.button("🧩 Mostrar cuadro", use_container_width=True, key="btn_ct_toggle"):
+        if st.button("🧮 Mostrar cuadro", use_container_width=True, key="btn_ct_toggle"):
             st.session_state["show_ct"] = not st.session_state["show_ct"]
 
     if st.session_state["show_ct"]:
-        with st.expander("🧩 Cuadro del torneo (doble entrada)", expanded=True):
+        with st.expander("🧮 Cuadro del torneo (doble entrada)", expanded=True):
             try:
                 ct_df = build_crosstable_df(df_st, publicadas)
                 st.dataframe(ct_df, use_container_width=True)
@@ -408,9 +418,9 @@ else:
                 st.caption("Cada celda muestra el resultado desde la perspectiva de la FILA: 1 = ganó, ½ = tablas, 0 = perdió. Si jugaron varias veces, aparecen separados por ' / '.")
             except Exception as e:
                 st.error(f"No se pudo construir el cuadro: {e}")
-with st.expander("Desglose de Buchholz", expanded=False):
+with st.expander("📈 Desglose de Buchholz", expanded=False):
     # ——— Desglose de Buchholz ———
-        st.markdown("#### 🔎 Ver desglose de Buchholz")
+        st.markdown("#### 📈 Ver desglose de Buchholz")
         try:
             # Opciones: etiqueta visible -> id interno
             _opts = {f"{row['nombre']} (Pos {int(row['pos'])}, {row['puntos']} pts)": row["id"] for _, row in df_st.iterrows()}
@@ -419,7 +429,7 @@ with st.expander("Desglose de Buchholz", expanded=False):
 
         sel_label = st.selectbox("Jugador", list(_opts.keys()), index=0, key="bh_player_select")
 
-        if st.button("🔎 Ver desglose de Buchholz", use_container_width=True, key="btn_bh_breakdown"):
+        if st.button("📈 Ver desglose de Buchholz", use_container_width=True, key="btn_bh_breakdown"):
             pid = _opts.get(sel_label)
             if pid and pid in players:
                 # Puntos actuales por jugador (tras aplicar rondas publicadas)
