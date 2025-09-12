@@ -16,6 +16,8 @@ from lib.tournament import (
     round_file,
     planned_rounds,
     format_with_cfg,
+    get_round_date,
+    format_date_es,
 )
 
 st.set_page_config(page_title="Rondas", page_icon="🧩", layout="wide")
@@ -309,6 +311,16 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         nivel = (cfg.get("nivel") or "").strip()
         linea_fecha = (cfg.get("pdf_fecha") or "").strip()
         linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
+        # Fecha específica de la ronda (solo PDF sin resultados)
+        if not include_results:
+            try:
+                _iso = get_round_date(i)
+                if _iso:
+                    _fmt = format_date_es(_iso)
+                    if _fmt:
+                        linea_fecha = _fmt
+            except Exception:
+                pass
 
         # Bandas
         band1 = Table([[Paragraph(f"{titulo} {anio}" if titulo and anio else "TORNEO DE AJEDREZ", H1)]],
@@ -415,6 +427,16 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             linea_fecha = (cfg.get("pdf_fecha") or "").strip()
             linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
+            # Fecha específica de la ronda (solo PDF sin resultados)
+            if not include_results:
+                try:
+                    _iso = get_round_date(i)
+                    if _iso:
+                        _fmt = format_date_es(_iso)
+                        if _fmt:
+                            linea_fecha = _fmt
+                except Exception:
+                    pass
             # cabeceras centradas
             pdf.set_font("Helvetica", "B", 18); pdf.cell(0, 10, f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", ln=1, align="C")
             pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 10, f"RONDA {i}", ln=1, align="C")
@@ -502,6 +524,15 @@ def render_round(i: int):
     safe_df["resultado"] = _normalize_result_series(safe_df["resultado"])
 
     # ---- TABLA EN PANTALLA (4 columnas limpias) ----
+    # Mostrar fecha de celebración de la ronda (si existe en meta.json); si no, usar pdf_fecha del config
+    try:
+        _iso_view = get_round_date(i)
+        _fecha_view = format_date_es(_iso_view) if _iso_view else (cfg.get("pdf_fecha") or "").strip()
+    except Exception:
+        _fecha_view = (cfg.get("pdf_fecha") or "").strip()
+    if _fecha_view:
+        st.caption(f"📅 Fecha de celebración: {_fecha_view}")
+
     st.dataframe(
         show_df[["mesa", "blancas_nombre", "resultado_mostrar", "negras_nombre"]],
         use_container_width=True,
