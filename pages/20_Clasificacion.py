@@ -87,7 +87,7 @@ for i in publicadas:
 
 df_st = compute_standings(players)
 
-st.markdown("### Tabla")
+st.markdown("### Clasificación del torneo (tras ronda {ronda_actual}")
 if df_st is None or df_st.empty:
     st.info("Sin datos de clasificación todavía.")
 else:
@@ -104,6 +104,20 @@ else:
             "pj": st.column_config.NumberColumn("PJ"),
         },
     )
+
+    # Descarga CSV con nivel/año en el nombre
+    csv_buf = io.StringIO()
+    df_st.to_csv(csv_buf, index=False, encoding="utf-8")
+    fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
+    st.download_button(
+        "⬇️ Descargar clasificación (CSV)",
+        data=csv_buf.getvalue().encode("utf-8"),
+        file_name=fn,
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+
 
     with st.expander("Desglose de Buchholz", expanded=False):
     # ——— Desglose de Buchholz ———
@@ -144,18 +158,6 @@ else:
             else:
                 st.warning("No se ha podido localizar el jugador seleccionado.")
 
-
-    # Descarga CSV con nivel/año en el nombre
-    csv_buf = io.StringIO()
-    df_st.to_csv(csv_buf, index=False, encoding="utf-8")
-    fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
-    st.download_button(
-        "⬇️ Descargar clasificación (CSV)",
-        data=csv_buf.getvalue().encode("utf-8"),
-        file_name=fn,
-        mime="text/csv",
-        use_container_width=True,
-    )
 
 st.divider()
 st.caption(format_with_cfg("Vista pública de emparejamientos y resultados — {nivel} ({anio})", cfg))
