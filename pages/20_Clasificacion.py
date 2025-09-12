@@ -158,7 +158,7 @@ def build_standings_pdf(df_st, cfg, ronda_actual, show_bh=True):
             data.append(row)
         from reportlab.platypus import Table as RLTable
         widths = [14*mm, 70*mm, 22*mm, 22*mm, 18*mm, 28*mm, 12*mm] if has_bh else [14*mm, 82*mm, 24*mm, 24*mm, 20*mm, 14*mm]
-        t = RLTable(data, colWidths=widths, repeatRows=2)
+        t = Table(data, colWidths=widths, repeatRows=2)
         t.setStyle(TableStyle([
             # cabecera
             ("FONT", (0,0), (-1,0), SERIF_B, 11.5),
@@ -284,7 +284,6 @@ st.markdown(f"### Clasificación del torneo (tras ronda {ronda_actual})")
 if df_st is None or df_st.empty:
     st.info("Sin datos de clasificación todavía.")
 else:
-    
     # Selector para mostrar/ocultar Buchholz
     show_bh = st.checkbox(
         "Mostrar BUCHHOLZ (para desempates)",
@@ -308,51 +307,50 @@ else:
     }
     if "buchholz" in cols:
         col_config["buchholz"] = st.column_config.NumberColumn("Buchholz")
+
     st.dataframe(
         df_st[cols],
         use_container_width=True, hide_index=True,
         column_config=col_config,
     )
 
+    # Descarga CSV con nivel/año en el nombre
+    csv_buf = io.StringIO()
+    df_st[cols].to_csv(csv_buf, index=False, encoding="utf-8")
+    fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
+    
     # Descargas CSV + PDF en la misma línea
-
+    import io
     c_csv, c_pdf = st.columns([1, 1])
 
     with c_csv:
         csv_buf = io.StringIO()
-        # Si usas selector de columnas (p.ej. cols), usa df_st[cols]
-        df_st.to_csv(csv_buf, index=False, encoding="utf-8")
+        df_st[cols].to_csv(csv_buf, index=False, encoding="utf-8")
+        fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
         st.download_button(
             "⬇️ Descargar clasificación (CSV)",
             data=csv_buf.getvalue().encode("utf-8"),
-            file_name=f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv",
+            file_name=fn,
             mime="text/csv",
             use_container_width=True,
         )
 
     with c_pdf:
-        # Si usas selector de columnas y/o show_bh, ajusta la llamada:
-        # pdf_bytes = build_standings_pdf(df_st[cols], cfg, ronda_actual, show_bh=show_bh)
-        pdf_bytes = build_standings_pdf(df_st, cfg, ronda_actual)
-
-        # ✔️ Comprobación robusta (evita falsos negativos)
+        pdf_bytes = build_standings_pdf(df_st[cols], cfg, ronda_actual, show_bh=show_bh)
         if isinstance(pdf_bytes, (bytes, bytearray)) and len(pdf_bytes) > 0:
+            fn_pdf = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf"
             st.download_button(
                 "📄 Descargar clasificación (PDF)",
                 data=pdf_bytes,
-                file_name=f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf",
+                file_name=fn_pdf,
                 mime="application/pdf",
                 use_container_width=True,
             )
         else:
             st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
-  
-   
-
-
-    if show_bh:
+if show_bh:
         with st.expander("Desglose de Buchholz", expanded=False):
-            # ——— Desglose de Buchholz ———
+        # ——— Desglose de Buchholz ———
             st.markdown("#### 🔎 Ver desglose de Buchholz")
             try:
                 # Opciones: etiqueta visible -> id interno
