@@ -88,7 +88,7 @@ for i in publicadas:
 
 df_st = compute_standings(players)
 
-st.markdown("### Tabla")
+st.markdown("### Clasificación general")
 if df_st is None or df_st.empty:
     st.info("Sin datos de clasificación todavía.")
 else:
