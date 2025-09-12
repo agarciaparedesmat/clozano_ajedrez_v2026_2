@@ -37,7 +37,7 @@ sidebar_title_and_nav(
 cfg = load_config()
 page_header(
     format_with_cfg("🧩 Rondas — {nivel}", cfg),
-    format_with_cfg("Curso {anio} · Emparejamientos y resultados (solo PUBLICADAS)", cfg),
+    format_with_cfg("Curso {anio} · Emparejamientos y resultados de rondas (solo PUBLICADAS)", cfg),
 )
 
 # ---------- utilidades ----------
