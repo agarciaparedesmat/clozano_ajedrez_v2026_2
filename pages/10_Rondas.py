@@ -240,327 +240,159 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
     if not include_results:
         tbl["resultado_mostrar"] = ":"
 
-    # ---------- ReportLab principal ----------
+    
+# ---------- ReportLab principal ----------
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
         from reportlab.lib.units import mm
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
+        import io
 
-        # Paleta (aprox. plantilla)
-        VERDE     = colors.HexColor("#d9ead3")
-        MELOCOTON = colors.HexColor("#f7e1d5")
-        AZUL      = colors.HexColor("#cfe2f3")
-
-        # Registrar fuentes si existen
-        def _register_fonts():
-            basep = os.path.join("assets", "fonts")
-            ok = False
-            try:
-                if os.path.exists(os.path.join(basep, "OldStandard-Regular.ttf")):
-                    pdfmetrics.registerFont(TTFont("OldStd", os.path.join(basep, "OldStandard-Regular.ttf")))
-                    if os.path.exists(os.path.join(basep, "OldStandard-Bold.ttf")):
-                        pdfmetrics.registerFont(TTFont("OldStd-B", os.path.join(basep, "OldStandard-Bold.ttf")))
-                    ok = True
-                if os.path.exists(os.path.join(basep, "PlayfairDisplay-Regular.ttf")):
-                    pdfmetrics.registerFont(TTFont("Playfair", os.path.join(basep, "PlayfairDisplay-Regular.ttf")))
-                    if os.path.exists(os.path.join(basep, "PlayfairDisplay-Bold.ttf")):
-                        pdfmetrics.registerFont(TTFont("Playfair-B", os.path.join(basep, "PlayfairDisplay-Bold.ttf")))
-                    ok = True
-            except Exception:
-                pass
-            return ok
-
-        has_custom = _register_fonts()
-        SERIF    = "OldStd"   if has_custom else "Times-Roman"
-        SERIF_B  = "OldStd-B" if has_custom else "Times-Bold"
-        DISPLAY  = "Playfair-B" if has_custom else SERIF_B
-
-        buf = io.BytesIO()
-        # Márgenes algo más “editoriales”
-        doc = SimpleDocTemplate(
-            buf, pagesize=A4,
-            leftMargin=17*mm, rightMargin=17*mm,
-            topMargin=14*mm, bottomMargin=14*mm
-        )
-
-        # Marco exterior (sin numeración)
-        def _draw_frame(canvas, d):
-            canvas.saveState()
-            canvas.setStrokeColor(colors.black)
-            canvas.setLineWidth(1.1)
-            x = doc.leftMargin - 5*mm
-            y = doc.bottomMargin - 5*mm
-            w = doc.width + 10*mm
-            h = doc.height + 10*mm
-            canvas.rect(x, y, w, h)
-            canvas.restoreState()
-
-        # Estilos con sangría/leading cuidados
+        # Fuentes simples y legibles
         styles = getSampleStyleSheet()
+        SERIF   = "Helvetica"
+        SERIF_B = "Helvetica-Bold"
+        DISPLAY = SERIF_B
+
         H1 = ParagraphStyle("H1", parent=styles["Normal"], fontName=SERIF_B, fontSize=18, leading=22, alignment=1, spaceAfter=2)
         H2 = ParagraphStyle("H2", parent=styles["Normal"], fontName=DISPLAY,  fontSize=28, leading=32, alignment=1, spaceAfter=4)
         H3 = ParagraphStyle("H3", parent=styles["Normal"], fontName=SERIF_B, fontSize=16, leading=20, alignment=1, spaceBefore=2, spaceAfter=4)
-        BODY = ParagraphStyle("BODY", parent=styles["Normal"], fontName=SERIF, fontSize=11.5, leading=14.2, leftIndent=0)
+        BODY = ParagraphStyle("BODY", parent=styles["Normal"], fontName=SERIF, fontSize=11.5, leading=14.2)
 
-        titulo = (cfg.get("titulo") or "").strip() 
-        anio = (cfg.get("anio") or "").strip()
-        nivel = (cfg.get("nivel") or "").strip()
-        linea_fecha = (cfg.get("pdf_fecha") or "").strip()
-        
-        # Fecha específica de la ronda (si existe en meta.json)
-        try:
-            rd_iso = get_round_date(i)
-            rd_fmt = format_date_es(rd_iso) if rd_iso else ""
-            if rd_fmt:
-                linea_fecha = rd_fmt
-        except Exception:
-            pass
-linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=17*mm, rightMargin=17*mm, topMargin=14*mm, bottomMargin=14*mm)
 
         # Bandas
-        band1 = Table([[Paragraph(f"{titulo} {anio}" if titulo and anio else "TORNEO DE AJEDREZ", H1)]],
-                      colWidths=[doc.width])
-        band1.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,-1), VERDE),
-            ("ALIGN", (0,0), (-1,-1), "CENTER"),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-            ("TOPPADDING", (0,0), (-1,-1), 6),
-        ]))
+        band1 = Table([[Paragraph(f"{titulo} {anio}" if titulo and anio else "TORNEO DE AJEDREZ", H1)]], colWidths=[doc.width])
+        band1.setStyle(TableStyle([("BACKGROUND", (0,0), (-1,-1), VERDE), ("ALIGN", (0,0), (-1,-1), "CENTER"),
+                                   ("BOTTOMPADDING", (0,0), (-1,-1), 6), ("TOPPADDING", (0,0), (-1,-1), 6)]))
 
         band2 = Table([[Paragraph(f"RONDA {i}", H1)]], colWidths=[doc.width])
-        band2.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,-1), MELOCOTON),
-            ("ALIGN", (0,0), (-1,-1), "CENTER"),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 12),
-            ("TOPPADDING", (0,0), (-1,-1), 12),
-        ]))
+        band2.setStyle(TableStyle([("BACKGROUND", (0,0), (-1,-1), MELOCOTON), ("ALIGN", (0,0), (-1,-1), "CENTER"),
+                                   ("BOTTOMPADDING", (0,0), (-1,-1), 12), ("TOPPADDING", (0,0), (-1,-1), 12)]))
 
+        # Cabecera secundaria
         cab_lines = []
         if nivel:       cab_lines.append(f"<b>{nivel}</b>")
         if not include_results:
             if linea_fecha: cab_lines.append(linea_fecha)
             if linea_hora:  cab_lines.append(linea_hora)
         cab_text = "<br/>".join(cab_lines) if cab_lines else ""
-        cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=20, leading=24, alignment=1))]],
-                    colWidths=[doc.width])
-        cab.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,-1), AZUL),
-            ("BOX", (0,0), (-1,-1), 0.5, colors.black),
-            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
-            ("LEFTPADDING", (0,0), (-1,-1), 10),
-            ("RIGHTPADDING", (0,0), (-1,-1), 10),
-            ("TOPPADDING", (0,0), (-1,-1), 10),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 10),
-        ]))
+        cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=20, leading=24, alignment=1))]], colWidths=[doc.width])
+        cab.setStyle(TableStyle([("BACKGROUND", (0,0), (-1,-1), AZUL), ("BOX", (0,0), (-1,-1), 0.5, colors.black),
+                                 ("VALIGN", (0,0), (-1,-1), "MIDDLE"), ("LEFTPADDING", (0,0), (-1,-1), 10),
+                                 ("RIGHTPADDING", (0,0), (-1,-1), 10), ("TOPPADDING", (0,0), (-1,-1), 10),
+                                 ("BOTTOMPADDING", (0,0), (-1,-1), 10)]))
 
-        titulo_lista = Table([[Paragraph("RESULTADOS" if include_results else "RESULTADOS" if include_results else "Lista de emparejamientos", H3)]], colWidths=[doc.width])
-        titulo_lista.setStyle(TableStyle([
-            ("ALIGN", (0,0), (-1,-1), "CENTER"),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-            ("TOPPADDING", (0,0), (-1,-1), 6),
-        ]))
+        titulo_lista = Table([[Paragraph("RESULTADOS" if include_results else "Lista de emparejamientos", H3)]], colWidths=[doc.width])
+        titulo_lista.setStyle(TableStyle([("ALIGN", (0,0), (-1,-1), "CENTER"),
+                                          ("BOTTOMPADDING", (0,0), (-1,-1), 6), ("TOPPADDING", (0,0), (-1,-1), 6)]))
 
-        # Construir filas: usar Paragraph en nombres para buena ruptura de línea + sangría/padding
-        rows = []
-        for _, r in tbl.iterrows():
-            mesa = str(r["mesa"])
-            b = Paragraph(str(r["blancas_nombre_pdf"]), BODY)
-            res = Paragraph(str(r["resultado_mostrar"]), ParagraphStyle("RES", parent=BODY, alignment=1))  # centrado
-            n = Paragraph(str(r["negras_nombre_pdf"]), BODY)
-            rows.append([mesa, b, res, n])
-
-        data = [["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"], ["", "", "", ""]] + rows
-        widths = [20*mm, (doc.width - 40*mm)/2, 20*mm, (doc.width - 40*mm)/2]
-
-        t = Table(data, colWidths=widths, repeatRows=2)  # repite cabecera si salta de página
+        # Tabla datos
+        head = ["Mesa", "Blancas", "Resultado", "Negras"]
+        data = [head] + [[str(r["mesa"]), str(r["blancas_nombre_pdf"]), str(r["resultado_mostrar"]), str(r["negras_nombre_pdf"])] for _, r in tbl.iterrows()]
+        t = Table(data, colWidths=[18*mm, 73*mm, 22*mm, 73*mm])
         t.setStyle(TableStyle([
-            # cabecera
-            ("FONT", (0,0), (-1,0), SERIF_B, 11.5),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
-            ("ALIGN", (0,0), (-1,0), "CENTER"),
-            ("VALIGN", (0,0), (-1,0), "MIDDLE"),
-            ("BOTTOMPADDING", (0,0), (-1,0), 6),
-            ("TOPPADDING", (0,0), (-1,0), 6),
-
-            # doble línea real (cabecera → cuerpo)
-            ("LINEBELOW", (0,0), (-1,0), 1.3, colors.black),  # 1ª
-            ("LINEBELOW", (0,1), (-1,1), 0.6, colors.black),  # 2ª fina
-
-            # fila separadora “fantasma”
-            ("TOPPADDING", (0,1), (-1,1), 0),
-            ("BOTTOMPADDING", (0,1), (-1,1), 0),
-            ("FONTSIZE", (0,1), (-1,1), 1),
-            ("ROWHEIGHTS", (0,1), (-1,1), 2),
-
-            # cuerpo: padding y alineaciones
-            ("LEFTPADDING", (0,2), (-1,-1), 6),
-            ("RIGHTPADDING", (0,2), (-1,-1), 6),
-            ("ALIGN", (0,2), (0,-1), "CENTER"),
-            ("ALIGN", (2,2), (2,-1), "CENTER"),
-            ("VALIGN", (0,2), (-1,-1), "MIDDLE"),
-
-            # rejilla suave
-            ("GRID", (0,2), (-1,-1), 0.4, colors.lightgrey),
+            ("FONTNAME", (0,0), (-1,0), SERIF_B),
+            ("FONTSIZE", (0,0), (-1,0), 12),
+            ("ALIGN", (0,0), (0,0), "CENTER"),
+            ("ALIGN", (2,0), (2,0), "CENTER"),
+            ("LINEABOVE", (0,0), (-1,0), 1.2, colors.black),
+            ("LINEBELOW", (0,0), (-1,0), 1.2, colors.black),
+            ("FONTNAME", (0,1), (-1,-1), SERIF),
+            ("FONTSIZE", (0,1), (-1,-1), 11),
+            ("ALIGN", (0,1), (0,-1), "CENTER"),
+            ("ALIGN", (2,1), (2,-1), "CENTER"),
+            ("VALIGN", (0,1), (-1,-1), "MIDDLE"),
+            ("GRID", (0,1), (-1,-1), 0.3, colors.lightgrey),
         ]))
+
+        # Marco
+        def _draw_frame(canvas, d):
+            from reportlab.lib.units import mm as _mm
+            canvas.saveState()
+            canvas.setStrokeColor(colors.black)
+            canvas.setLineWidth(1.1)
+            x = doc.leftMargin - 5*_mm
+            y = doc.bottomMargin - 5*_mm
+            w = doc.width + 10*_mm
+            h = doc.height + 10*_mm
+            canvas.rect(x, y, w, h)
+            canvas.restoreState()
 
         story = [band1, band2, cab, Spacer(1, 6), titulo_lista, t]
         doc.build(story, onFirstPage=_draw_frame, onLaterPages=_draw_frame)
         return buf.getvalue()
-
     except Exception:
         # ---------- FPDF fallback (simple, sin números) ----------
         try:
             from fpdf import FPDF
+
             pdf = FPDF(orientation="P", unit="mm", format="A4")
             pdf.set_auto_page_break(auto=True, margin=15)
             pdf.add_page()
 
+            # Cabecera título + ronda
+            titulo = (cfg.get("titulo") or "TORNEO DE AJEDREZ").strip()
             anio = (cfg.get("anio") or "").strip()
             nivel = (cfg.get("nivel") or "").strip()
-            linea_fecha = (cfg.get("pdf_fecha") or "").strip()
-            linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-            # cabeceras centradas
-            pdf.set_font("Helvetica", "B", 18); pdf.cell(0, 10, f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", ln=1, align="C")
-            pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 10, f"RONDA {i}", ln=1, align="C")
             pdf.set_font("Helvetica", "B", 18)
-            for ln in ([nivel] + ([] if include_results else [linea_fecha, linea_hora])):
-                if ln: pdf.cell(0, 8, ln, ln=1, align="C")
+            title_txt = f"{titulo} {anio}".strip() if anio else titulo
+            pdf.cell(0, 10, title_txt, ln=1, align="C")
+            pdf.set_font("Helvetica", "B", 24)
+            pdf.cell(0, 10, f"RONDA {i}", ln=1, align="C")
+
+            # Meta (nivel y, si NO es resultados, fecha—hora en una sola línea)
+            pdf.set_font("Helvetica", "B", 14)
+            if nivel:
+                pdf.cell(0, 8, nivel, ln=1, align="C")
+            if not include_results:
+                linea_fecha = (cfg.get("pdf_fecha") or "").strip()
+                linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
+                # Per-round date override
+                try:
+                    _iso = get_round_date(i)
+                    if _iso:
+                        _fmt = format_date_es(_iso)
+                        if _fmt:
+                            linea_fecha = _fmt
+                except Exception:
+                    pass
+                meta_line = f"{linea_fecha} — {linea_hora}" if (linea_fecha and linea_hora) else (linea_fecha or linea_hora)
+                if meta_line:
+                    pdf.set_font("Helvetica", "B", 12)
+                    pdf.cell(0, 7, meta_line, ln=1, align="C")
             pdf.ln(2)
-            pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "RESULTADOS" if include_results else "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
 
-            headers = ["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"]
-            widths = [20, 85, 20, 85]  # un poco más anchas las columnas de nombres
-            pdf.set_font("Helvetica", "B", 11)
-            x0 = pdf.get_x()
-            for h, w in zip(headers, widths): pdf.cell(w, 8, h, border=1, align="C")
+            # Título de tabla
+            pdf.set_font("Helvetica", "B", 16)
+            pdf.cell(0, 8, "RESULTADOS" if include_results else "Lista de emparejamientos", ln=1, align="C")
+            pdf.ln(1)
+
+            # Cabecera tabla
+            col_w = [18, 76, 22, 76]
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.cell(col_w[0], 8, "Mesa", border=1, align="C")
+            pdf.cell(col_w[1], 8, "Blancas", border=1, align="C")
+            pdf.cell(col_w[2], 8, "Res.", border=1, align="C")
+            pdf.cell(col_w[3], 8, "Negras", border=1, align="C")
             pdf.ln(8)
-            # doble línea
-            x1 = x0 + sum(widths); y1 = pdf.get_y()
-            pdf.set_draw_color(0,0,0); pdf.set_line_width(0.6); pdf.line(x0, y1, x1, y1)
-            pdf.set_line_width(0.2); pdf.line(x0, y1 + 1.2, x1, y1 + 1.2)
 
+            # Filas
             pdf.set_font("Helvetica", "", 11)
-            for _, r in tbl.iterrows():
-                cells = [str(r["mesa"]), str(r["blancas_nombre_pdf"]), str(r["resultado_mostrar"]), str(r["negras_nombre_pdf"])]
-                aligns = ["C", "L", "C", "L"]
-                for c, w, a in zip(cells, widths, aligns):
-                    pdf.cell(w, 7, c[:64], border=1, align=a)
+            # Usamos 'tbl' ya formateado arriba (mismos nombres de columnas que en ReportLab)
+            for _, row in tbl.iterrows():
+                pdf.cell(col_w[0], 7, str(row["mesa"]), border=1, align="C")
+                pdf.cell(col_w[1], 7, str(row["blancas_nombre_pdf"]), border=1)
+                pdf.cell(col_w[2], 7, str(row["resultado_mostrar"]), border=1, align="C")
+                pdf.cell(col_w[3], 7, str(row["negras_nombre_pdf"]), border=1)
                 pdf.ln(7)
 
-            return bytes(pdf.output(dest="S"))
+            return pdf.output(dest="S").encode("latin-1", errors="ignore")
+
         except Exception:
             return None
-
-#--------- render de UNA sola ronda (la seleccionada) ----------
-def render_round(i: int):
-    path = round_file(i)
-    df = read_csv_safe(path)
-    if df is None or df.empty:
-        st.warning(f"No hay datos para la Ronda {i}.")
-        return
-
-    safe_df = df.copy()
-    if "seleccionar" in safe_df.columns:  # columna solo usada en admin
-        safe_df = safe_df.drop(columns=["seleccionar"])
-
-    # asegurar columnas básicas
-    for col in ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]:
-        if col not in safe_df.columns:
-            safe_df[col] = ""
-
-    empties = _results_empty_count(safe_df)
-    estado = "✅ Cerrada" if empties == 0 else "📣 Publicada"
-    lm = last_modified(path)
-
-    st.markdown(f"### Ronda {i} — {estado}")
-    st.caption(f"Archivo: `{path}` · Última modificación: {lm} · Resultados vacíos: {empties}")
-
-    # ordenar por mesa (para vista y export)
-    try:
-        safe_df["mesa"] = pd.to_numeric(safe_df["mesa"], errors="coerce")
-    except Exception:
-        pass
-    safe_df = safe_df.sort_values(by=["mesa"], na_position="last")
-
-    # ---- BYE y resultado mostrado (badge en RESULTADO) ----
-    bye_mask = (
-        safe_df["blancas_id"].astype(str).str.upper().eq("BYE")
-        | safe_df["blancas_nombre"].astype(str).str.upper().eq("BYE")
-        | safe_df["negras_id"].astype(str).str.upper().eq("BYE")
-        | safe_df["negras_nombre"].astype(str).str.upper().eq("BYE")
-    )
-
-    show_df = safe_df.copy()
-    show_df["resultado_mostrar"] = _normalize_result_series(show_df["resultado"])
-    show_df.loc[show_df["resultado_mostrar"] == "", "resultado_mostrar"] = "—"
-    show_df.loc[bye_mask, "resultado_mostrar"] = show_df["resultado_mostrar"] + "  🟨 BYE"
-
-    # normalizar resultados crudos para export
-    safe_df["resultado"] = _normalize_result_series(safe_df["resultado"])
-
-    # ---- TABLA EN PANTALLA (4 columnas limpias) ----
-    st.dataframe(
-        show_df[["mesa", "blancas_nombre", "resultado_mostrar", "negras_nombre"]],
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "mesa": st.column_config.NumberColumn("Mesa", help="Número de mesa"),
-            "blancas_nombre": st.column_config.TextColumn("Blancas"),
-            "negras_nombre": st.column_config.TextColumn("Negras"),
-            "resultado_mostrar": st.column_config.TextColumn("Resultado"),
-        },
-    )
-
-    # ---- OPCIÓN PDF: incluir resultados o dejar hueco ----
-    include_results = st.checkbox("Incluir resultados en el PDF", value=True, key=f"pdf_include_results_R{i}")
-
-    # ---- DESCARGAS CSV + PDF (misma línea) ----
-    export_cols = ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]
-    df_export = safe_df[export_cols].copy()
-
-    nivel_slug = _slugify(cfg.get("nivel", ""))
-    anio_slug = _slugify(cfg.get("anio", ""))
-    base = f"ronda_{i}"
-    if nivel_slug or anio_slug:
-        base = f"{base}_{nivel_slug}_{anio_slug}"
-
-    # CSV
-    buf_csv = io.StringIO()
-    df_export.to_csv(buf_csv, index=False, encoding="utf-8")
-
-    # PDF
-    pdf_bytes = build_round_pdf(i, show_df, cfg, include_results=include_results)
-
-    col_csv, col_pdf = st.columns(2)
-    with col_csv:
-        st.download_button(
-            label=f"⬇️ CSV · Ronda {i}",
-            data=buf_csv.getvalue().encode("utf-8"),
-            file_name=f"{base}.csv",
-            mime="text/csv",
-            use_container_width=True,
-            key=f"dl_csv_ronda_{i}",
-        )
-    with col_pdf:
-        if pdf_bytes:
-            st.download_button(
-                label=f"📄 PDF · Ronda {i}",
-                data=pdf_bytes,
-                file_name=f"{base}.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-                key=f"dl_pdf_ronda_{i}",
-            )
-        else:
-            st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
-
-# pinta solo la ronda seleccionada
-render_round(sel)
-
-st.divider()
-st.caption(format_with_cfg("Vista pública de emparejamientos y resultados — {nivel} ({anio})", cfg))
