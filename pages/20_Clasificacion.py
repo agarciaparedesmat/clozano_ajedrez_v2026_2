@@ -44,6 +44,66 @@ def slugify(s: str) -> str:
     s = re.sub(r"[^A-Za-z0-9_\\-]+", "", s)
     return s or "torneo"
 
+def build_crosstable_df_positions(df_st: pd.DataFrame, publicadas: list[int]) -> pd.DataFrame:
+    """Devuelve una tabla de doble entrada indexada por POSICIONES.
+    Cada celda es el resultado visto desde la FILA: '1', '½' o '0'.
+    Si se han enfrentado varias veces, concatena con ' / '.
+    Solo considera rondas PUBLICADAS.
+    """
+    # Mapa id -> pos (según la clasificación mostrada)
+    ids = [str(r.get("id")) for _, r in df_st.iterrows()]
+    pos_map = {str(r.get("id")): int(r.get("pos")) for _, r in df_st.iterrows()}
+
+    import pandas as _pd
+    positions = [pos_map[i] for i in ids]
+    mat = _pd.DataFrame("", index=positions, columns=positions)
+
+    def parse_res(s: str):
+        if not s:
+            return None, None
+        r = str(s).strip().replace("–", "-").replace("—", "-").replace(" ", "")
+        r = r.replace("½", "0.5").replace(",", ".")
+        if r.upper().startswith("BYE"):
+            return None, None
+        if r == "1-0":
+            return "1", "0"
+        if r == "0-1":
+            return "0", "1"
+        if r in ("0.5-0.5", "0.5-0.5"):
+            return "½", "½"
+        return None, None
+
+    for rnd in (publicadas or []):
+        dfp = read_csv_safe(round_file(rnd))
+        if dfp is None or dfp.empty:
+            continue
+        for _, row in dfp.iterrows():
+            wid = str(row.get("blancas_id", "")).strip()
+            bid = str(row.get("negras_id", "")).strip()
+            res = row.get("resultado", "")
+            if not wid or not bid:
+                continue
+            if wid not in pos_map or bid not in pos_map:
+                continue
+            sw, sb = parse_res(res)
+            if sw is None:
+                continue
+
+            pw, pb = pos_map[wid], pos_map[bid]
+            prev_wb = mat.at[pw, pb]
+            prev_bw = mat.at[pb, pw]
+            mat.at[pw, pb] = (prev_wb + " / " if prev_wb else "") + sw
+            mat.at[pb, pw] = (prev_bw + " / " if prev_bw else "") + sb
+
+    for pid in ids:
+        p = pos_map[pid]
+        mat.at[p, p] = "—"
+
+    # Ordenar por posición por si acaso
+    mat = mat.sort_index().reindex(sorted(mat.columns), axis=1)
+    return mat
+
+
 def build_standings_pdf(df_st, cfg, ronda_actual, show_bh=True):
     """
     Genera un PDF de CLASIFICACIÓN con la estética de Rondas:
@@ -158,7 +218,7 @@ def build_standings_pdf(df_st, cfg, ronda_actual, show_bh=True):
             data.append(row)
         from reportlab.platypus import Table as RLTable
         widths = [14*mm, 70*mm, 22*mm, 22*mm, 18*mm, 28*mm, 12*mm] if has_bh else [14*mm, 82*mm, 24*mm, 24*mm, 20*mm, 14*mm]
-        t = Table(data, colWidths=widths, repeatRows=2)
+        t = RLTable(data, colWidths=widths, repeatRows=2)
         t.setStyle(TableStyle([
             # cabecera
             ("FONT", (0,0), (-1,0), SERIF_B, 11.5),
@@ -284,6 +344,7 @@ st.markdown(f"### Clasificación del torneo (tras ronda {ronda_actual})")
 if df_st is None or df_st.empty:
     st.info("Sin datos de clasificación todavía.")
 else:
+    
     # Selector para mostrar/ocultar Buchholz
     show_bh = st.checkbox(
         "Mostrar BUCHHOLZ (para desempates)",
@@ -307,50 +368,66 @@ else:
     }
     if "buchholz" in cols:
         col_config["buchholz"] = st.column_config.NumberColumn("Buchholz")
-
     st.dataframe(
         df_st[cols],
         use_container_width=True, hide_index=True,
         column_config=col_config,
     )
 
-    # Descarga CSV con nivel/año en el nombre
-    csv_buf = io.StringIO()
-    df_st[cols].to_csv(csv_buf, index=False, encoding="utf-8")
-    fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
-    
     # Descargas CSV + PDF en la misma línea
-    import io
+
     c_csv, c_pdf = st.columns([1, 1])
 
     with c_csv:
         csv_buf = io.StringIO()
-        df_st[cols].to_csv(csv_buf, index=False, encoding="utf-8")
-        fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
+        # Si usas selector de columnas (p.ej. cols), usa df_st[cols]
+        df_st.to_csv(csv_buf, index=False, encoding="utf-8")
         st.download_button(
             "⬇️ Descargar clasificación (CSV)",
             data=csv_buf.getvalue().encode("utf-8"),
-            file_name=fn,
+            file_name=f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv",
             mime="text/csv",
             use_container_width=True,
         )
 
     with c_pdf:
-        pdf_bytes = build_standings_pdf(df_st[cols], cfg, ronda_actual, show_bh=show_bh)
+        # Si usas selector de columnas y/o show_bh, ajusta la llamada:
+        # pdf_bytes = build_standings_pdf(df_st[cols], cfg, ronda_actual, show_bh=show_bh)
+        pdf_bytes = build_standings_pdf(df_st, cfg, ronda_actual)
+
+        # ✔️ Comprobación robusta (evita falsos negativos)
         if isinstance(pdf_bytes, (bytes, bytearray)) and len(pdf_bytes) > 0:
-            fn_pdf = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf"
             st.download_button(
                 "📄 Descargar clasificación (PDF)",
                 data=pdf_bytes,
-                file_name=fn_pdf,
+                file_name=f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf",
                 mime="application/pdf",
                 use_container_width=True,
             )
         else:
             st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
+  
+   
+
+
+    
+    # —— Cuadro del torneo (doble entrada por posiciones) ——
+    if "show_ct" not in st.session_state:
+        st.session_state["show_ct"] = False
+
+    if st.button("Mostrar cuadro del torneo", use_container_width=True, key="btn_ctoggle"):
+        st.session_state["show_ct"] = not st.session_state["show_ct"]
+
+    if st.session_state["show_ct"]:
+        with st.expander("Cuadro del torneo (doble entrada por posiciones)", expanded=True):
+            try:
+                ct_df = build_crosstable_df_positions(df_st, publicadas)
+                st.dataframe(ct_df, use_container_width=True)
+            except Exception as e:
+                st.error(f"No se pudo construir el cuadro: {e}")
 if show_bh:
         with st.expander("Desglose de Buchholz", expanded=False):
-        # ——— Desglose de Buchholz ———
+            # ——— Desglose de Buchholz ———
             st.markdown("#### 🔎 Ver desglose de Buchholz")
             try:
                 # Opciones: etiqueta visible -> id interno
