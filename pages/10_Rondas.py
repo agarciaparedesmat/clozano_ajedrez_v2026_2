@@ -348,7 +348,7 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             ("BOTTOMPADDING", (0,0), (-1,-1), 10),
         ]))
 
-        titulo_lista = Table([[Paragraph("RESULTADOS" if include_results else "RESULTADOS" if include_results else "Lista de emparejamientos", H3)]], colWidths=[doc.width])
+        titulo_lista = Table([[Paragraph("RESULTADOS" if include_results else "Lista de emparejamientos", H3)]], colWidths=[doc.width])
         titulo_lista.setStyle(TableStyle([
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
             ("BOTTOMPADDING", (0,0), (-1,-1), 6),
@@ -514,9 +514,6 @@ def render_round(i: int):
         },
     )
 
-    # ---- OPCIÓN PDF: incluir resultados o dejar hueco ----
-    include_results = st.checkbox("Incluir resultados en el PDF", value=True, key=f"pdf_include_results_R{i}")
-
     # ---- DESCARGAS CSV + PDF (misma línea) ----
     export_cols = ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]
     df_export = safe_df[export_cols].copy()
@@ -531,10 +528,11 @@ def render_round(i: int):
     buf_csv = io.StringIO()
     df_export.to_csv(buf_csv, index=False, encoding="utf-8")
 
-    # PDF
-    pdf_bytes = build_round_pdf(i, show_df, cfg, include_results=include_results)
+    # PDFs (dos variantes)
+    pdf_res = build_round_pdf(i, show_df, cfg, include_results=True)
+    pdf_blank = build_round_pdf(i, show_df, cfg, include_results=False)
 
-    col_csv, col_pdf = st.columns(2)
+    col_csv, col_pdf1, col_pdf2 = st.columns(3)
     with col_csv:
         st.download_button(
             label=f"⬇️ CSV · Ronda {i}",
@@ -544,18 +542,31 @@ def render_round(i: int):
             use_container_width=True,
             key=f"dl_csv_ronda_{i}",
         )
-    with col_pdf:
-        if pdf_bytes:
+    with col_pdf1:
+        if pdf_res:
             st.download_button(
-                label=f"📄 PDF · Ronda {i}",
-                data=pdf_bytes,
-                file_name=f"{base}.pdf",
+                label=f"📄 PDF RESULTADOS · Ronda {i}",
+                data=pdf_res,
+                file_name=f"{base}_resultados.pdf",
                 mime="application/pdf",
                 use_container_width=True,
-                key=f"dl_pdf_ronda_{i}",
+                key=f"dl_pdf_ronda_{i}_res",
             )
         else:
-            st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
+            st.caption("📄 PDF resultados no disponible (instala reportlab o fpdf2).")
+    with col_pdf2:
+        if pdf_blank:
+            st.download_button(
+                label=f"📄 PDF sin resultados · Ronda {i}",
+                data=pdf_blank,
+                file_name=f"{base}_en_blanco.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key=f"dl_pdf_ronda_{i}_blank",
+            )
+        else:
+            st.caption("📄 PDF en blanco no disponible (instala reportlab o fpdf2).")
+")
 
 # pinta solo la ronda seleccionada
 render_round(sel)
