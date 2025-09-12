@@ -411,15 +411,12 @@ else:
         else:
             st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
   
-   
-
-
     
     # —— Cuadro del torneo (doble entrada por posiciones) ——
     if "show_ct" not in st.session_state:
         st.session_state["show_ct"] = False
 
-    if st.button("Mostrar cuadro del torneo", use_container_width=True, key="btn_ctoggle"):
+    if st.button("🧮 Mostrar cuadro del torneo", use_container_width=True, key="btn_ctoggle"):
         st.session_state["show_ct"] = not st.session_state["show_ct"]
 
     if st.session_state["show_ct"]:
@@ -431,7 +428,7 @@ else:
                 st.error(f"No se pudo construir el cuadro: {e}")
 
     if st.session_state.get("show_bh", True):
-        with st.expander("Desglose de Buchholz", expanded=False):
+        with st.expander("📈 Desglose de Buchholz", expanded=False):
             # ——— Desglose de Buchholz ———
             st.markdown("#### 🔎 Ver desglose de Buchholz")
             try:
