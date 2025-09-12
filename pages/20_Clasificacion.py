@@ -430,7 +430,7 @@ else:
     if st.session_state.get("show_bh", True):
         with st.expander("📈 Desglose de Buchholz", expanded=False):
             # ——— Desglose de Buchholz ———
-            st.markdown("#### 🔎 Ver desglose de Buchholz")
+            st.markdown("#### 📈  Ver desglose de Buchholz")
             try:
                 # Opciones: etiqueta visible -> id interno
                 _opts = {f"{row['nombre']} (Pos {int(row['pos'])}, {row['puntos']} pts)": row["id"] for _, row in df_st.iterrows()}
@@ -439,7 +439,7 @@ else:
 
             sel_label = st.selectbox("Jugador", list(_opts.keys()), index=0, key="bh_player_select")
 
-            if st.button("🔎 Ver desglose de Buchholz", use_container_width=True, key="btn_bh_breakdown"):
+            if st.button("📈  Ver desglose de Buchholz", use_container_width=True, key="btn_bh_breakdown"):
                 pid = _opts.get(sel_label)
                 if pid and pid in players:
                     # Puntos actuales por jugador (tras aplicar rondas publicadas)
