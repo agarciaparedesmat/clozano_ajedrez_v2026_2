@@ -16,8 +16,6 @@ from lib.tournament import (
     round_file,
     planned_rounds,
     format_with_cfg,
-    get_round_date,
-    format_date_es,
 )
 
 st.set_page_config(page_title="Rondas", page_icon="🧩", layout="wide")
@@ -151,7 +149,7 @@ with c_sel:
     )
 
 with c_chips:
-    st.markdown("**Ir directo a...**")
+    st.markdown("**Ir directo a…**")
     per_row = min(len(publicadas), 12)
     chip_cols = st.columns(per_row, gap="small")
 
@@ -312,16 +310,6 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         linea_fecha = (cfg.get("pdf_fecha") or "").strip()
         linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-
-        # ← fecha específica de la ronda (si existe en meta.json)
-        try:
-            _iso = get_round_date(i)
-            if _iso:
-                _fmt = format_date_es(_iso)
-                if _fmt:
-                    linea_fecha = _fmt
-        except Exception:
-            pass
         # Bandas
         band1 = Table([[Paragraph(f"{titulo} {anio}" if titulo and anio else "TORNEO DE AJEDREZ", H1)]],
                       colWidths=[doc.width])
@@ -341,9 +329,12 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
         ]))
 
         cab_lines = []
-        if nivel:       cab_lines.append(f"<b>{nivel}</b>")
-        if linea_fecha: cab_lines.append(linea_fecha)
-        if linea_hora:  cab_lines.append(linea_hora)
+        if nivel:
+            cab_lines.append(f"<b>{nivel}</b>")
+        if not include_results:
+            meta_line = (f"{linea_fecha} — {linea_hora}" if (linea_fecha and linea_hora) else (linea_fecha or linea_hora))
+            if meta_line:
+                cab_lines.append(f"<font size=14>{meta_line}</font>")
         cab_text = "<br/>".join(cab_lines) if cab_lines else ""
         cab = Table([[Paragraph(cab_text, ParagraphStyle("CAB", fontName=SERIF_B, fontSize=20, leading=24, alignment=1))]],
                     colWidths=[doc.width])
@@ -357,7 +348,7 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             ("BOTTOMPADDING", (0,0), (-1,-1), 10),
         ]))
 
-        titulo_lista = Table([[Paragraph("Lista de emparejamientos", H3)]], colWidths=[doc.width])
+        titulo_lista = Table([[Paragraph("RESULTADOS" if include_results else "Lista de emparejamientos", H3)]], colWidths=[doc.width])
         titulo_lista.setStyle(TableStyle([
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
             ("BOTTOMPADDING", (0,0), (-1,-1), 6),
@@ -424,24 +415,21 @@ def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: 
             linea_fecha = (cfg.get("pdf_fecha") or "").strip()
             linea_hora  = (cfg.get("pdf_hora_lugar") or "").strip()
 
-
-            # ← fecha específica de la ronda (si existe en meta.json)
-            try:
-                _iso = get_round_date(i)
-                if _iso:
-                    _fmt = format_date_es(_iso)
-                    if _fmt:
-                        linea_fecha = _fmt
-            except Exception:
-                pass
             # cabeceras centradas
             pdf.set_font("Helvetica", "B", 18); pdf.cell(0, 10, f"TORNEO DE AJEDREZ {anio}" if anio else "TORNEO DE AJEDREZ", ln=1, align="C")
             pdf.set_font("Helvetica", "B", 24); pdf.cell(0, 10, f"RONDA {i}", ln=1, align="C")
-            pdf.set_font("Helvetica", "B", 18)
-            for ln in [nivel, linea_fecha, linea_hora]:
-                if ln: pdf.cell(0, 8, ln, ln=1, align="C")
+            # Nivel (igual)
+            if nivel:
+                pdf.set_font("Helvetica", "B", 18)
+                pdf.cell(0, 8, nivel, ln=1, align="C")
+            # Meta: solo si NO incluimos resultados, en una sola línea y un poco menor
+            if not include_results:
+                meta_line = (f"{linea_fecha} — {linea_hora}" if (linea_fecha and linea_hora) else (linea_fecha or linea_hora))
+                if meta_line:
+                    pdf.set_font("Helvetica", "B", 13)
+                    pdf.cell(0, 7, meta_line, ln=1, align="C")
             pdf.ln(2)
-            pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
+            pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 8, "RESULTADOS" if include_results else "Lista de emparejamientos", ln=1, align="C"); pdf.ln(1)
 
             headers = ["Nº MESA", "BLANCAS", "RESULTADO", "NEGRAS"]
             widths = [20, 85, 20, 85]  # un poco más anchas las columnas de nombres
@@ -514,21 +502,8 @@ def render_round(i: int):
     safe_df["resultado"] = _normalize_result_series(safe_df["resultado"])
 
     # ---- TABLA EN PANTALLA (4 columnas limpias) ----
-    # Fecha de celebración (vista)
-    fecha_view = ""
-    try:
-        _iso_view = get_round_date(current_round)
-        if _iso_view:
-            fecha_view = format_date_es(_iso_view)
-    except Exception:
-        fecha_view = ""
-    if not fecha_view:
-        fecha_view = (cfg.get("pdf_fecha") or "").strip()
-    if fecha_view:
-        st.caption(f"📅 Fecha de celebración: {fecha_view}")
-
     st.dataframe(
-        show_df[["mesa", "blancas_nombre", "negras_nombre", "resultado_mostrar"]],
+        show_df[["mesa", "blancas_nombre", "resultado_mostrar", "negras_nombre"]],
         use_container_width=True,
         hide_index=True,
         column_config={
@@ -538,9 +513,6 @@ def render_round(i: int):
             "resultado_mostrar": st.column_config.TextColumn("Resultado"),
         },
     )
-
-    # ---- OPCIÓN PDF: incluir resultados o dejar hueco ----
-    include_results = st.checkbox("Incluir resultados en el PDF", value=True, key=f"pdf_include_results_R{i}")
 
     # ---- DESCARGAS CSV + PDF (misma línea) ----
     export_cols = ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]
@@ -556,10 +528,11 @@ def render_round(i: int):
     buf_csv = io.StringIO()
     df_export.to_csv(buf_csv, index=False, encoding="utf-8")
 
-    # PDF
-    pdf_bytes = build_round_pdf(i, show_df, cfg, include_results=include_results)
+    # PDFs (dos variantes)
+    pdf_res = build_round_pdf(i, show_df, cfg, include_results=True)
+    pdf_blank = build_round_pdf(i, show_df, cfg, include_results=False)
 
-    col_csv, col_pdf = st.columns(2)
+    col_csv, col_pdf1, col_pdf2 = st.columns(3)
     with col_csv:
         st.download_button(
             label=f"⬇️ CSV · Ronda {i}",
@@ -569,18 +542,31 @@ def render_round(i: int):
             use_container_width=True,
             key=f"dl_csv_ronda_{i}",
         )
-    with col_pdf:
-        if pdf_bytes:
+    with col_pdf1:
+        if pdf_res:
             st.download_button(
-                label=f"📄 PDF · Ronda {i}",
-                data=pdf_bytes,
-                file_name=f"{base}.pdf",
+                label=f"📄 PDF RESULTADOS · Ronda {i}",
+                data=pdf_res,
+                file_name=f"{base}_resultados.pdf",
                 mime="application/pdf",
                 use_container_width=True,
-                key=f"dl_pdf_ronda_{i}",
+                key=f"dl_pdf_ronda_{i}_res",
             )
         else:
-            st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
+            st.caption("📄 PDF resultados no disponible (instala reportlab o fpdf2).")
+    with col_pdf2:
+        if pdf_blank:
+            st.download_button(
+                label=f"📄 PDF sin resultados · Ronda {i}",
+                data=pdf_blank,
+                file_name=f"{base}_en_blanco.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key=f"dl_pdf_ronda_{i}_blank",
+            )
+        else:
+            st.caption("📄 PDF en blanco no disponible (instala reportlab o fpdf2).")
+
 
 # pinta solo la ronda seleccionada
 render_round(sel)
