@@ -22,62 +22,6 @@ from lib.tournament import (
     format_with_cfg,
 )
 
-
-def build_crosstable_df(df_st: pd.DataFrame, publicadas: list[int]) -> pd.DataFrame:
-    """Construye una tabla de doble entrada (cuadro) a partir de las rondas PUBLICADAS."""
-    # Mapa id -> nombre y orden por la tabla de clasificación
-    ids = [str(r["id"]) for _, r in df_st.iterrows()]
-    nombres = {str(r["id"]): str(r["nombre"]) for _, r in df_st.iterrows()}
-
-    # DataFrame vacío con índices/columnas de nombres
-    idx_cols = [nombres[i] for i in ids]
-    mat = pd.DataFrame("", index=idx_cols, columns=idx_cols)
-
-    def parse_res(res_str: str):
-        # Devuelve (s_w, s_b) como símbolos '1','½','0' (o (None,None) si no aplicable).
-        if not res_str:
-            return None, None
-        r = str(res_str).strip().replace("–", "-").replace("—", "-").replace(" ", "")
-        r = r.replace("½", "0.5")
-        if r.upper().startswith("BYE"):
-            return None, None
-        if r == "1-0":
-            return "1", "0"
-        if r == "0-1":
-            return "0", "1"
-        if r in ("0.5-0.5", "0.5-0,5", "0,5-0,5"):
-            return "½", "½"
-        return None, None
-
-    # Rellenar la matriz con las rondas publicadas
-    for rnd in (publicadas or []):
-        dfp = read_csv_safe(round_file(rnd))
-        if dfp is None or dfp.empty:
-            continue
-        for _, row in dfp.iterrows():
-            wid = str(row.get("blancas_id", "")).strip()
-            bid = str(row.get("negras_id", "")).strip()
-            res = str(row.get("resultado", "")).strip()
-            if not wid or not bid:
-                continue
-            if wid not in ids or bid not in ids:
-                continue
-            s_w, s_b = parse_res(res)
-            if s_w is None or s_b is None:
-                continue
-            n_w, n_b = nombres[wid], nombres[bid]
-            prev_wb = mat.at[n_w, n_b]
-            prev_bw = mat.at[n_b, n_w]
-            mat.at[n_w, n_b] = (prev_wb + " / " if prev_wb else "") + s_w
-            mat.at[n_b, n_w] = (prev_bw + " / " if prev_bw else "") + s_b
-
-    # Diagonal
-    for pid in ids:
-        n = nombres[pid]
-        mat.at[n, n] = "—"
-
-    return mat
-
 # NAV personalizada debajo de la cabecera (título + nivel/año)
 #sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
 sidebar_title_and_nav(
@@ -100,7 +44,7 @@ def slugify(s: str) -> str:
     s = re.sub(r"[^A-Za-z0-9_\\-]+", "", s)
     return s or "torneo"
 
-def build_standings_pdf(df_st, cfg, ronda_actual):
+def build_standings_pdf(df_st, cfg, ronda_actual, show_bh=True):
     """
     Genera un PDF de CLASIFICACIÓN con la estética de Rondas:
     - Bandas de color, tipografías (Old Standard / Playfair si existen), marco exterior
@@ -199,18 +143,22 @@ def build_standings_pdf(df_st, cfg, ronda_actual):
             ("TOPPADDING", (0,0), (-1,-1), 6),
         ]))
 
-        # Tabla de clasificación
-        head = ["POS", "JUGADOR/A", "CURSO", "GRUPO", "PTS", "BUCHHOLZ", "PJ"]
-        data = [head, ["", "", "", "", "", "", ""]]
+        # Tabla de clasificación (dinámica con/sin Buchholz)
+        has_bh = bool(show_bh and ("buchholz" in df_st.columns))
+        if has_bh:
+            head = ["POS", "JUGADOR/A", "CURSO", "GRUPO", "PTS", "BUCHHOLZ", "PJ"]
+        else:
+            head = ["POS", "JUGADOR/A", "CURSO", "GRUPO", "PTS", "PJ"]
+        data = [head, [""] * len(head)]
         for _, r in df_st.iterrows():
-            data.append([
-                str(r.get("pos","")), str(r.get("nombre","")), str(r.get("curso","")), str(r.get("grupo","")),
-                str(r.get("puntos","")), str(r.get("buchholz","")), str(r.get("pj",""))
-            ])
-
+            row = [str(r.get("pos","")), str(r.get("nombre","")), str(r.get("curso","")), str(r.get("grupo","")), str(r.get("puntos",""))]
+            if has_bh:
+                row.append(str(r.get("buchholz","")))
+            row.append(str(r.get("pj","")))
+            data.append(row)
         from reportlab.platypus import Table as RLTable
-        widths = [14*mm, 70*mm, 22*mm, 22*mm, 18*mm, 28*mm, 12*mm]
-        t = RLTable(data, colWidths=widths, repeatRows=2)
+        widths = [14*mm, 70*mm, 22*mm, 22*mm, 18*mm, 28*mm, 12*mm] if has_bh else [14*mm, 82*mm, 24*mm, 24*mm, 20*mm, 14*mm]
+        t = Table(data, colWidths=widths, repeatRows=2)
         t.setStyle(TableStyle([
             # cabecera
             ("FONT", (0,0), (-1,0), SERIF_B, 11.5),
@@ -231,10 +179,8 @@ def build_standings_pdf(df_st, cfg, ronda_actual):
             # cuerpo
             ("LEFTPADDING", (0,2), (-1,-1), 6),
             ("RIGHTPADDING", (0,2), (-1,-1), 6),
-            ("ALIGN", (0,2), (0,-1), "CENTER"),
-            ("ALIGN", (4,2), (4,-1), "CENTER"),
-            ("ALIGN", (5,2), (5,-1), "CENTER"),
-            ("ALIGN", (6,2), (6,-1), "CENTER"),
+            ("ALIGN", (0,2), (-1,-1), "CENTER"),
+            ("ALIGN", (1,2), (1,-1), "LEFT"),
             ("VALIGN", (0,2), (-1,-1), "MIDDLE"),
             ("GRID", (0,2), (-1,-1), 0.4, colors.lightgrey),
         ]))
@@ -266,8 +212,8 @@ def build_standings_pdf(df_st, cfg, ronda_actual):
             pdf.cell(0, 8, linea, ln=1, align="C")
             pdf.ln(1)
 
-            headers = ["POS", "JUGADOR/A", "CURSO", "GRUPO", "PTS", "BUCHHOLZ", "PJ"]
-            widths  = [14, 70, 22, 22, 18, 28, 12]
+            headers = (["POS","JUGADOR/A","CURSO","GRUPO","PTS","BUCHHOLZ","PJ"] if (show_bh and ("buchholz" in df_st.columns)) else ["POS","JUGADOR/A","CURSO","GRUPO","PTS","PJ"])
+            widths  = ([14,70,22,22,18,28,12] if "BUCHHOLZ" in headers else [14,82,24,24,20,14])
             pdf.set_font("Helvetica", "B", 11)
             x0 = pdf.get_x()
             for h, w in zip(headers, widths): pdf.cell(w, 8, h, border=1, align="C")
@@ -278,9 +224,10 @@ def build_standings_pdf(df_st, cfg, ronda_actual):
 
             pdf.set_font("Helvetica", "", 11)
             for _, r in df_st.iterrows():
-                cells = [str(r.get("pos","")), str(r.get("nombre","")), str(r.get("curso","")), str(r.get("grupo","")),
-                         str(r.get("puntos","")), str(r.get("buchholz","")), str(r.get("pj",""))]
-                aligns = ["C", "L", "C", "C", "C", "C", "C"]
+                cells = [str(r.get("pos","")), str(r.get("nombre","")), str(r.get("curso","")), str(r.get("grupo","")), str(r.get("puntos",""))]
+                if "BUCHHOLZ" in headers: cells.append(str(r.get("buchholz","")))
+                cells.append(str(r.get("pj","")))
+                aligns = ["C", "L"] + ["C"]*(len(headers)-2)
                 for c, w, a in zip(cells, widths, aligns):
                     pdf.cell(w, 7, (c or "")[:64], border=1, align=a)
                 pdf.ln(7)
@@ -333,119 +280,113 @@ for i in publicadas:
 
 df_st = compute_standings(players)
 
-st.markdown("### Clasificación del torneo (tras ronda {ronda_actual}")
+st.markdown(f"### Clasificación del torneo (tras ronda {ronda_actual})")
 if df_st is None or df_st.empty:
     st.info("Sin datos de clasificación todavía.")
 else:
+    # Selector para mostrar/ocultar Buchholz
+    show_bh = st.checkbox(
+        "Mostrar BUCHHOLZ (para desempates)",
+        value=True,
+        help="Muestra la columna Buchholz, el PDF con Buchholz y el desglose por rivales."
+    )
+
+    # Columnas a mostrar según preferencia
+    cols = ["pos", "nombre", "curso", "grupo", "puntos", "pj"]
+    if show_bh and "buchholz" in df_st.columns:
+        cols = ["pos", "nombre", "curso", "grupo", "puntos", "buchholz", "pj"]
+
+    # column_config dinámico para no referenciar columnas ausentes
+    col_config = {
+        "pos": st.column_config.NumberColumn("Pos"),
+        "nombre": st.column_config.TextColumn("Jugador/a"),
+        "curso": st.column_config.TextColumn("Curso"),
+        "grupo": st.column_config.TextColumn("Grupo"),
+        "puntos": st.column_config.NumberColumn("Puntos"),
+        "pj": st.column_config.NumberColumn("PJ"),
+    }
+    if "buchholz" in cols:
+        col_config["buchholz"] = st.column_config.NumberColumn("Buchholz")
+
     st.dataframe(
-        df_st[["pos", "nombre", "curso", "grupo", "puntos", "buchholz", "pj"]],
+        df_st[cols],
         use_container_width=True, hide_index=True,
-        column_config={
-            "pos": st.column_config.NumberColumn("Pos"),
-            "nombre": st.column_config.TextColumn("Jugador/a"),
-            "curso": st.column_config.TextColumn("Curso"),
-            "grupo": st.column_config.TextColumn("Grupo"),
-            "puntos": st.column_config.NumberColumn("Puntos"),
-            "buchholz": st.column_config.NumberColumn("Buchholz"),
-            "pj": st.column_config.NumberColumn("PJ"),
-        },
+        column_config=col_config,
     )
 
     # Descarga CSV con nivel/año en el nombre
     csv_buf = io.StringIO()
-    df_st.to_csv(csv_buf, index=False, encoding="utf-8")
+    df_st[cols].to_csv(csv_buf, index=False, encoding="utf-8")
     fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
-    st.download_button(
-        "⬇️ Descargar clasificación (CSV)",
-        data=csv_buf.getvalue().encode("utf-8"),
-        file_name=fn,
-        mime="text/csv",
-        use_container_width=True,
-    )
+    
+    # Descargas CSV + PDF en la misma línea
+    import io
+    c_csv, c_pdf = st.columns([1, 1])
 
-    # PDF de clasificación (formato similar a Rondas)
-    pdf_bytes = build_standings_pdf(df_st, cfg, ronda_actual)
-    if pdf_bytes:
-        fn_pdf = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf"
+    with c_csv:
+        csv_buf = io.StringIO()
+        df_st[cols].to_csv(csv_buf, index=False, encoding="utf-8")
+        fn = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv"
         st.download_button(
-            "📄 Descargar clasificación (PDF)",
-            data=pdf_bytes,
-            file_name=fn_pdf,
-            mime="application/pdf",
+            "⬇️ Descargar clasificación (CSV)",
+            data=csv_buf.getvalue().encode("utf-8"),
+            file_name=fn,
+            mime="text/csv",
             use_container_width=True,
         )
-    else:
-        st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
 
-    
-    # ——— Cuadro del torneo (doble entrada) ———
-    if "show_ct" not in st.session_state:
-        st.session_state["show_ct"] = False
-
-    col_ct1, col_ct2 = st.columns([3, 1])
-    with col_ct1:
-        st.caption("Resumen con todos los enfrentamientos y resultados (tabla de doble entrada)")
-    with col_ct2:
-        if st.button("🧩 Mostrar cuadro", use_container_width=True, key="btn_ct_toggle"):
-            st.session_state["show_ct"] = not st.session_state["show_ct"]
-
-    if st.session_state["show_ct"]:
-        with st.expander("🧩 Cuadro del torneo (doble entrada)", expanded=True):
+    with c_pdf:
+        pdf_bytes = build_standings_pdf(df_st[cols], cfg, ronda_actual, show_bh=show_bh)
+        if isinstance(pdf_bytes, (bytes, bytearray)) and len(pdf_bytes) > 0:
+            fn_pdf = f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf"
+            st.download_button(
+                "📄 Descargar clasificación (PDF)",
+                data=pdf_bytes,
+                file_name=fn_pdf,
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        else:
+            st.caption("📄 PDF no disponible (instala reportlab o fpdf2).")
+if show_bh:
+        with st.expander("Desglose de Buchholz", expanded=False):
+        # ——— Desglose de Buchholz ———
+            st.markdown("#### 🔎 Ver desglose de Buchholz")
             try:
-                ct_df = build_crosstable_df(df_st, publicadas)
-                st.dataframe(ct_df, use_container_width=True)
-                # Descarga CSV del cuadro
-                import io as _io
-                _buf = _io.StringIO(); ct_df.to_csv(_buf, index=True, encoding="utf-8")
-                st.download_button(
-                    "⬇️ Descargar cuadro (CSV)",
-                    data=_buf.getvalue().encode("utf-8"),
-                    file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    key="dl_ct_csv"
-                )
-                st.caption("Cada celda muestra el resultado desde la perspectiva de la FILA: 1 = ganó, ½ = tablas, 0 = perdió. Si jugaron varias veces, aparecen separados por ' / '.")
-            except Exception as e:
-                st.error(f"No se pudo construir el cuadro: {e}")
-with st.expander("Desglose de Buchholz", expanded=False):
-    # ——— Desglose de Buchholz ———
-        st.markdown("#### 🔎 Ver desglose de Buchholz")
-        try:
-            # Opciones: etiqueta visible -> id interno
-            _opts = {f"{row['nombre']} (Pos {int(row['pos'])}, {row['puntos']} pts)": row["id"] for _, row in df_st.iterrows()}
-        except Exception:
-            _opts = {str(row["nombre"]): row["id"] for _, row in df_st.iterrows()}
+                # Opciones: etiqueta visible -> id interno
+                _opts = {f"{row['nombre']} (Pos {int(row['pos'])}, {row['puntos']} pts)": row["id"] for _, row in df_st.iterrows()}
+            except Exception:
+                _opts = {str(row["nombre"]): row["id"] for _, row in df_st.iterrows()}
 
-        sel_label = st.selectbox("Jugador", list(_opts.keys()), index=0, key="bh_player_select")
+            sel_label = st.selectbox("Jugador", list(_opts.keys()), index=0, key="bh_player_select")
 
-        if st.button("🔎 Ver desglose de Buchholz", use_container_width=True, key="btn_bh_breakdown"):
-            pid = _opts.get(sel_label)
-            if pid and pid in players:
-                # Puntos actuales por jugador (tras aplicar rondas publicadas)
-                pts_map = {p: float(info.get("points", 0.0)) for p, info in players.items()}
-                opos = players[pid].get("opponents", []) or []
-                rows = []
-                total = 0.0
-                for oid in opos:
-                    info_o = players.get(oid, {})
-                    nombre_o = info_o.get("nombre", oid)
-                    p = float(pts_map.get(oid, 0.0))
-                    total += p
-                    rows.append({"Rival": nombre_o, "Puntos actuales": p})
-                import pandas as _pd
-                df_bh = _pd.DataFrame(rows)
-                if df_bh.empty:
-                    st.info("Este jugador todavía no tiene rivales para calcular Buchholz.")
+            if st.button("🔎 Ver desglose de Buchholz", use_container_width=True, key="btn_bh_breakdown"):
+                pid = _opts.get(sel_label)
+                if pid and pid in players:
+                    # Puntos actuales por jugador (tras aplicar rondas publicadas)
+                    pts_map = {p: float(info.get("points", 0.0)) for p, info in players.items()}
+                    opos = players[pid].get("opponents", []) or []
+                    rows = []
+                    total = 0.0
+                    for oid in opos:
+                        info_o = players.get(oid, {})
+                        nombre_o = info_o.get("nombre", oid)
+                        p = float(pts_map.get(oid, 0.0))
+                        total += p
+                        rows.append({"Rival": nombre_o, "Puntos actuales": p})
+                    import pandas as _pd
+                    df_bh = _pd.DataFrame(rows)
+                    if df_bh.empty:
+                        st.info("Este jugador todavía no tiene rivales para calcular Buchholz.")
+                    else:
+                        st.dataframe(df_bh, use_container_width=True, hide_index=True,
+                                     column_config={
+                                         "Rival": st.column_config.TextColumn("Rival"),
+                                         "Puntos actuales": st.column_config.NumberColumn("Puntos actuales", format="%.2f"),
+                                     })
+                        st.metric("Buchholz", f"{total:.2f}")
                 else:
-                    st.dataframe(df_bh, use_container_width=True, hide_index=True,
-                                 column_config={
-                                     "Rival": st.column_config.TextColumn("Rival"),
-                                     "Puntos actuales": st.column_config.NumberColumn("Puntos actuales", format="%.2f"),
-                                 })
-                    st.metric("Buchholz", f"{total:.2f}")
-            else:
-                st.warning("No se ha podido localizar el jugador seleccionado.")
+                    st.warning("No se ha podido localizar el jugador seleccionado.")
 
 
 st.divider()
