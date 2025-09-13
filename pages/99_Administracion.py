@@ -322,6 +322,7 @@ def _show_semilla():
 # Generar ronda siguiente (Suizo)
 # =========================
 def _show_generar():
+    actor = (st.session_state.get("actor_name") or st.session_state.get("actor") or "admin")
 
     # Prefacio local para evitar NameError
     JUG_PATH = get_jug_path()
