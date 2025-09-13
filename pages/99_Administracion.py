@@ -151,6 +151,8 @@ view = st.session_state["admin_view"]
 # =========================
 def _show_config():
     import json
+    cfg = get_cfg()
+    JUG_PATH = get_jug_path()
 
     st.markdown("### 🧾 Configuración (solo lectura)")
 
