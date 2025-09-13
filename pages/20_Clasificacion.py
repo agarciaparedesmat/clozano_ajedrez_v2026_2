@@ -645,7 +645,21 @@ else:
                     )
 
                 with c2:
-                    paper = st.selectbox("Tamaño PDF del cuadro", ["A4", "A3"], index=0, key="ct_pdf_paper")
+                    # Botones de tamaño (encima del botón de descarga)
+                    if "ct_pdf_paper" not in st.session_state:
+                        st.session_state["ct_pdf_paper"] = "A4"  # valor por defecto
+
+                    b_a4, b_a3 = st.columns(2)
+                    with b_a4:
+                        if st.button("A4", key="ct_paper_a4"):
+                            st.session_state["ct_pdf_paper"] = "A4"
+                    with b_a3:
+                        if st.button("A3", key="ct_paper_a3"):
+                            st.session_state["ct_pdf_paper"] = "A3"
+
+                    paper = st.session_state["ct_pdf_paper"]
+
+                    # Generar y descargar el PDF con el tamaño elegido
                     pdf_ct = build_crosstable_pdf(ct_df, cfg, paper=paper)
                     if isinstance(pdf_ct, (bytes, bytearray)) and len(pdf_ct) > 0:
                         st.download_button(
