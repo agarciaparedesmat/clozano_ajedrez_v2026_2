@@ -35,14 +35,3 @@ st.components.v1.iframe(
 
 
 
-html(f"""
-<div style="position:relative; width:100%; height:85vh;">
-  <iframe
-    src="{https://view.genially.com/x68bfc66a46b5ebd63d00b9b0}"
-    style="position:absolute; inset:0; width:100%; height:100%; border:0;"
-    frameborder="0"
-    allow="fullscreen; clipboard-read; clipboard-write"
-    allowfullscreen>
-  </iframe>
-</div>
-""", height=800)
