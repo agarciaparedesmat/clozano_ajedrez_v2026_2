@@ -138,7 +138,7 @@ def _show_config():
         "⬇️ min_rondas": min_r,
         "⬆️ max_rondas": max_r,
         "🧑‍🎓 Jugadores activos": activos,
-        "🧭 Plan de rondas (resuelto)": N_ROUNDS,  # calculado con planned_rounds(cfg, JUG_PATH)
+        "🧭 Plan de rondas (resuelto)": get_n_rounds(),  # calculado con planned_rounds(cfg, JUG_PATH)
     }], index=[0])
 
     st.dataframe(resumen, use_container_width=True, hide_index=True)
@@ -232,7 +232,7 @@ def _show_semilla():
     with col_b:
         # Condiciones para permitir regenerar
         r1_published = is_pub(1)
-        later_exist = any(os.path.exists(round_file(i)) for i in range(2, N_ROUNDS + 1))
+        later_exist = any(os.path.exists(round_file(i)) for i in range(2, get_n_rounds() + 1))
         can_regen = (not r1_published) and (not later_exist)
 
         if st.button("🔁 Regenerar R1 con esta semilla", use_container_width=True, disabled=not can_regen):
