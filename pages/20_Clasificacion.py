@@ -645,9 +645,7 @@ else:
                     )
 
                 with c2:
-                    # paper = st.selectbox("Tamaño PDF del cuadro", ["A4", "A3"], index=0, key="ct_pdf_paper")
-                    # Valor por defecto A3 para el cuadro del torneo
-                    paper="A3"
+                    paper = st.selectbox("Tamaño PDF del cuadro", ["A4", "A3"], index=0, key="ct_pdf_paper")
                     pdf_ct = build_crosstable_pdf(ct_df, cfg, paper=paper)
                     if isinstance(pdf_ct, (bytes, bytearray)) and len(pdf_ct) > 0:
                         st.download_button(
@@ -658,7 +656,6 @@ else:
                             use_container_width=True,
                             key="dl_ct_pdf",
                         )
-                        paper = st.selectbox("Tamaño PDF del cuadro", ["A4", "A3"], index=0, key="ct_pdf_paper")
                     else:
                         st.caption("📄 PDF del cuadro no disponible (instala reportlab o fpdf2).")
 
