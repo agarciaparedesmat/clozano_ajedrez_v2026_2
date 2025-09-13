@@ -29,7 +29,8 @@ sidebar_title_and_nav(
         ("app.py", "♟️ Inicio"),
         ("pages/10_Rondas.py", "🧩 Rondas"),
         ("pages/20_Clasificacion.py", "🏆 Clasificación"),
-        ("pages/99_Administracion.py", "🛠️ Administración")
+        ("pages/99_Administracion.py", "🛠️ Administración"),
+        ("pages/30_Genially.py", "♞ Genially")
     ]
 )
 
