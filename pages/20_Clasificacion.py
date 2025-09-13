@@ -307,13 +307,15 @@ def build_standings_pdf(df_st, cfg, ronda_actual, show_bh=True):
         except Exception:
             return None
 
-def build_crosstable_pdf(ct_df: pd.DataFrame, cfg: dict) -> bytes | None:
+
+def build_crosstable_pdf(ct_df: pd.DataFrame, cfg: dict, paper: str = "A4") -> bytes | None:
+
     """
     Genera el PDF del cuadro del torneo (tabla de doble entrada por posiciones)
     con la estética de los PDFs anteriores. Devuelve bytes o None si falla.
     """
     import io
-    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.pagesizes import A4, A3, landscape
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
@@ -351,9 +353,12 @@ def build_crosstable_pdf(ct_df: pd.DataFrame, cfg: dict) -> bytes | None:
         SERIF_B  = "OldStd-B"  if has_custom else "Times-Bold"
 
         buf = io.BytesIO()
-        # A4 apaisado para que quepan más columnas
+        # A4/A3 apaisado para que quepan más columnas
+        from reportlab.lib.pagesizes import A4, A3, landscape
+        PAPER_RL = {"A4": A4, "A3": A3}
+        page_size = landscape(PAPER_RL.get(paper, A4))
         doc = SimpleDocTemplate(
-            buf, pagesize=landscape(A4),
+            buf, pagesize=page_size,
             leftMargin=14*mm, rightMargin=14*mm,
             topMargin=12*mm, bottomMargin=12*mm
         )
@@ -450,7 +455,8 @@ def build_crosstable_pdf(ct_df: pd.DataFrame, cfg: dict) -> bytes | None:
     # ---------- Opción B: FPDF (fallback) ----------
     try:
         from fpdf import FPDF
-        pdf = FPDF(orientation="L", unit="mm", format="A4")
+        fmt = "A3" if paper == "A3" else "A4"
+        pdf = FPDF(orientation="L", unit="mm", format=fmt)
         pdf.set_auto_page_break(auto=True, margin=12)
         pdf.add_page()
 
@@ -639,7 +645,8 @@ else:
                     )
 
                 with c2:
-                    pdf_ct = build_crosstable_pdf(ct_df, cfg)
+                    paper = st.selectbox("Tamaño PDF del cuadro", ["A4", "A3"], index=0, key="ct_pdf_paper")
+                    pdf_ct = build_crosstable_pdf(ct_df, cfg, paper=paper)
                     if isinstance(pdf_ct, (bytes, bytearray)) and len(pdf_ct) > 0:
                         st.download_button(
                             "📄 Descargar cuadro (PDF)",
