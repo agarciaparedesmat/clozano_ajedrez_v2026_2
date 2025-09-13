@@ -327,6 +327,13 @@ def _show_generar():
     # Prefacio local para evitar NameError
     JUG_PATH = get_jug_path()
 
+    try:
+        _ = _log_msg
+    except NameError:
+        def _log_msg(x):
+            return str(x)
+
+
     # Asegurar estados locales
     states = get_states(get_n_rounds())
     st.markdown("### ♟️ Generar siguiente ronda (sistema suizo)")
