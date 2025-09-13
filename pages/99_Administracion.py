@@ -245,12 +245,6 @@ def recalc_and_save_standings(bye_points: float = 1.0) -> tuple[bool, str]:
 
 
 
-# Pre-cálculo de estados de rondas para que otras secciones puedan usarlos sin depender del diagnóstico
-try:
-    states = [round_status(i) for i in range(1, N_ROUNDS + 1)]
-except Exception:
-    states = []
-
 # =========================
 # Carga de jugadores
 # =========================
