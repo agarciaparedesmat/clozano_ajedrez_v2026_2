@@ -4,6 +4,8 @@ import pandas as pd
 import streamlit as st
 from lib.ui import sidebar_title_and_nav, page_header
 
+actor = get_actor()
+
 from lib.ui2 import is_pub, set_pub, results_empty_count, round_status, status_label, get_states
 from lib.tournament import (
     DATA_DIR,
@@ -82,7 +84,44 @@ def get_jug_path() -> str:
     import os
     return os.path.join(DATA_DIR, "jugadores.csv")
 
-def get_n_rounds() -> int:
+def get_n_rounds(
+
+def get_actor() -> str:
+    """Obtiene el actor desde session_state de forma segura."""
+    return (
+        st.session_state.get("actor_name")
+        or st.session_state.get("actor")
+        or "admin"
+    )
+
+
+def add_log(action: str, rnd: int | None, actor: str, message: str) -> None:
+    """Añade una línea al log de administración en data/admin_log.csv (silencioso ante errores)."""
+    try:
+        row = {
+            "ts": _dt.datetime.now().isoformat(timespec="seconds"),
+            "action": action,
+            "round": rnd,
+            "actor": actor,
+            "msg": message,
+        }
+        log_path = os.path.join(DATA_DIR, "admin_log.csv")
+        if os.path.exists(log_path):
+            try:
+                df = pd.read_csv(log_path)
+            except Exception:
+                df = pd.DataFrame(columns=["ts","action","round","actor","msg"])
+            df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+        else:
+            df = pd.DataFrame([row])
+        try:
+            df.to_csv(log_path, index=False, encoding="utf-8-sig")
+        except Exception:
+            df.to_csv(log_path, index=False)
+    except Exception:
+        pass
+
+) -> int:
     try:
         return int(N_ROUNDS)
     except Exception:
