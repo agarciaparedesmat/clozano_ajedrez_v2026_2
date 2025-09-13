@@ -449,6 +449,17 @@ st.divider()
 # =========================
 # 📅 Fecha de celebración por ronda (solo borradores)
 # =========================
+# Salvaguarda local: definir is_pub si aún no está disponible
+try:
+    is_pub  # type: ignore
+except NameError:
+    def is_pub(i:int)->bool:  # fallback mínimo sin romper lógica
+        import os
+        try:
+            return os.path.exists(os.path.join(DATA_DIR, f"published_R{i}.flag"))
+        except Exception:
+            return False
+
 st.markdown("### 📅 Fecha de celebración (solo rondas en borrador)")
 draft_rounds = [i for i in existing_rounds if not is_pub(i)]
 if draft_rounds:
