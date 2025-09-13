@@ -6,6 +6,31 @@ import random
 import pandas as pd
 import streamlit as st
 
+# =========================
+# Salvaguardas globales (orden de carga seguro)
+# =========================
+# Fallback de is_pub: si aún no estuviera definido cuando alguna sección lo llame,
+# definimos una versión mínima que consulta el flag-file. Si más adelante existe
+# una definición "real", la sobreescribirá (lo cual es correcto).
+try:
+    is_pub  # type: ignore
+except NameError:
+    def is_pub(i: int) -> bool:
+        import os
+        try:
+            return os.path.exists(os.path.join(DATA_DIR, f"published_R{i}.flag"))
+        except Exception:
+            return False
+
+# Acceso unificado a 'states' para evitar dependencias por orden de renderizado
+def get_states() -> list:
+    try:
+        return [round_status(i) for i in range(1, N_ROUNDS + 1)]
+    except NameError:
+        # Si aún no están definidas las utilidades necesarias, devolvemos vacío
+        return []
+
+
 from lib.tournament import (
     DATA_DIR,
     load_config, load_meta, save_meta,
@@ -343,8 +368,11 @@ st.divider()
 # =========================
 # Generar ronda siguiente (Suizo)
 # =========================
+# Asegurar 'states' disponible localmente
+states = get_states()
+
 # Asegurar cálculo local de 'states' para esta sección
-states = [round_status(i) for i in range(1, N_ROUNDS + 1)]
+states = get_states()
 
 st.markdown("### ♟️ Generar siguiente ronda (sistema suizo)")
 
@@ -440,8 +468,11 @@ st.divider()
 # =========================
 # Publicar / Despublicar
 # =========================
+# Asegurar 'states' disponible localmente
+states = get_states()
+
 # Asegurar cálculo local de 'states' para esta sección
-states = [round_status(i) for i in range(1, N_ROUNDS + 1)]
+states = get_states()
 
 
 st.divider()
@@ -449,6 +480,9 @@ st.divider()
 # =========================
 # 📅 Fecha de celebración por ronda (solo borradores)
 # =========================
+# Asegurar 'states' disponible localmente
+states = get_states()
+
 # Salvaguarda local: definir is_pub si aún no está disponible
 try:
     is_pub  # type: ignore
@@ -531,8 +565,11 @@ st.divider()
 # =========================
 # Resultados y clasificación (solo PUBLICADAS)
 # =========================
+# Asegurar 'states' disponible localmente
+states = get_states()
+
 # Asegurar cálculo local de 'states' para esta sección
-states = [round_status(i) for i in range(1, N_ROUNDS + 1)]
+states = get_states()
 
 st.markdown("### ✏️ Resultados y clasificación (solo PUBLICADAS)")
 
@@ -713,8 +750,11 @@ st.divider()
 # =========================
 # Eliminar ronda (solo la última generada)
 # =========================
+# Asegurar 'states' disponible localmente
+states = get_states()
+
 # Asegurar cálculo local de 'states' para esta sección
-states = [round_status(i) for i in range(1, N_ROUNDS + 1)]
+states = get_states()
 
 st.markdown("### 🗑️ Eliminar ronda")
 if existing_rounds:
