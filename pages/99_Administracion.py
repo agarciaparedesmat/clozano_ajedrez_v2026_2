@@ -103,7 +103,7 @@ def get_actor():
 
 actor = get_actor()
 
-def add_log((action, rnd, actor, message):
+def add_log(action, rnd, actor, message):
     """Añade una línea al log de administración en data/admin_log.csv (silencioso ante errores)."""
     try:
         row = {
