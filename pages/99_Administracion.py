@@ -1,5 +1,14 @@
 
 
+# Normaliza la serie de resultados para que None/nan/espacios queden como vacío ""
+def _normalize_result_series(s: pd.Series) -> pd.Series:
+    return (
+        s.astype(str)
+         .str.strip()
+         .replace({"None": "", "none": "", "NaN": "", "nan": "", "N/A": "", "n/a": ""})
+    )
+
+
 # Lista de rondas publicadas existentes (según flags/meta)
 def published_rounds_list() -> list[int]:
     try:
