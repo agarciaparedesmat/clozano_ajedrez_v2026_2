@@ -34,7 +34,7 @@ div.block-container {
 }
 /* Un pelín menos de separación entre bloques del main */
 [data-testid="stAppViewContainer"] [data-testid="stVerticalBlock"]{
-  gap: 1.20rem !important;
+  gap: 1.00rem !important;
 }
 </style>
 """, unsafe_allow_html=True)
