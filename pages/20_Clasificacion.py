@@ -424,7 +424,7 @@ else:
             try:
                 ct_df = build_crosstable_df_positions(df_st, publicadas)
                 # Columnas estrechas para el cuadro (no estirar a todo el ancho)
-                col_config_ct = {c: st.column_config.TextColumn(str(c), width="small") for c in ct_df.columns}
+                col_config_ct = {c: st.column_config.TextColumn(str(c), width=30) for c in ct_df.columns}
                 st.dataframe(
                     ct_df,
                     use_container_width=False,
