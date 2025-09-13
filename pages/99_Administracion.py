@@ -343,6 +343,9 @@ st.divider()
 # =========================
 # Generar ronda siguiente (Suizo)
 # =========================
+# Asegurar cálculo local de 'states' para esta sección
+states = [round_status(i) for i in range(1, N_ROUNDS + 1)]
+
 st.markdown("### ♟️ Generar siguiente ronda (sistema suizo)")
 
 # Determinar siguiente a generar
@@ -437,6 +440,9 @@ st.divider()
 # =========================
 # Publicar / Despublicar
 # =========================
+# Asegurar cálculo local de 'states' para esta sección
+states = [round_status(i) for i in range(1, N_ROUNDS + 1)]
+
 
 st.divider()
 
@@ -514,6 +520,9 @@ st.divider()
 # =========================
 # Resultados y clasificación (solo PUBLICADAS)
 # =========================
+# Asegurar cálculo local de 'states' para esta sección
+states = [round_status(i) for i in range(1, N_ROUNDS + 1)]
+
 st.markdown("### ✏️ Resultados y clasificación (solo PUBLICADAS)")
 
 pubs = published_rounds_list()
@@ -693,6 +702,9 @@ st.divider()
 # =========================
 # Eliminar ronda (solo la última generada)
 # =========================
+# Asegurar cálculo local de 'states' para esta sección
+states = [round_status(i) for i in range(1, N_ROUNDS + 1)]
+
 st.markdown("### 🗑️ Eliminar ronda")
 if existing_rounds:
     last_exist = max(existing_rounds)
