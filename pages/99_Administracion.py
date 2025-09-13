@@ -1,3 +1,20 @@
+
+
+# Lista de rondas publicadas existentes (según flags/meta)
+def published_rounds_list() -> list[int]:
+    try:
+        n = get_n_rounds()
+    except Exception:
+        n = 0
+    res = []
+    for i in range(1, n + 1):
+        try:
+            if os.path.exists(round_file(i)) and is_pub(i):
+                res.append(i)
+        except Exception:
+            # ante cualquier problema, seguimos
+            pass
+    return res
 import datetime as _dt
 # pages/99_Admin.py
 # -*- coding: utf-8 -*-
