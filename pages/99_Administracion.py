@@ -4,8 +4,6 @@ import pandas as pd
 import streamlit as st
 from lib.ui import sidebar_title_and_nav, page_header
 
-actor = get_actor()
-
 from lib.ui2 import is_pub, set_pub, results_empty_count, round_status, status_label, get_states
 from lib.tournament import (
     DATA_DIR,
@@ -98,6 +96,9 @@ def get_n_rounds():
 def get_actor():
     """Obtiene el actor desde session_state de forma segura."""
     return (
+
+# Inicializar 'actor' global tras definir get_actor()
+actor = get_actor()
         st.session_state.get("actor_name")
         or st.session_state.get("actor")
         or "admin"
@@ -130,7 +131,7 @@ def add_log(action, rnd, actor, message):
         pass
 
 # Inicializar 'actor' global para compatibilidad con llamadas existentes
-actor = get_actor()
+
 # NAV personalizada debajo de la cabecera (título + nivel/año)
 #sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
 sidebar_title_and_nav(
