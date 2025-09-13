@@ -29,18 +29,21 @@ sidebar_title_and_nav(
 
 GENIALLY_URL = "https://view.genially.com/68bfc66a46b5ebd63d00b9b0"
 
-st.sidebar.header("Opciones de embed")
-alto = st.sidebar.slider("Altura (px)", 400, 1200, 800, 50)
-scroll = st.sidebar.toggle("Scroll en iframe", value=True)
+ratio = st.sidebar.selectbox("Relación de aspecto", ["21:9", "32:9", "16:9", "Personalizada"])
+custom_pct = 0  # padding-top en %, solo si eliges 'Personalizada'
+
+ratios = {"21:9": 100*9/21, "32:9": 100*9/32, "16:9": 56.25}
+padding_pct = ratios.get(ratio, custom_pct or 35)  # 35% ≈ muy panorámico
 
 html(f"""
-<div style="position:relative; width:100%; height:{alto}px;">
+<div style="position:relative; width:100%; padding-top:{padding_pct:.4f}%;">
   <iframe
     src="{GENIALLY_URL}"
-    style="position:absolute; top:0; left:0; width:100%; height:100%; border:0; overflow:{'auto' if scroll else 'hidden'};"
+    style="position:absolute; inset:0; width:100%; height:100%; border:0;"
     frameborder="0"
+    allow="fullscreen"
     allowfullscreen>
   </iframe>
 </div>
-""", height=alto+20)
+""", height=0)  # el alto lo da el padding-top (responsive)
 
