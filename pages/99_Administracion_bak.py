@@ -393,6 +393,13 @@ else:
                     st.rerun()
 
 st.divider()
+
+# =========================
+# Publicar / Despublicar
+# =========================
+
+st.divider()
+
 # =========================
 # 📅 Fecha de celebración por ronda (solo borradores)
 # =========================
