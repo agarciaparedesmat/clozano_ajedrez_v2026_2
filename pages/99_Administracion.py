@@ -96,15 +96,14 @@ def get_n_rounds():
 def get_actor():
     """Obtiene el actor desde session_state de forma segura."""
     return (
-
-# Inicializar 'actor' global tras definir get_actor()
-actor = get_actor()
         st.session_state.get("actor_name")
         or st.session_state.get("actor")
         or "admin"
     )
 
-def add_log(action, rnd, actor, message):
+actor = get_actor()
+
+def add_log((action, rnd, actor, message):
     """Añade una línea al log de administración en data/admin_log.csv (silencioso ante errores)."""
     try:
         row = {
