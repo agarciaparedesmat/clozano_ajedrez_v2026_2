@@ -393,78 +393,42 @@ def _show_publicar():
 # =========================
 def _show_fechas():
     
-    # Estado local y referencia a is_pub para evitar NameError por orden de carga
-    states = get_states(get_n_rounds())
-    _ = is_pub  # no-op: fuerza la resolución del símbolo en esta vista
-st.markdown("### 📅 Fecha de celebración (solo rondas en borrador)")
+    # Estado local y utilidades
+    n = get_n_rounds()
+    states = get_states(n)
+    # Construir lista de rondas existentes
+    existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
+    st.markdown("### 📅 Fecha de celebración (solo rondas en borrador)")
+    # Filtrar borradores (existen pero no publicadas)
     draft_rounds = [i for i in existing_rounds if not is_pub(i)]
     if draft_rounds:
         sel_draft = st.selectbox("Ronda en borrador a editar", draft_rounds, index=0, key="fecha_sel_round")
-        current_iso = ""
+        # Fecha actual (ISO) si existe
         try:
-            current_iso = get_round_date(sel_draft)
+            current_iso = get_round_date(sel_draft) or ""
         except Exception:
             current_iso = ""
         default_date = _dt.date.today()
         if current_iso:
             try:
-                y,m,d = map(int, current_iso.split("-"))
-                default_date = _dt.date(y,m,d)
+                y, m_, d = map(int, current_iso.split("-"))
+                default_date = _dt.date(y, m_, d)
             except Exception:
                 pass
         new_date = st.date_input("Nueva fecha de celebración", value=default_date, key=f"fecha_edit_R{sel_draft}")
         if st.button("💾 Guardar fecha de la ronda", use_container_width=True, key=f"save_fecha_R{sel_draft}"):
             try:
                 set_round_date(sel_draft, new_date.isoformat())
-                st.success(f"Fecha guardada para Ronda {sel_draft}: {format_date_es(new_date.isoformat())}")
+                try:
+                    pretty = format_date_es(new_date.isoformat())
+                except Exception:
+                    pretty = new_date.isoformat()
+                st.success(f"Fecha guardada para Ronda {sel_draft}: {pretty}")
             except Exception as e:
                 st.error(f"No se pudo guardar la fecha: {e}")
     else:
         st.info("No hay rondas en borrador para editar fecha.")
-    st.markdown("### 📣 Publicar / Despublicar rondas")
-
-    if existing_rounds:
-        status_rows = [{"ronda": i, "publicada": bool(is_pub(i))} for i in existing_rounds]
-        st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
-
-        # Publicar (cualquiera que exista y no esté publicada)
-        to_publish = [i for i in existing_rounds if not is_pub(i)]
-        if to_publish:
-            sel_pub = st.selectbox("Ronda a publicar", to_publish, index=len(to_publish) - 1, key="pub_sel")
-            if st.button("Publicar ronda seleccionada", use_container_width=True):
-                set_pub(sel_pub, True, seed=(r1_seed() if sel_pub == 1 else None))
-                add_log("publish_round", sel_pub, actor, _log_msg("Publicada desde Admin"))
-                ok, path = recalc_and_save_standings(bye_points=1.0)
-                if ok:
-                    st.success(f"Ronda {sel_pub} publicada. Clasificación recalculada en `{path}`.")
-                else:
-                    st.warning("Ronda publicada, pero no se pudo recalcular la clasificación.")
-                st.rerun()
-        else:
-            st.info("No hay rondas pendientes de publicar.")
-
-        # Despublicar (solo la última publicada)
-        pubs = published_rounds_list()
-        if pubs:
-            last_pub = max(pubs)
-            st.caption(f"Solo se puede **despublicar** la **última ronda publicada**: **Ronda {last_pub}**.")
-            if st.button(f"Despublicar Ronda {last_pub}", use_container_width=True):
-                set_pub(last_pub, False)
-                add_log("unpublish_round", last_pub, actor, _log_msg("Despublicada (última publicada)"))
-                ok, path = recalc_and_save_standings(bye_points=1.0)
-                if ok:
-                    st.success(f"Ronda {last_pub} despublicada. Clasificación recalculada en `{path}`.")
-                else:
-                    st.warning("Ronda despublicada, pero no se pudo recalcular la clasificación.")
-                st.rerun()
-        else:
-            st.info("No hay rondas publicadas actualmente.")
-    else:
-        st.info("Aún no hay rondas generadas.")
-
-    st.divider()
-
-
+    
 # =========================
 # Resultados y clasificación (solo PUBLICADAS)
 # =========================
