@@ -385,9 +385,85 @@ def _show_generar():
 # Publicar / Despublicar
 # =========================
 def _show_publicar():
+    st.markdown("### 📣 Publicar / Despublicar rondas")
+
+    # Estados locales
+    n = get_n_rounds()
+    states = get_states(n)
+    existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
+
+    unpublished = [i for i in existing_rounds if not is_pub(i)]
+    published   = [i for i in existing_rounds if is_pub(i)]
+
+    # Tabla de estado rápida
+    if states:
+        import pandas as pd
+        diag = pd.DataFrame([
+            {"Ronda": s["i"],
+             "Estado": status_label(s),
+             "Generada": "Sí" if s["exists"] else "No",
+             "Publicada": "Sí" if s["published"] else "No",
+             "Vacíos": ("—" if s["empties"] is None else s["empties"])}
+            for s in states
+        ])
+        st.dataframe(diag, use_container_width=True, hide_index=True)
+
     st.divider()
+    st.markdown("#### Publicar una ronda en borrador")
 
+    if unpublished:
+        sel = st.selectbox("Ronda a publicar", unpublished, index=0, key="publicar_sel_round")
+        if st.button("📣 Publicar ronda seleccionada", use_container_width=True, key=f"btn_publicar_R{sel}"):
+            try:
+                set_pub(sel, True)
+                # Recalcular clasificación tras publicar
+                from lib.tournament import read_players_from_csv, read_csv_safe, apply_results, compute_standings
+                players = read_players_from_csv(os.path.join(DATA_DIR, "jugadores.csv"))
+                pubs = [i for i in existing_rounds if is_pub(i)]
+                for r in pubs:
+                    dfp = read_csv_safe(round_file(r))
+                    if dfp is not None:
+                        players = apply_results(players, dfp, bye_points=1.0)
+                standings = compute_standings(players)
+                out_csv = os.path.join(DATA_DIR, "standings.csv")
+                try:
+                    standings.to_csv(out_csv, index=False, encoding="utf-8-sig")
+                except Exception:
+                    standings.to_csv(out_csv, index=False)
+                st.success(f"Publicada Ronda {sel} y clasificación recalculada.")
+            except Exception as e:
+                st.error(f"No se pudo publicar la ronda: {e}")
+    else:
+        st.info("No hay rondas en borrador para publicar.")
 
+    st.divider()
+    st.markdown("#### Despublicar (solo la última publicada)")
+    if published:
+        ultima_pub = max(published)
+        st.caption(f"Última publicada: Ronda {ultima_pub}")
+        if st.button("↩️ Despublicar última (Ronda {ultima_pub})", use_container_width=True, key="btn_despublicar_ultima"):
+            try:
+                set_pub(ultima_pub, False)
+                # Tras despublicar, recalcular clasificación con las restantes publicadas
+                from lib.tournament import read_players_from_csv, read_csv_safe, apply_results, compute_standings
+                players = read_players_from_csv(os.path.join(DATA_DIR, "jugadores.csv"))
+                pubs = [i for i in existing_rounds if is_pub(i)]
+                for r in pubs:
+                    dfp = read_csv_safe(round_file(r))
+                    if dfp is not None:
+                        players = apply_results(players, dfp, bye_points=1.0)
+                standings = compute_standings(players)
+                out_csv = os.path.join(DATA_DIR, "standings.csv")
+                try:
+                    standings.to_csv(out_csv, index=False, encoding="utf-8-sig")
+                except Exception:
+                    standings.to_csv(out_csv, index=False)
+                st.success(f"Ronda {ultima_pub} despublicada y clasificación recalculada.")
+            except Exception as e:
+                st.error(f"No se pudo despublicar: {e}")
+    else:
+        st.caption("No hay rondas publicadas actualmente.")
+    
 # =========================
 # 📅 Fecha de celebración por ronda (solo borradores)
 # =========================
