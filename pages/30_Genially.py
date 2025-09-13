@@ -24,11 +24,7 @@ sidebar_title_and_nav(
     ]
 )
 
-
-
-
 GENIALLY_URL = "https://view.genially.com/68bfc66a46b5ebd63d00b9b0"
-
 
 ratio = "32:9"  # "21:9" o "16:9"
 ratios = {"21:9": 100*9/21, "32:9": 100*9/32, "16:9": 56.25}
