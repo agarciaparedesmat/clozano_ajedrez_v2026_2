@@ -1,7 +1,24 @@
+from __future__ import annotations
+import os
+import pandas as pd
+import streamlit as st
+from lib.ui2 import is_pub, set_pub, results_empty_count, round_status, status_label, get_states
+from lib.tournament import (
+    DATA_DIR,
+    load_config, load_meta, save_meta,
+    read_csv_safe, last_modified,
+    read_players_from_csv, apply_results, compute_standings,
+    swiss_pair_round, formatted_name_from_parts,
+    is_published, set_published, r1_seed, add_log,
+    planned_rounds, format_with_cfg,  # ya estaban
+    set_round_date, get_round_date, format_date_es,
+    config_path, config_debug,        # <- añadidos
+)
 
+from lib.ui import page_header
 
 # Normaliza la serie de resultados para que None/nan/espacios queden como vacío ""
-def _normalize_result_series(s: pd.Series) -> pd.Series:
+def _normalize_result_series(s):
     return (
         s.astype(str)
          .str.strip()
@@ -27,11 +44,11 @@ def published_rounds_list() -> list[int]:
 import datetime as _dt
 # pages/99_Admin.py
 # -*- coding: utf-8 -*-
-import os
+
 import random
-import pandas as pd
-import streamlit as st
-from lib.ui2 import is_pub, set_pub, results_empty_count, round_status, status_label, get_states
+
+
+
 
 # Salvaguarda: si por orden de carga no existiera is_pub, define un fallback mínimo
 if 'is_pub' not in globals():
@@ -75,20 +92,9 @@ def get_n_rounds() -> int:
     except Exception:
         return 0
 
-from lib.tournament import (
-    DATA_DIR,
-    load_config, load_meta, save_meta,
-    read_csv_safe, last_modified,
-    read_players_from_csv, apply_results, compute_standings,
-    swiss_pair_round, formatted_name_from_parts,
-    is_published, set_published, r1_seed, add_log,
-    planned_rounds, format_with_cfg,  # ya estaban
-    set_round_date, get_round_date, format_date_es,
-    config_path, config_debug,        # <- añadidos
-)
 
-from lib.ui import page_header
-from lib.ui import hero_portada, inject_base_style, sidebar_title_and_nav
+
+
 
 # NAV personalizada debajo de la cabecera (título + nivel/año)
 #sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
