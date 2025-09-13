@@ -63,30 +63,39 @@ if 'is_pub' not in globals():
         except Exception:
             pass
         return os.path.exists(os.path.join(DATA_DIR, f"published_R{i}.flag"))
-from lib.tournament import DATA_DIR, load_config, config_path, planned_rounds, round_file
+
 
 # =========================
 # Helpers robustos de configuración/estado
 # =========================
-def get_cfg() -> dict:
+def get_cfg():
     try:
         return cfg  # seguir usando global si ya está
     except Exception:
         return load_config()
 
-def get_config_path() -> str:
+def get_config_path():
     try:
         return config_path()
     except Exception:
         return ""
 
-def get_jug_path() -> str:
-    import os
+def get_jug_path():
     return os.path.join(DATA_DIR, "jugadores.csv")
 
-def get_n_rounds(
+def get_n_rounds():
+    try:
+        return int(N_ROUNDS)
+    except Exception:
+        pass
+    try:
+        _cfg = get_cfg()
+        _jug = get_jug_path()
+        return int(planned_rounds(_cfg, _jug))
+    except Exception:
+        return 0
 
-def get_actor() -> str:
+def get_actor():
     """Obtiene el actor desde session_state de forma segura."""
     return (
         st.session_state.get("actor_name")
@@ -94,8 +103,7 @@ def get_actor() -> str:
         or "admin"
     )
 
-
-def add_log(action: str, rnd: int | None, actor: str, message: str) -> None:
+def add_log(action, rnd, actor, message):
     """Añade una línea al log de administración en data/admin_log.csv (silencioso ante errores)."""
     try:
         row = {
@@ -121,22 +129,8 @@ def add_log(action: str, rnd: int | None, actor: str, message: str) -> None:
     except Exception:
         pass
 
-) -> int:
-    try:
-        return int(N_ROUNDS)
-    except Exception:
-        pass
-    try:
-        _cfg = get_cfg()
-        _jug = get_jug_path()
-        return int(planned_rounds(_cfg, _jug))
-    except Exception:
-        return 0
-
-
-
-
-
+# Inicializar 'actor' global para compatibilidad con llamadas existentes
+actor = get_actor()
 # NAV personalizada debajo de la cabecera (título + nivel/año)
 #sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
 sidebar_title_and_nav(
