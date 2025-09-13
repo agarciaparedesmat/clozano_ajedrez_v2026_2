@@ -185,7 +185,7 @@ def _show_resumen():
     # Asegurar estados locales
     states = get_states(get_n_rounds())
     st.markdown("### 📋 Estado de rondas")
-    states = [round_status(i) for i in range(1, N_ROUNDS + 1)]
+    states = [round_status(i) for i in range(1, get_n_rounds() + 1)]
     diag = pd.DataFrame([
         {"Ronda": s["i"],
          "Estado": status_label(s),
@@ -198,12 +198,12 @@ def _show_resumen():
     ])
     st.dataframe(diag, use_container_width=True, hide_index=True)
 
-    existing_rounds = [i for i in range(1, N_ROUNDS + 1) if os.path.exists(round_file(i))]
+    existing_rounds = [i for i in range(1, get_n_rounds() + 1) if os.path.exists(round_file(i))]
     published_cnt = len([i for i in existing_rounds if is_pub(i)])
     closed_rounds = [s["i"] for s in states if s["closed"]]
 
-    st.info(f"📣 Publicadas: **{published_cnt} / {N_ROUNDS}**  ·  🗂️ Generadas: **{len(existing_rounds)}**  ·  🧭 Plan: **{N_ROUNDS}**")
-    st.write(f"🔒 Rondas cerradas (publicadas y sin vacíos): **{len(closed_rounds)}** / {N_ROUNDS}")
+    st.info(f"📣 Publicadas: **{published_cnt} / {get_n_rounds()}**  ·  🗂️ Generadas: **{len(existing_rounds)}**  ·  🧭 Plan: **{get_n_rounds()}**")
+    st.write(f"🔒 Rondas cerradas (publicadas y sin vacíos): **{len(closed_rounds)}** / {get_n_rounds()}")
 
     st.divider()
 
@@ -282,7 +282,7 @@ def _show_generar():
     st.markdown("### ♟️ Generar siguiente ronda (sistema suizo)")
 
     # Determinar siguiente a generar
-    first_missing = next((i for i in range(1, N_ROUNDS + 1) if not states[i - 1]["exists"]), None)
+    first_missing = next((i for i in range(1, get_n_rounds() + 1) if not states[i - 1]["exists"]), None)
 
     if first_missing is None:
         st.success("✅ Todas las rondas están generadas.")
