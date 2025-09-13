@@ -24,6 +24,22 @@ sidebar_title_and_nav(
     ]
 )
 
+# Compactar el marco derecho (main) para evitar scroll por padding vertical
+st.markdown("""
+<style>
+/* Reduce el padding superior/inferior del contenedor principal */
+div.block-container { 
+  padding-top: .30rem !important; 
+  padding-bottom: .30rem !important; 
+}
+/* Un pelín menos de separación entre bloques del main */
+[data-testid="stAppViewContainer"] [data-testid="stVerticalBlock"]{
+  gap: .35rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
 GENIALLY_URL = "https://view.genially.com/68bfc66a46b5ebd63d00b9b0"
 
 ratio = "32:9"  # "21:9" o "16:9"
