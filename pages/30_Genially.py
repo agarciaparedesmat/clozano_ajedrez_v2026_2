@@ -27,7 +27,7 @@ GENIALLY_URL = "https://view.genially.com/x68bfc66a46b5ebd63d00b9b0"  # ← pon 
 
 # iframe nativo de Streamlit
 st.components.v1.iframe(
-    src=GENIALLY_URL,
+    src="https://view.genially.com/x68bfc66a46b5ebd63d00b9b0",
     width=None,          # ocupa el ancho disponible
     height=700,          # ajusta a tu gusto
     scrolling=True       # útil si el contenido es más alto
