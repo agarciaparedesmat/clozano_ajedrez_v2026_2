@@ -86,8 +86,7 @@ st.markdown('<div id="admin-local-nav">', unsafe_allow_html=True)
 st.session_state.setdefault("admin_view", "📋 Resumen")
 st.radio("Menú", MENU, horizontal=True, key="admin_view")
 st.markdown("</div>", unsafe_allow_html=True)
-st.session_state["admin_view"] = view
-
+view = st.session_state["admin_view"]
 
 # =========================
 # 🧾 Configuración (solo lectura)
