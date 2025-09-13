@@ -1,3 +1,17 @@
+
+
+# Helper robusto: número de rondas planificadas (evita NameError global)
+def get_n_rounds() -> int:
+    try:
+        return int(N_ROUNDS)  # si ya está disponible globalmente
+    except Exception:
+        pass
+    try:
+        _cfg = load_config()
+        _jug = os.path.join(DATA_DIR, "jugadores.csv")
+        return int(planned_rounds(_cfg, _jug))
+    except Exception:
+        return 0
 import datetime as _dt
 # pages/99_Admin.py
 # -*- coding: utf-8 -*-
@@ -69,7 +83,8 @@ if "admin_view" not in st.session_state:
     st.session_state["admin_view"] = "📋 Resumen"
 
 st.markdown('<div id="admin-local-nav">', unsafe_allow_html=True)
-view = st.radio("Menú", MENU, horizontal=True, index=MENU.index(st.session_state.get("admin_view","📋 Resumen")))
+st.session_state.setdefault("admin_view", "📋 Resumen")
+st.radio("Menú", MENU, horizontal=True, key="admin_view")
 st.markdown("</div>", unsafe_allow_html=True)
 st.session_state["admin_view"] = view
 
@@ -155,9 +170,9 @@ def _show_jugadores():
 def _show_resumen():
 
     # Asegurar estados locales
-    states = get_states(N_ROUNDS)
+    states = get_states(get_n_rounds())
     st.markdown("### 📋 Estado de rondas")
-    states = [round_status(i) for i in range(1, N_ROUNDS + 1)]
+    states = [round_status(i) for i in range(1, get_n_rounds() + 1)]
     diag = pd.DataFrame([
         {"Ronda": s["i"],
          "Estado": status_label(s),
@@ -170,7 +185,7 @@ def _show_resumen():
     ])
     st.dataframe(diag, use_container_width=True, hide_index=True)
 
-    existing_rounds = [i for i in range(1, N_ROUNDS + 1) if os.path.exists(round_file(i))]
+    existing_rounds = [i for i in range(1, get_n_rounds() + 1) if os.path.exists(round_file(i))]
     published_cnt = len([i for i in existing_rounds if is_pub(i)])
     closed_rounds = [s["i"] for s in states if s["closed"]]
 
@@ -250,11 +265,11 @@ def _show_semilla():
 def _show_generar():
 
     # Asegurar estados locales
-    states = get_states(N_ROUNDS)
+    states = get_states(get_n_rounds())
     st.markdown("### ♟️ Generar siguiente ronda (sistema suizo)")
 
     # Determinar siguiente a generar
-    first_missing = next((i for i in range(1, N_ROUNDS + 1) if not states[i - 1]["exists"]), None)
+    first_missing = next((i for i in range(1, get_n_rounds() + 1) if not states[i - 1]["exists"]), None)
 
     if first_missing is None:
         st.success("✅ Todas las rondas están generadas.")
