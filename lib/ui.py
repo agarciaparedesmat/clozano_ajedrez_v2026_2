@@ -271,37 +271,35 @@ def sidebar_title_and_nav(
 
     # CSS: compactar espacios en la sidebar y estilizar los enlaces custom
     st.sidebar.markdown(
-        """
-        <style>
-        section[data-testid="stSidebar"] { padding-top: 0 !important; }
-        section[data-testid="stSidebar"] > div:first-child {
-          display: flex; flex-direction: column; gap: .1rem !important; padding-top: .1rem !important;
-        }
-        ._csb_title { margin: .05rem 0 0 0 !important; font-weight: 800; font-size: 1.05rem; line-height: 1.2; }
-        ._csb_meta  { margin: 0 0 .15rem 0 !important; color: var(--muted); }
-        ._csb_sep   { border: none; border-top: 1px solid rgba(36,32,36,.25);
-                      margin: .10rem 0 .10rem 0 !important; opacity: 1; }
+    """
+    <style>
+    /* 1) Compactar de verdad la parte superior del sidebar */
+    aside[data-testid="stSidebar"] { padding-top: 0 !important; }
+    aside[data-testid="stSidebar"] > div:first-child {
+      display: flex; flex-direction: column;
+      gap: .05rem !important; padding-top: 0 !important;
+    }
+    /* 2) Quitar el cabezal del sidebar y su hueco */
+    [data-testid="stSidebarHeader"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
+    /* 3) Evitar padding/margen interno extra en el contenido */
+    div[data-testid="stSidebarContent"] { padding-top: 0 !important; margin-top: 0 !important; }
+    /* 4) Ocultar nav automática sin dejar hueco residual */
+    [data-testid="stSidebarNav"] { display: none !important; margin: 0 !important; padding: 0 !important; }
 
-        /* Enlaces de la nav propia: aspecto consistente con tu estilo */
-        ._nav_list a, ._nav_list button {
-          display: block !important;
-          width: 100% !important;
-          text-align: left !important;
-          text-decoration: none !important;
-          color: var(--text) !important;
-          background: transparent !important;
-          border: none !important;
-          padding: .35rem .2rem !important;
-          border-radius: 8px !important;
-          font-weight: 600 !important;
-        }
-        ._nav_list a:hover, ._nav_list button:hover {
-          background: rgba(36,32,36,.06) !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    /* 5) Título/meta/separador súper compactos */
+    ._csb_title { margin: .05rem 0 0 0 !important; font-weight: 800; font-size: 1.00rem; line-height: 1.15; }
+    ._csb_meta  { margin: .05rem 0 .15rem 0 !important; color: var(--muted); font-size: .92rem; }
+    ._csb_sep   { border: none; border-top: 1px solid rgba(36,32,36,.20); margin: .15rem 0 .15rem 0 !important; }
+
+    /* 6) Enlaces de la nav propia más juntos */
+    ._nav_list a, ._nav_list button { padding: .30rem .20rem !important; }
+
+    /* 7) Widgets (sliders/toggles) con menos separación vertical */
+    aside[data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: .25rem !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+  )
 
     # Cabecera
     st.sidebar.markdown(f'<div class="_csb_title">{text}</div>', unsafe_allow_html=True)
