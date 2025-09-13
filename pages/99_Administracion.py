@@ -729,12 +729,8 @@ def _show_resultados():
 # Eliminar ronda (solo la última generada)
 # =========================
 def _show_eliminar():
-        # --- Prefacio local para evitar NameError ---
-    n = get_n_rounds()
-    states = get_states(n)
-    existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
-
-    st.markdown("### 🗑️ Eliminar ronda")
+        actor = (st.session_state.get("actor_name") or st.session_state.get("actor") or "admin")
+st.markdown("### 🗑️ Eliminar ronda")
     if existing_rounds:
         last_exist = max(existing_rounds)
         st.caption(f"Solo se puede **eliminar** la **última ronda generada**: **Ronda {last_exist}**.")
