@@ -144,12 +144,6 @@ st.divider()
 
 def round_file(
 
-# Llamada tardía del resumen: solo después de definir round_file
-try:
-    if st.session_state.get('admin_view','📋 Resumen') == '📋 Resumen':
-        _admin_show_resumen()
-except NameError:
-    st.warning("El resumen se mostrará cuando se carguen las utilidades internas.")
 i: int) -> str:
     return os.path.join(DATA_DIR, f"pairings_R{i}.csv")
 
@@ -749,3 +743,14 @@ try:
         st.info("`data/` está vacío.")
 except Exception as e:
     st.warning(f"No se pudo listar `data/`: {e}")
+
+
+# =========================
+# Ejecución tardía y segura del Resumen (después de cargar todo)
+# =========================
+try:
+    if st.session_state.get('admin_view','📋 Resumen') == '📋 Resumen':
+        _admin_show_resumen()
+except NameError:
+    # Si aún faltara alguna dependencia, mostramos aviso sin romper la app
+    st.warning("El resumen se mostrará cuando se carguen las utilidades internas.")
