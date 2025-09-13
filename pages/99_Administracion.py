@@ -150,10 +150,6 @@ view = st.session_state["admin_view"]
 # 🧾 Configuración (solo lectura)
 # =========================
 def _show_config():
-    
-    # --- Fix local config & paths to avoid NameError ---
-    cfg = get_cfg()
-    JUG_PATH = get_jug_path()
     import json
 
     st.markdown("### 🧾 Configuración (solo lectura)")
@@ -733,7 +729,12 @@ def _show_resultados():
 # Eliminar ronda (solo la última generada)
 # =========================
 def _show_eliminar():
-    st.markdown("### 🗑️ Eliminar ronda")
+        # --- Prefacio local para evitar NameError ---
+    n = get_n_rounds()
+    states = get_states(n)
+    existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
+
+st.markdown("### 🗑️ Eliminar ronda")
     if existing_rounds:
         last_exist = max(existing_rounds)
         st.caption(f"Solo se puede **eliminar** la **última ronda generada**: **Ronda {last_exist}**.")
