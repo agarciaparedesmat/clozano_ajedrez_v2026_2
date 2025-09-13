@@ -14,7 +14,7 @@ from lib.tournament import (
     format_with_cfg,
 )
 
-st.set_page_config(page_title="Inicio", page_icon="♟️", layout="wide")
+st.set_page_config(page_title="Inicio", page_icon="♟️", layout="wide",initial_sidebar_state="expanded")  # o "collapsed"
 inject_base_style()  # ← NUEVO: aplica el bg_color de config.json en la raíz
 
 # NAV personalizada debajo de la cabecera (título + nivel/año)

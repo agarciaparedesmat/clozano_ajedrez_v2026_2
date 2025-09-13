@@ -280,7 +280,25 @@ def sidebar_title_and_nav(
       gap: .05rem !important; padding-top: 0 !important;
     }
     /* 2) Quitar el cabezal del sidebar y su hueco */
-    [data-testid="stSidebarHeader"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
+    /*[data-testid="stSidebarHeader"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
+    /* Restaurar el header para que exista el botón de colapsar */
+    [data-testid="stSidebarHeader"] {
+      display: flex !important;
+      align-items: center;
+      justify-content: flex-end;     /* botón a la derecha, sin texto */
+      height: 34px !important;
+      padding: 2px 6px !important;
+      margin: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+    }
+
+    /* Ocultar cualquier título del header para no sumar altura */
+    [data-testid="stSidebarHeader"] h2,
+    [data-testid="stSidebarHeader"] [role="heading"] {
+      display: none !important;
+    }
+
     /* 3) Evitar padding/margen interno extra en el contenido */
     div[data-testid="stSidebarContent"] { padding-top: 0 !important; margin-top: 0 !important; }
     /* 4) Ocultar nav automática sin dejar hueco residual */
