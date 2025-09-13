@@ -29,14 +29,14 @@ sidebar_title_and_nav(
 
 GENIALLY_URL = "https://view.genially.com/68bfc66a46b5ebd63d00b9b0"
 
-ratio = st.sidebar.selectbox("Relación de aspecto", ["21:9", "32:9", "16:9", "Personalizada"])
-custom_pct = 0  # padding-top en %, solo si eliges 'Personalizada'
 
+ratio = "32:9"  # "21:9" o "16:9"
 ratios = {"21:9": 100*9/21, "32:9": 100*9/32, "16:9": 56.25}
-padding_pct = ratios.get(ratio, custom_pct or 35)  # 35% ≈ muy panorámico
+padding_pct = ratios[ratio]
 
+# IMPORTANTE: pon un height > 0 para que Streamlit reserve espacio
 html(f"""
-<div style="position:relative; width:100%; padding-top:{padding_pct:.4f}%;">
+<div style="position:relative; width:100%; padding-top:{padding_pct:.4f}%; min-height:180px;">
   <iframe
     src="{GENIALLY_URL}"
     style="position:absolute; inset:0; width:100%; height:100%; border:0;"
@@ -45,5 +45,4 @@ html(f"""
     allowfullscreen>
   </iframe>
 </div>
-""", height=0)  # el alto lo da el padding-top (responsive)
-
+""", height=220)  # ← reserva en Streamlit (ajústalo si te queda corto)
