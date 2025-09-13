@@ -742,6 +742,15 @@ def _show_resultados():
 # Eliminar ronda (solo la última generada)
 # =========================
 def _show_eliminar():
+    # Prefacio local: rondas existentes y _log_msg seguro
+    n = get_n_rounds()
+    existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
+    try:
+        _ = _log_msg  # ¿definido globalmente?
+    except NameError:
+        def _log_msg(x):
+            return str(x)
+
     actor = (st.session_state.get("actor_name") or st.session_state.get("actor") or "admin")
     st.markdown("### 🗑️ Eliminar ronda")
     if existing_rounds:
