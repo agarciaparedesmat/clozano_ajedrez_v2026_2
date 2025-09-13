@@ -61,27 +61,28 @@ if 'is_pub' not in globals():
         except Exception:
             pass
         return os.path.exists(os.path.join(DATA_DIR, f"published_R{i}.flag"))
-
+from lib.tournament import DATA_DIR, load_config, config_path, planned_rounds, round_file
 
 # =========================
 # Helpers robustos de configuración/estado
 # =========================
-def get_cfg():
+def get_cfg() -> dict:
     try:
         return cfg  # seguir usando global si ya está
     except Exception:
         return load_config()
 
-def get_config_path():
+def get_config_path() -> str:
     try:
         return config_path()
     except Exception:
         return ""
 
-def get_jug_path():
+def get_jug_path() -> str:
+    import os
     return os.path.join(DATA_DIR, "jugadores.csv")
 
-def get_n_rounds():
+def get_n_rounds() -> int:
     try:
         return int(N_ROUNDS)
     except Exception:
@@ -93,43 +94,9 @@ def get_n_rounds():
     except Exception:
         return 0
 
-def get_actor():
-    """Obtiene el actor desde session_state de forma segura."""
-    return (
-        st.session_state.get("actor_name")
-        or st.session_state.get("actor")
-        or "admin"
-    )
 
-actor = get_actor()
 
-def add_log(action, rnd, actor, message):
-    """Añade una línea al log de administración en data/admin_log.csv (silencioso ante errores)."""
-    try:
-        row = {
-            "ts": _dt.datetime.now().isoformat(timespec="seconds"),
-            "action": action,
-            "round": rnd,
-            "actor": actor,
-            "msg": message,
-        }
-        log_path = os.path.join(DATA_DIR, "admin_log.csv")
-        if os.path.exists(log_path):
-            try:
-                df = pd.read_csv(log_path)
-            except Exception:
-                df = pd.DataFrame(columns=["ts","action","round","actor","msg"])
-            df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-        else:
-            df = pd.DataFrame([row])
-        try:
-            df.to_csv(log_path, index=False, encoding="utf-8-sig")
-        except Exception:
-            df.to_csv(log_path, index=False)
-    except Exception:
-        pass
 
-# Inicializar 'actor' global para compatibilidad con llamadas existentes
 
 # NAV personalizada debajo de la cabecera (título + nivel/año)
 #sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
