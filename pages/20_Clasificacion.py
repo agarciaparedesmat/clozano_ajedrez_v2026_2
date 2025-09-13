@@ -1,5 +1,16 @@
 # pages/20_Clasificacion.py
 # -*- coding: utf-8 -*-
+
+
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+
 import io, re
 import streamlit as st
 import pandas as pd
@@ -296,6 +307,188 @@ def build_standings_pdf(df_st, cfg, ronda_actual, show_bh=True):
         except Exception:
             return None
 
+def build_crosstable_pdf(ct_df: pd.DataFrame, cfg: dict) -> bytes | None:
+    """
+    Genera el PDF del cuadro del torneo (tabla de doble entrada por posiciones)
+    con la estética de los PDFs anteriores. Devuelve bytes o None si falla.
+    """
+    import io
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+    from reportlab.lib.units import mm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    # ---------- Opción A: ReportLab ----------
+    try:
+        # Paleta (igual que en tus PDFs de rondas/clasificación)
+        VERDE     = colors.HexColor("#d9ead3")
+        MELOCOTON = colors.HexColor("#f7e1d5")
+
+        # Registro de fuentes (si existen en assets/fonts), con fallback seguro
+        def _register_fonts():
+            basep = "assets/fonts"
+            ok = False
+            try:
+                import os
+                if os.path.exists(f"{basep}/OldStandard-Regular.ttf"):
+                    pdfmetrics.registerFont(TTFont("OldStd",   f"{basep}/OldStandard-Regular.ttf"))
+                    if os.path.exists(f"{basep}/OldStandard-Bold.ttf"):
+                        pdfmetrics.registerFont(TTFont("OldStd-B", f"{basep}/OldStandard-Bold.ttf"))
+                    ok = True
+                if os.path.exists(f"{basep}/PlayfairDisplay-Regular.ttf"):
+                    pdfmetrics.registerFont(TTFont("Playfair",   f"{basep}/PlayfairDisplay-Regular.ttf"))
+                    if os.path.exists(f"{basep}/PlayfairDisplay-Bold.ttf"):
+                        pdfmetrics.registerFont(TTFont("Playfair-B", f"{basep}/PlayfairDisplay-Bold.ttf"))
+                    ok = True
+            except Exception:
+                pass
+            return ok
+
+        has_custom = _register_fonts()
+        SERIF    = "OldStd"    if has_custom else "Times-Roman"
+        SERIF_B  = "OldStd-B"  if has_custom else "Times-Bold"
+
+        buf = io.BytesIO()
+        # A4 apaisado para que quepan más columnas
+        doc = SimpleDocTemplate(
+            buf, pagesize=landscape(A4),
+            leftMargin=14*mm, rightMargin=14*mm,
+            topMargin=12*mm, bottomMargin=12*mm
+        )
+
+        def _draw_frame(canvas, d):
+            canvas.saveState()
+            canvas.setStrokeColor(colors.black)
+            canvas.setLineWidth(1.1)
+            x = doc.leftMargin - 5*mm
+            y = doc.bottomMargin - 5*mm
+            w = doc.width + 10*mm
+            h = doc.height + 10*mm
+            canvas.rect(x, y, w, h)
+            canvas.restoreState()
+
+        styles = getSampleStyleSheet()
+        H1 = ParagraphStyle("H1", parent=styles["Normal"], fontName=SERIF_B, fontSize=18, leading=22, alignment=1, spaceAfter=2)
+        H3 = ParagraphStyle("H3", parent=styles["Normal"], fontName=SERIF_B, fontSize=16, leading=20, alignment=1, spaceBefore=2, spaceAfter=4)
+
+        titulo = (cfg.get("titulo") or "TORNEO DE AJEDREZ").strip()
+        anio   = (cfg.get("anio") or "").strip()
+        nivel  = (cfg.get("nivel") or "").strip()
+
+        band1 = Table([[Paragraph(f"{titulo} {anio}".strip(), H1)]], colWidths=[doc.width])
+        band1.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), VERDE),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING", (0,0), (-1,-1), 6),
+        ]))
+
+        band2 = Table([[Paragraph(nivel or "", H1)]], colWidths=[doc.width])
+        band2.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), MELOCOTON),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+            ("TOPPADDING", (0,0), (-1,-1), 10),
+        ]))
+
+        titulo_lista = Table([[Paragraph("CUADRO DEL TORNEO (por posiciones)", H3)]], colWidths=[doc.width])
+        titulo_lista.setStyle(TableStyle([
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING", (0,0), (-1,-1), 6),
+        ]))
+
+        # ---- Tabla del cuadro ----
+        # La primera fila/columna son etiquetas de posición
+        n = len(ct_df.columns)
+        header = ["POS"] + [str(c) for c in ct_df.columns]
+        data = [header, [""] * len(header)]
+        for idx, row in ct_df.iterrows():
+            data.append([str(idx)] + [str(x) if x is not None else "" for x in row.tolist()])
+
+        # Anchos: primera columna algo mayor; el resto compactas
+        if n > 0:
+            first_w = 16*mm
+            rest_w  = max(8*mm, min(12*mm, (doc.width - first_w) / n))
+            widths  = [first_w] + [rest_w] * n
+        else:
+            widths = [doc.width]
+
+        t = Table(data, colWidths=widths, repeatRows=2)
+        t.setStyle(TableStyle([
+            ("FONT", (0,0), (-1,0), SERIF_B, 11.5),
+            ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
+            ("ALIGN", (0,0), (-1,0), "CENTER"),
+            ("VALIGN", (0,0), (-1,0), "MIDDLE"),
+            ("BOTTOMPADDING", (0,0), (-1,0), 6),
+            ("TOPPADDING", (0,0), (-1,0), 6),
+
+            ("LINEBELOW", (0,0), (-1,0), 1.2, colors.black),
+            ("LINEBELOW", (0,1), (-1,1), 0.6, colors.black),
+            ("TOPPADDING", (0,1), (-1,1), 0),
+            ("BOTTOMPADDING", (0,1), (-1,1), 0),
+            ("FONTSIZE", (0,1), (-1,1), 1),
+            ("ROWHEIGHTS", (0,1), (-1,1), 2),
+
+            ("LEFTPADDING", (0,2), (-1,-1), 4),
+            ("RIGHTPADDING", (0,2), (-1,-1), 4),
+            ("ALIGN", (0,2), (0,-1), "CENTER"),   # POS a la izquierda centrado
+            ("ALIGN", (1,2), (-1,-1), "CENTER"),  # celdas del cuadro centradas
+            ("VALIGN", (0,2), (-1,-1), "MIDDLE"),
+            ("GRID", (0,2), (-1,-1), 0.35, colors.lightgrey),
+        ]))
+
+        story = [band1, band2, titulo_lista, t]
+        doc.build(story, onFirstPage=_draw_frame, onLaterPages=_draw_frame)
+        return buf.getvalue()
+
+    except Exception:
+        pass
+
+    # ---------- Opción B: FPDF (fallback) ----------
+    try:
+        from fpdf import FPDF
+        pdf = FPDF(orientation="L", unit="mm", format="A4")
+        pdf.set_auto_page_break(auto=True, margin=12)
+        pdf.add_page()
+
+        titulo = (cfg.get("titulo") or "TORNEO DE AJEDREZ").strip()
+        anio   = (cfg.get("anio") or "").strip()
+        nivel  = (cfg.get("nivel") or "").strip()
+
+        pdf.set_font("Helvetica", "B", 18)
+        pdf.cell(0, 9, f"{titulo} {anio}".strip(), ln=1, align="C")
+        pdf.set_font("Helvetica", "B", 20)
+        if nivel:
+            pdf.cell(0, 10, nivel, ln=1, align="C")
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.cell(0, 8, "CUADRO DEL TORNEO (por posiciones)", ln=1, align="C")
+        pdf.ln(1)
+
+        n = len(ct_df.columns)
+        headers = ["POS"] + [str(c) for c in ct_df.columns]
+        first_w = 16
+        rest_w  = max(8, min(12, (pdf.w - pdf.l_margin - pdf.r_margin - first_w) / max(1, n)))
+        widths  = [first_w] + [rest_w] * n
+
+        pdf.set_font("Helvetica", "B", 11)
+        for h, w in zip(headers, widths):
+            pdf.cell(w, 8, h, border=1, align="C")
+        pdf.ln(8)
+
+        pdf.set_font("Helvetica", "", 11)
+        for idx, row in ct_df.iterrows():
+            cells = [str(idx)] + [str(x) if x is not None else "" for x in row.tolist()]
+            for c, w in zip(cells, widths):
+                pdf.cell(w, 7, (c or "")[:12], border=1, align="C")
+            pdf.ln(7)
+
+        return bytes(pdf.output(dest="S"))
+    except Exception:
+        return None
+
 
 # Nº de rondas planificado
 JUG_PATH = f"{DATA_DIR}/jugadores.csv"
@@ -430,6 +623,35 @@ else:
                     use_container_width=False,
                     column_config=col_config_ct,
                 )
+                # — Descargas del cuadro —
+                c1, c2 = st.columns(2)
+
+                with c1:
+                    buf_ct = io.StringIO()
+                    ct_df.to_csv(buf_ct, index=True, encoding="utf-8")
+                    st.download_button(
+                        "⬇️ Descargar cuadro (CSV)",
+                        data=buf_ct.getvalue().encode("utf-8"),
+                        file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                        key="dl_ct_csv",
+                    )
+
+                with c2:
+                    pdf_ct = build_crosstable_pdf(ct_df, cfg)
+                    if isinstance(pdf_ct, (bytes, bytearray)) and len(pdf_ct) > 0:
+                        st.download_button(
+                            "📄 Descargar cuadro (PDF)",
+                            data=pdf_ct,
+                            file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                            key="dl_ct_pdf",
+                        )
+                    else:
+                        st.caption("📄 PDF del cuadro no disponible (instala reportlab o fpdf2).")
+
             except Exception as e:
                 st.error(f"No se pudo construir el cuadro: {e}")
 
