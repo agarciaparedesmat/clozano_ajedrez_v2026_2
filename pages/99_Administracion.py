@@ -154,7 +154,7 @@ def _show_config():
     # --- Fix local config & paths to avoid NameError ---
     cfg = get_cfg()
     JUG_PATH = get_jug_path()
-import json
+    import json
 
     st.markdown("### 🧾 Configuración (solo lectura)")
 
