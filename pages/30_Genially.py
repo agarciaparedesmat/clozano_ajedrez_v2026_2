@@ -30,7 +30,7 @@ st.markdown("""
 /* Reduce el padding superior/inferior del contenedor principal */
 div.block-container { 
   padding-top: .90rem !important; 
-  padding-bottom: .30rem !important; 
+  padding-bottom: .90rem !important; 
 }
 /* Un pelín menos de separación entre bloques del main */
 [data-testid="stAppViewContainer"] [data-testid="stVerticalBlock"]{
