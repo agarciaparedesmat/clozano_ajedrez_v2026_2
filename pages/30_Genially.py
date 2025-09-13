@@ -29,7 +29,7 @@ st.markdown("""
 <style>
 /* Reduce el padding superior/inferior del contenedor principal */
 div.block-container { 
-  padding-top: .50rem !important; 
+  padding-top: .90rem !important; 
   padding-bottom: .30rem !important; 
 }
 /* Un pelín menos de separación entre bloques del main */
