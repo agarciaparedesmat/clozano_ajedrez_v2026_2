@@ -6,6 +6,8 @@ import streamlit as st
 
 from lib.ui import sidebar_title_and_nav
 
+from streamlit.components.v1 import html
+
 # NAV personalizada debajo de la cabecera (título + nivel/año)
 #sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
 sidebar_title_and_nav(
@@ -19,7 +21,7 @@ sidebar_title_and_nav(
     ]
 )
 
-st.set_page_config(page_title="Genially en Streamlit", layout="wide")
+#st.set_page_config(page_title="Genially en Streamlit", layout="wide")
 
 GENIALLY_URL = "https://view.genially.com/x68bfc66a46b5ebd63d00b9b0"  # ← pon aquí tu URL
 
@@ -30,3 +32,17 @@ st.components.v1.iframe(
     height=700,          # ajusta a tu gusto
     scrolling=True       # útil si el contenido es más alto
 )
+
+
+
+html(f"""
+<div style="position:relative; width:100%; height:85vh;">
+  <iframe
+    src="{https://view.genially.com/x68bfc66a46b5ebd63d00b9b0}"
+    style="position:absolute; inset:0; width:100%; height:100%; border:0;"
+    frameborder="0"
+    allow="fullscreen; clipboard-read; clipboard-write"
+    allowfullscreen>
+  </iframe>
+</div>
+""", height=800)
