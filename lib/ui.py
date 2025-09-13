@@ -271,53 +271,65 @@ def sidebar_title_and_nav(
 
     # CSS: compactar espacios en la sidebar y estilizar los enlaces custom
     st.sidebar.markdown(
-    """
-    <style>
-    /* 1) Compactar de verdad la parte superior del sidebar */
-    aside[data-testid="stSidebar"] { padding-top: 0 !important; }
-    aside[data-testid="stSidebar"] > div:first-child {
-      display: flex; flex-direction: column;
-      gap: .05rem !important; padding-top: 0 !important;
-    }
-    /* 2) Quitar el cabezal del sidebar y su hueco */
-    /*[data-testid="stSidebarHeader"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
-    /* Restaurar el header para que exista el botón de colapsar */
-    [data-testid="stSidebarHeader"] {
-      display: flex !important;
-      align-items: center;
-      justify-content: flex-end;     /* botón a la derecha, sin texto */
-      height: 34px !important;
-      padding: 2px 6px !important;
-      margin: 0 !important;
-      background: transparent !important;
-      border: 0 !important;
-    }
+        """
+        <style>
+        /* ===== Sidebar compacto con botón de colapsar ===== */
 
-    /* Ocultar cualquier título del header para no sumar altura */
-    [data-testid="stSidebarHeader"] h2,
-    [data-testid="stSidebarHeader"] [role="heading"] {
-      display: none !important;
-    }
+        /* Quitar huecos generales del lateral (y liberar unos px bajando la fuente) */
+        aside[data-testid="stSidebar"]{
+          padding-top:0!important;
+          font-size:0.97em; /* opcional: reduce ~6–12 px de alto total */
+        }
+        aside[data-testid="stSidebar"] > div:first-child{
+          display:flex; flex-direction:column;
+          gap:.10rem!important; padding-top:0!important;
+        }
 
-    /* 3) Evitar padding/margen interno extra en el contenido */
-    div[data-testid="stSidebarContent"] { padding-top: 0 !important; margin-top: 0 !important; }
-    /* 4) Ocultar nav automática sin dejar hueco residual */
-    [data-testid="stSidebarNav"] { display: none !important; margin: 0 !important; padding: 0 !important; }
+        /* Header visible (para el botón de colapsar) pero ultra-compacto */
+        [data-testid="stSidebarHeader"]{
+          display:flex!important; align-items:center; justify-content:flex-end;
+          height:26px!important; padding:2px 6px!important; margin:0!important;
+          background:transparent!important; border:0!important;
+        }
+        /* Oculta cualquier título en el header (dejamos solo el botón) */
+        [data-testid="stSidebarHeader"] h2,
+        [data-testid="stSidebarHeader"] [role="heading"]{ display:none!important; }
 
-    /* 5) Título/meta/separador súper compactos */
-    ._csb_title { margin: .05rem 0 0 0 !important; font-weight: 800; font-size: 1.00rem; line-height: 1.15; }
-    ._csb_meta  { margin: .05rem 0 .15rem 0 !important; color: var(--muted); font-size: .92rem; }
-    ._csb_sep   { border: none; border-top: 1px solid rgba(36,32,36,.20); margin: .15rem 0 .15rem 0 !important; }
+        /* Contenido sin márgenes/padding de más */
+        div[data-testid="stSidebarContent"]{
+          padding-top:0!important; padding-bottom:0!important;
+          margin-top:0!important;  margin-bottom:0!important;
+        }
 
-    /* 6) Enlaces de la nav propia más juntos */
-    ._nav_list a, ._nav_list button { padding: .30rem .20rem !important; }
+        /* Ocultar la nav automática de Streamlit (evita duplicados y huecos) */
+        [data-testid="stSidebarNav"]{ display:none!important; margin:0!important; padding:0!important; }
 
-    /* 7) Widgets (sliders/toggles) con menos separación vertical */
-    aside[data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: .25rem !important; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-  )
+        /* Título/meta/separador de tu nav propia */
+        ._csb_title{ margin:.05rem 0 0 0!important; font-weight:800; font-size:1.00rem; line-height:1.15; }
+        ._csb_meta { margin:.05rem 0 .15rem 0!important; color: var(--muted); font-size:.92rem; }
+        ._csb_sep  { border:none; border-top:1px solid rgba(36,32,36,.20); margin:.10rem 0 .10rem 0!important; }
+
+        /* Enlaces/botones de tu lista de navegación personalizada (más densos) */
+        ._nav_list a, ._nav_list button{
+          padding:.22rem .20rem!important; line-height:1.05!important;
+        }
+
+        /* Menos separación vertical entre bloques/widgets */
+        aside[data-testid="stSidebar"] [data-testid="stVerticalBlock"]{ gap:.18rem!important; }
+        aside[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]{ gap:.18rem!important; }
+        /* Elimina el último “colchón” inferior que suele sobrar */
+        aside[data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div:last-child{
+          margin-bottom:0!important; padding-bottom:0!important;
+        }
+
+        /* (Opcional) Si aún aparece un mini-scroll, ocúltalo visualmente */
+        aside[data-testid="stSidebar"]::-webkit-scrollbar{ width:0; height:0; }
+        aside[data-testid="stSidebar"]{ scrollbar-width:none; -ms-overflow-style:none; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
     # Cabecera
     st.sidebar.markdown(f'<div class="_csb_title">{text}</div>', unsafe_allow_html=True)
