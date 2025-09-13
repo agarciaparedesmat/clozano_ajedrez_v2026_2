@@ -645,33 +645,40 @@ else:
                     )
 
                 with c2:
-                    # Botones de tamaño (encima del botón de descarga)
+                    # ---- Dentro de `with c2:` ----
                     if "ct_pdf_paper" not in st.session_state:
-                        st.session_state["ct_pdf_paper"] = "A4"  # valor por defecto
+                        st.session_state["ct_pdf_paper"] = "A4"  # por defecto
 
-                    b_a4, b_a3 = st.columns(2)
-                    with b_a4:
+                    # 3 columnas: [descarga]  [A4]  [A3]
+                    col_dl, col_a4, col_a3 = st.columns([4, 1, 1])
+
+                    # Botones de tamaño (a la derecha)
+                    with col_a4:
                         if st.button("A4", key="ct_paper_a4"):
                             st.session_state["ct_pdf_paper"] = "A4"
-                    with b_a3:
+
+                    with col_a3:
                         if st.button("A3", key="ct_paper_a3"):
                             st.session_state["ct_pdf_paper"] = "A3"
 
                     paper = st.session_state["ct_pdf_paper"]
-
-                    # Generar y descargar el PDF con el tamaño elegido
                     pdf_ct = build_crosstable_pdf(ct_df, cfg, paper=paper)
-                    if isinstance(pdf_ct, (bytes, bytearray)) and len(pdf_ct) > 0:
-                        st.download_button(
-                            "📄 Descargar cuadro (PDF)",
-                            data=pdf_ct,
-                            file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True,
-                            key="dl_ct_pdf",
-                        )
-                    else:
-                        st.caption("📄 PDF del cuadro no disponible (instala reportlab o fpdf2).")
+
+                    # Botón de descarga (a la izquierda)
+                    with col_dl:
+                        if isinstance(pdf_ct, (bytes, bytearray)) and len(pdf_ct) > 0:
+                            st.download_button(
+                                "📄 Descargar cuadro (PDF)",
+                                data=pdf_ct,
+                                file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True,
+                                key="dl_ct_pdf",
+                            )
+                        else:
+                            st.caption("📄 PDF del cuadro no disponible (instala reportlab o fpdf2).")
+
+
 
             except Exception as e:
                 st.error(f"No se pudo construir el cuadro: {e}")
