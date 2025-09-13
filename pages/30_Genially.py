@@ -21,17 +21,23 @@ sidebar_title_and_nav(
     ]
 )
 
-#st.set_page_config(page_title="Genially en Streamlit", layout="wide")
 
-GENIALLY_URL = "https://view.genially.com/x68bfc66a46b5ebd63d00b9b0"  # ← pon aquí tu URL
+st.set_page_config(page_title="Genially en Streamlit", layout="wide")
 
-# iframe nativo de Streamlit
-st.components.v1.iframe(
-    src="https://view.genially.com/x68bfc66a46b5ebd63d00b9b0",
-    width=None,          # ocupa el ancho disponible
-    height=700,          # ajusta a tu gusto
-    scrolling=True       # útil si el contenido es más alto
-)
+GENIALLY_URL = "https://view.genially.com/68bfc66a46b5ebd63d00b9b0"
 
+st.sidebar.header("Opciones de embed")
+alto = st.sidebar.slider("Altura (px)", 400, 1200, 800, 50)
+scroll = st.sidebar.toggle("Scroll en iframe", value=True)
 
+html(f"""
+<div style="position:relative; width:100%; height:{alto}px;">
+  <iframe
+    src="{GENIALLY_URL}"
+    style="position:absolute; top:0; left:0; width:100%; height:100%; border:0; overflow:{'auto' if scroll else 'hidden'};"
+    frameborder="0"
+    allowfullscreen>
+  </iframe>
+</div>
+""", height=alto+20)
 
