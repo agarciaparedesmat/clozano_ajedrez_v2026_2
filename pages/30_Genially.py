@@ -8,6 +8,9 @@ from lib.ui import sidebar_title_and_nav
 
 from streamlit.components.v1 import html
 
+# st.set_page_config(page_title="Genially en Streamlit", layout="wide")
+# inject_base_style()
+
 # NAV personalizada debajo de la cabecera (título + nivel/año)
 #sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
 sidebar_title_and_nav(
@@ -22,7 +25,7 @@ sidebar_title_and_nav(
 )
 
 
-st.set_page_config(page_title="Genially en Streamlit", layout="wide")
+
 
 GENIALLY_URL = "https://view.genially.com/68bfc66a46b5ebd63d00b9b0"
 
