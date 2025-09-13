@@ -21,6 +21,8 @@ import pandas as pd
 import streamlit as st
 
 from lib.tournament import (
+
+from lib.tournament import DATA_DIR, load_config, config_path, planned_rounds, round_file
     DATA_DIR,
     load_config, load_meta, save_meta,
     read_csv_safe, last_modified,
@@ -57,6 +59,38 @@ page_header("🛠️ Panel de Administración", "Gestión de rondas, publicació
 # =========================
 # Barra de menú interna (sticky)
 # =========================
+
+# =========================
+# Helpers de configuración robustos (evitan NameError)
+# =========================
+def get_cfg() -> dict:
+    try:
+        return cfg  # si ya existe en global (compatibilidad)
+    except Exception:
+        return load_config()
+
+def get_get_config_path() -> str:
+    try:
+        return get_config_path()
+    except Exception:
+        return ""
+
+def get_jug_path() -> str:
+    import os
+    return os.path.join(DATA_DIR, "jugadores.csv")
+
+def get_n_rounds() -> int:
+    try:
+        return int(N_ROUNDS)  # si ya está fijado globalmente
+    except Exception:
+        pass
+    try:
+        _cfg = get_cfg()
+        _jug = get_jug_path()
+        return int(planned_rounds(_cfg, _jug))
+    except Exception:
+        return 0
+
 _STICKY_MENU_CSS = """
 <style>
 #admin-local-nav {
@@ -100,7 +134,7 @@ def _show_config():
     try:
         st.code(json.dumps(cfg, ensure_ascii=False, indent=2), language="json")
     except Exception:
-        st.write(cfg)
+        st.write(get_cfg())
 
     # Resumen práctico
     df_j = read_csv_safe(JUG_PATH)
