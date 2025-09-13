@@ -19,6 +19,14 @@ sidebar_title_and_nav(
     ]
 )
 
+st.set_page_config(page_title="Genially en Streamlit", layout="wide")
 
+GENIALLY_URL = "https://view.genially.com/x68bfc66a46b5ebd63d00b9b0"  # ← pon aquí tu URL
 
-<div style="width: 100%;"><div style="position: relative; padding-bottom: 56.25%; padding-top: 0; height: 0;"><iframe title="2025-2026 JUEGA AL AJEDREZ EN LOS RECREOS" frameborder="0" width="1200" height="675" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" src="https://view.genially.com/68bfc66a46b5ebd63d00b9b0" type="text/html" allowscriptaccess="always" allowfullscreen="true" scrolling="yes" allownetworking="all"></iframe> </div> </div>
+# iframe nativo de Streamlit
+st.components.v1.iframe(
+    src=GENIALLY_URL,
+    width=None,          # ocupa el ancho disponible
+    height=700,          # ajusta a tu gusto
+    scrolling=True       # útil si el contenido es más alto
+)
