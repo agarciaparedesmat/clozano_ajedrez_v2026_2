@@ -6,6 +6,16 @@ import random
 import pandas as pd
 import streamlit as st
 from lib.ui2 import is_pub, set_pub, results_empty_count, round_status, status_label, get_states
+
+# Salvaguarda: si por orden de carga no existiera is_pub, define un fallback mínimo
+if 'is_pub' not in globals():
+    def is_pub(i: int) -> bool:
+        try:
+            if is_published(i):
+                return True
+        except Exception:
+            pass
+        return os.path.exists(os.path.join(DATA_DIR, f"published_R{i}.flag"))
 from lib.tournament import DATA_DIR, load_config, config_path, planned_rounds, round_file
 
 # =========================
@@ -382,7 +392,11 @@ def _show_publicar():
 # 📅 Fecha de celebración por ronda (solo borradores)
 # =========================
 def _show_fechas():
-    st.markdown("### 📅 Fecha de celebración (solo rondas en borrador)")
+    
+    # Estado local y referencia a is_pub para evitar NameError por orden de carga
+    states = get_states(get_n_rounds())
+    _ = is_pub  # no-op: fuerza la resolución del símbolo en esta vista
+st.markdown("### 📅 Fecha de celebración (solo rondas en borrador)")
     draft_rounds = [i for i in existing_rounds if not is_pub(i)]
     if draft_rounds:
         sel_draft = st.selectbox("Ronda en borrador a editar", draft_rounds, index=0, key="fecha_sel_round")
