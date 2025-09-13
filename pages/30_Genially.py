@@ -45,4 +45,4 @@ html(f"""
     allowfullscreen>
   </iframe>
 </div>
-""", height=420)  # ← reserva en Streamlit (ajústalo si te queda corto)
+""", height=380)  # ← reserva en Streamlit (ajústalo si te queda corto)
