@@ -44,6 +44,8 @@ from lib.tournament import (
 )
 
 from lib.ui import page_header
+
+from lib.ui2 import is_pub, set_pub, results_empty_count, round_status, status_label, get_states
 from lib.ui import hero_portada, inject_base_style, sidebar_title_and_nav
 
 # NAV personalizada debajo de la cabecera (título + nivel/año)
@@ -190,24 +192,6 @@ def is_pub(i: int) -> bool:
         pass
     return os.path.exists(_pub_flag_path(i))
 
-def set_pub(i: int, val: bool, seed=None):
-    try:
-        set_published(i, val, seed=seed)
-    except Exception:
-        pass
-    fp = _pub_flag_path(i)
-    try:
-        if val:
-            open(fp, "w").close()
-        else:
-            if os.path.exists(fp):
-                os.remove(fp)
-    except Exception:
-        pass
-
-# =========================
-# Helpers de normalización/estado
-# =========================
 def _normalize_result_series(s: pd.Series) -> pd.Series:
     """Convierte None/nan/'None'/'nan'/'N/A' en '' y recorta espacios."""
     return (
@@ -369,10 +353,10 @@ st.divider()
 # Generar ronda siguiente (Suizo)
 # =========================
 # Asegurar 'states' disponible localmente
-states = get_states()
+states = get_states(N_ROUNDS)
 
 # Asegurar cálculo local de 'states' para esta sección
-states = get_states()
+states = get_states(N_ROUNDS)
 
 st.markdown("### ♟️ Generar siguiente ronda (sistema suizo)")
 
@@ -469,10 +453,10 @@ st.divider()
 # Publicar / Despublicar
 # =========================
 # Asegurar 'states' disponible localmente
-states = get_states()
+states = get_states(N_ROUNDS)
 
 # Asegurar cálculo local de 'states' para esta sección
-states = get_states()
+states = get_states(N_ROUNDS)
 
 
 st.divider()
@@ -481,7 +465,7 @@ st.divider()
 # 📅 Fecha de celebración por ronda (solo borradores)
 # =========================
 # Asegurar 'states' disponible localmente
-states = get_states()
+states = get_states(N_ROUNDS)
 
 # Salvaguarda local: definir is_pub si aún no está disponible
 try:
@@ -566,10 +550,10 @@ st.divider()
 # Resultados y clasificación (solo PUBLICADAS)
 # =========================
 # Asegurar 'states' disponible localmente
-states = get_states()
+states = get_states(N_ROUNDS)
 
 # Asegurar cálculo local de 'states' para esta sección
-states = get_states()
+states = get_states(N_ROUNDS)
 
 st.markdown("### ✏️ Resultados y clasificación (solo PUBLICADAS)")
 
@@ -751,10 +735,10 @@ st.divider()
 # Eliminar ronda (solo la última generada)
 # =========================
 # Asegurar 'states' disponible localmente
-states = get_states()
+states = get_states(N_ROUNDS)
 
 # Asegurar cálculo local de 'states' para esta sección
-states = get_states()
+states = get_states(N_ROUNDS)
 
 st.markdown("### 🗑️ Eliminar ronda")
 if existing_rounds:
