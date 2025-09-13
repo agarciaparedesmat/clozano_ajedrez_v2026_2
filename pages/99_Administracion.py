@@ -20,8 +20,6 @@ import random
 import pandas as pd
 import streamlit as st
 
-from lib.tournament import (
-
 from lib.tournament import DATA_DIR, load_config, config_path, planned_rounds, round_file
     DATA_DIR,
     load_config, load_meta, save_meta,
@@ -32,7 +30,7 @@ from lib.tournament import DATA_DIR, load_config, config_path, planned_rounds, r
     planned_rounds, format_with_cfg,  # ya estaban
     set_round_date, get_round_date, format_date_es,
     config_path, config_debug,        # <- añadidos
-)
+
 
 from lib.ui import page_header
 
