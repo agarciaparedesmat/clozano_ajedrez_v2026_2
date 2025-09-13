@@ -323,6 +323,9 @@ def _show_semilla():
 # =========================
 def _show_generar():
 
+    # Prefacio local para evitar NameError
+    JUG_PATH = get_jug_path()
+
     # Asegurar estados locales
     states = get_states(get_n_rounds())
     st.markdown("### ♟️ Generar siguiente ronda (sistema suizo)")
