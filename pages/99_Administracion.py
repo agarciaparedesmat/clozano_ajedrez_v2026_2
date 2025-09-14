@@ -155,10 +155,11 @@ actor = st.session_state.get("actor_name", "Admin")
 # Botón "Cerrar sesión"
 
 if st.button("🔒 Cerrar sesión", key="logout_btn"):
-    st.session_state["actor_name"] = "Admin"
-    st.session_state["admin_auth_ok"] = False
-    st.session_state["admin_pwd"] = ""
+    # quitar claves gestionadas por widgets y flags de login
+    for k in ("admin_auth_ok", "admin_pwd", "actor_name"):
+        st.session_state.pop(k, None)
     st.rerun()
+
 
 # =========================
 # Barra de menú interna (sticky)
