@@ -1137,6 +1137,40 @@ def _show_archivos():
             st.caption("No hay rondas generadas.")
     else:
         st.caption("No hay rondas planificadas.")
+    
+    # Botón: recalcular 'closed' según realidad (publicada y sin vacíos)
+    if st.button("Recalcular 'closed' en meta.json", key="meta_recalc_closed"):
+        try:
+            meta_w = meta_cur if isinstance(meta_cur, dict) else {}
+        except Exception:
+            meta_w = {}
+        rounds_w = meta_w.setdefault("rounds", {})
+        cambios = 0
+        for i in rondas_exist:
+            # Publicada real (preferimos helper; si falla, usamos flag-file)
+            try:
+                pub = is_pub(i)
+            except Exception:
+                pub = os.path.exists(_pub_flag_path(i))
+            # Vacíos reales
+            try:
+                vacios = results_empty_count(i)
+            except Exception:
+                vacios = None
+            closed_now = bool(pub and (vacios == 0))
+
+            r = rounds_w.setdefault(str(i), {})
+            if r.get("closed") != closed_now:
+                r["closed"] = closed_now
+                cambios += 1
+
+        try:
+            save_meta(meta_w)
+            st.success(f"Campo 'closed' actualizado para {cambios} rondas.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"No se pudo actualizar meta.json: {e}")
+
 
     # ---------- Snapshot ZIP (opcional) ----------
     with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):
