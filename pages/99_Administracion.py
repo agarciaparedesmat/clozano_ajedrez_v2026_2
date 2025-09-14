@@ -941,94 +941,79 @@ def _show_eliminar():
 
 
 # =========================
-# Inspector de data/
+# Archivos (descarga)
 # =========================
 def _show_archivos():
-    st.markdown("### 🗂️ Archivos en `data/` (inspector rápido)")
-    try:
-        files = os.listdir(DATA_DIR)
-        if files:
-            rows = []
-            for f in sorted(files):
-                p = os.path.join(DATA_DIR, f)
-                try:
-                    sz = os.path.getsize(p)
-                    mt = last_modified(p)
-                except Exception:
-                    sz, mt = 0, "—"
-                rows.append({"archivo": f, "tamaño_bytes": sz, "modificado": mt})
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    import os, io, zipfile
+    st.markdown("### 🗂️ Archivos")
+
+    # helpers de descarga
+    def _dl_button(label, path, mime, key):
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                st.download_button(label, f.read(), file_name=os.path.basename(path), mime=mime, key=key)
         else:
-            st.info("`data/` está vacío.")
-    except Exception as e:
-        st.warning(f"No se pudo listar `data/`: {e}")
+            st.caption(f"· {os.path.basename(path)} — no existe")
 
-import os, io, json, zipfile
-import streamlit as st
-from lib.tournament import DATA_DIR, load_config, round_file
-# si tienes get_n_rounds() disponible:
-n = get_n_rounds() if 'get_n_rounds' in globals() else 0
+    # rutas base
+    _cfg_path = os.path.join(os.path.dirname(DATA_DIR), "config.json")  # config.json al lado de /data
+    n = get_n_rounds() if 'get_n_rounds' in globals() else 0
 
-def _dl_button(label, path, mime, key):
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            st.download_button(label, f.read(), file_name=os.path.basename(path), mime=mime, key=key)
-    else:
-        st.caption(f"· {os.path.basename(path)} — no existe")
+    st.markdown("#### 📦 Descargas directas")
+    _dl_button("Descargar config.json", _cfg_path, "application/json", "dl_cfg")
+    _dl_button("Descargar jugadores.csv", os.path.join(DATA_DIR, "jugadores.csv"), "text/csv", "dl_jug")
+    _dl_button("Descargar standings.csv", os.path.join(DATA_DIR, "standings.csv"), "text/csv", "dl_std")
 
-st.markdown("#### 📦 Descargas directas")
-_cfg_path = os.path.join(os.path.dirname(DATA_DIR), "config.json")  # ajusta si lo guardas en otra carpeta
-_dl_button("Descargar config.json", _cfg_path, "application/json", "dl_cfg")
-_dl_button("Descargar jugadores.csv", os.path.join(DATA_DIR, "jugadores.csv"), "text/csv", "dl_jug")
-_dl_button("Descargar standings.csv", os.path.join(DATA_DIR, "standings.csv"), "text/csv", "dl_std")
+    # Meta/publicación (ajusta el nombre si tu proyecto usa otro fichero)
+    _meta_path = os.path.join(DATA_DIR, "meta.json")
+    if os.path.exists(_meta_path):
+        _dl_button("Descargar meta de publicación (meta.json)", _meta_path, "application/json", "dl_meta")
 
-# Meta/publicación (ajusta el nombre real si es distinto)
-_meta_path = os.path.join(DATA_DIR, "meta.json")
-if os.path.exists(_meta_path):
-    _dl_button("Descargar meta de publicación (meta.json)", _meta_path, "application/json", "dl_meta")
+    # Log de administración
+    _log_path = os.path.join(DATA_DIR, "admin_log.csv")
+    if os.path.exists(_log_path):
+        _dl_button("Descargar log de administración", _log_path, "text/csv", "dl_log")
 
-# Log de administración
-_log_path = os.path.join(DATA_DIR, "admin_log.csv")
-if os.path.exists(_log_path):
-    _dl_button("Descargar log de administración", _log_path, "text/csv", "dl_log")
-
-# Rondas: selector + descarga
-if n > 0:
+    # Rondas: selector + descarga
     st.markdown("#### ♟️ Rondas")
-    rondas_exist = [i for i in range(1, n+1) if os.path.exists(round_file(i))]
-    if rondas_exist:
-        r_sel = st.selectbox("Ronda", rondas_exist, index=len(rondas_exist)-1)
-        _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel), "text/csv", f"dl_r{r_sel}")
+    if n > 0:
+        rondas_exist = [i for i in range(1, n+1) if os.path.exists(round_file(i))]
+        if rondas_exist:
+            r_sel = st.selectbox("Ronda", rondas_exist, index=len(rondas_exist)-1, key="dl_r_sel")
+            _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel), "text/csv", f"dl_r{r_sel}")
+        else:
+            st.caption("No hay rondas generadas.")
     else:
-        st.caption("No hay rondas generadas.")
+        st.caption("No hay rondas planificadas.")
 
-# (Opcional) Snapshot ZIP con lo más importante
-if st.button("Crear snapshot ZIP (config, jugadores, standings, meta, todas las rondas)"):
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for p in [
-            _cfg_path,
-            os.path.join(DATA_DIR, "jugadores.csv"),
-            os.path.join(DATA_DIR, "standings.csv"),
-            _meta_path,
-        ]:
-            if os.path.exists(p):
-                z.write(p, arcname=os.path.basename(p))
-        # rondas
-        for i in range(1, n+1):
-            p = round_file(i)
-            if os.path.exists(p):
-                z.write(p, arcname=os.path.basename(p))
-        # log si existe
-        if os.path.exists(_log_path):
-            z.write(_log_path, arcname=os.path.basename(_log_path))
-    st.download_button(
-        "Descargar snapshot.zip",
-        buf.getvalue(),
-        file_name="snapshot_torneo.zip",
-        mime="application/zip",
-        key="dl_zip"
-    )
+    # Snapshot ZIP con lo más importante (opcional)
+    with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):
+        if st.button("Crear snapshot.zip", use_container_width=True):
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+                for p in [
+                    _cfg_path,
+                    os.path.join(DATA_DIR, "jugadores.csv"),
+                    os.path.join(DATA_DIR, "standings.csv"),
+                    _meta_path,
+                    _log_path,
+                ]:
+                    if os.path.exists(p):
+                        z.write(p, arcname=os.path.basename(p))
+                for i in range(1, n+1):
+                    p = round_file(i)
+                    if os.path.exists(p):
+                        z.write(p, arcname=os.path.basename(p))
+            st.download_button(
+                "Descargar snapshot.zip",
+                buf.getvalue(),
+                file_name="snapshot_torneo.zip",
+                mime="application/zip",
+                key="dl_zip_all",
+                use_container_width=True,
+            )
+
+    st.divider()
 
 # =========================
 # Router de vistas
