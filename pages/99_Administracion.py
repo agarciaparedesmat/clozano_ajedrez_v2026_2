@@ -202,6 +202,51 @@ def set_pub_safe(i: int, val: bool, seed=None):
     except Exception:
         pass
     return ok_meta
+
+
+# === Recalcular 'closed' en meta.json a partir del estado real ===
+def recalc_closed_in_meta() -> int:
+    """Actualiza meta['rounds'][i]['closed'] usando publicación real y resultados. Devuelve nº de cambios."""
+    try:
+        meta = load_meta()
+    except Exception:
+        meta = {}
+    rounds = meta.setdefault("rounds", {})
+
+    # Determinar rondas existentes por ficheros CSV visibles para la app
+    try:
+        nmax = get_n_rounds()
+    except Exception:
+        nmax = 0
+    existing = [i for i in range(1, nmax + 1) if os.path.exists(round_file(i))]
+
+    cambios = 0
+    for i in existing:
+        # Estado publicado real
+        try:
+            pub = is_pub(i)
+        except Exception:
+            pub = False
+        # Vacíos reales de resultados
+        try:
+            dfp = read_csv_safe(round_file(i))
+            vacios = results_empty_count(dfp)
+        except Exception:
+            vacios = None
+        closed_now = bool(pub and (vacios == 0))
+
+        r = rounds.setdefault(str(i), {})
+        if r.get("closed") != closed_now:
+            r["closed"] = closed_now
+            cambios += 1
+
+    try:
+        save_meta(meta)
+    except Exception:
+        pass
+
+    return cambios
+
 # =========================
 # Barra de menú interna (sticky)
 # =========================
@@ -567,6 +612,10 @@ def _show_publicar():
                     except Exception:
                         standings.to_csv(out_csv, index=False)
                 st.toast(f"✅ Publicada Ronda {sel}")
+                try:
+                    _ = recalc_closed_in_meta()
+                except Exception:
+                    pass
                 st.rerun()
             except Exception as e:
                 st.error(f"No se pudo publicar la ronda: {e}")
@@ -597,6 +646,10 @@ def _show_publicar():
                     except Exception:
                         standings.to_csv(out_csv, index=False)
                 st.toast(f"↩️ Despublicada Ronda {ultima_pub}")
+                try:
+                    _ = recalc_closed_in_meta()
+                except Exception:
+                    pass
                 st.rerun()
             except Exception as e:
                 st.error(f"No se pudo despublicar: {e}")
@@ -844,6 +897,10 @@ def _show_resultados():
                     st.session_state[buf_key] = df_after
 
                     st.success(f"Resultados guardados. Clasificación recalculada en `{out_csv}`.")
+                    try:
+                        _ = recalc_closed_in_meta()
+                    except Exception:
+                        pass
                     st.rerun()
 
                 except Exception as e:
@@ -1140,39 +1197,14 @@ def _show_archivos():
     
     # Botón: recalcular 'closed' según realidad (publicada y sin vacíos)
     if st.button("Recalcular 'closed' en meta.json", key="meta_recalc_closed"):
-        try:
-            meta_w = meta_cur if isinstance(meta_cur, dict) else {}
-        except Exception:
-            meta_w = {}
-        rounds_w = meta_w.setdefault("rounds", {})
-        cambios = 0
-        for i in rondas_exist:
-            # Publicada real (preferimos helper; si falla, usamos flag-file)
-            try:
-                pub = is_pub(i)
-            except Exception:
-                pub = os.path.exists(_pub_flag_path(i))
-            # Vacíos reales
-            try:
-                vacios = results_empty_count(i)
-            except Exception:
-                vacios = None
-            closed_now = bool(pub and (vacios == 0))
+    try:
+        cambios = recalc_closed_in_meta()
+        st.success(f"Campo 'closed' actualizado para {cambios} rondas.")
+        st.rerun()
+    except Exception as e:
+        st.error(f"No se pudo recalcular 'closed': {e}")
 
-            r = rounds_w.setdefault(str(i), {})
-            if r.get("closed") != closed_now:
-                r["closed"] = closed_now
-                cambios += 1
-
-        try:
-            save_meta(meta_w)
-            st.success(f"Campo 'closed' actualizado para {cambios} rondas.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"No se pudo actualizar meta.json: {e}")
-
-
-    # ---------- Snapshot ZIP (opcional) ----------
+# ---------- Snapshot ZIP (opcional) ----------
     with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):
         if st.button("Crear snapshot.zip", use_container_width=True):
             buf = io.BytesIO()
