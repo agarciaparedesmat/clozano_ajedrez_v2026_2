@@ -941,10 +941,10 @@ def _show_eliminar():
 
 
 # =========================
-# Archivos (inspector + descargas)
+# Archivos (inspector + visores + descargas)
 # =========================
 def _show_archivos():
-    import os, io, zipfile, pandas as pd, datetime as _dt
+    import os, io, zipfile, pandas as pd, datetime as _dt, json
     st.markdown("### 🗂️ Archivos")
 
     # ---------- Inspector rápido de /data ----------
@@ -975,6 +975,49 @@ def _show_archivos():
     else:
         st.caption("No hay ficheros en `data/` o no es accesible.")
 
+    # Rutas base que usaremos abajo
+    _cfg_path = os.path.join(os.path.dirname(DATA_DIR), "config.json")  # ajusta si tu config vive en otra carpeta
+    _meta_path = os.path.join(DATA_DIR, "meta.json")                    # cambia si tu meta tiene otro nombre
+    _log_path  = os.path.join(DATA_DIR, "admin_log.csv")
+
+    st.markdown("---")
+
+    # ---------- Visores rápidos (solo para ficheros no visualizados en otros módulos) ----------
+    st.markdown("#### 👀 Visores rápidos")
+
+    # admin_log.csv → tabla
+    if os.path.exists(_log_path):
+        st.markdown("**admin_log.csv**")
+        try:
+            dflog = pd.read_csv(_log_path)
+            st.dataframe(dflog, use_container_width=True, hide_index=True)
+        except Exception as e:
+            st.caption(f"No se puede leer admin_log.csv: {e}")
+
+    # meta.json → JSON + (opcional) tabla de rondas si hay estructura 'rounds'
+    if os.path.exists(_meta_path):
+        st.markdown("**meta.json**")
+        try:
+            with open(_meta_path, "r", encoding="utf-8") as f:
+                meta_obj = json.load(f)
+            st.json(meta_obj)
+            # Tabla auxiliar si hay 'rounds' con estructura de publicación/estado
+            rounds = meta_obj.get("rounds") if isinstance(meta_obj, dict) else None
+            if isinstance(rounds, dict) and rounds:
+                rows_meta = []
+                for k, v in rounds.items():
+                    row = {"ronda": k}
+                    if isinstance(v, dict):
+                        # extrae campos típicos si existen
+                        for kk in ("published", "date", "closed"):
+                            if kk in v:
+                                row[kk] = v[kk]
+                    rows_meta.append(row)
+                if rows_meta:
+                    st.dataframe(pd.DataFrame(rows_meta), use_container_width=True, hide_index=True)
+        except Exception as e:
+            st.caption(f"No se puede leer meta.json: {e}")
+
     st.markdown("---")
 
     # ---------- Descargas ----------
@@ -984,11 +1027,6 @@ def _show_archivos():
                 st.download_button(label, f.read(), file_name=os.path.basename(path), mime=mime, key=key)
         else:
             st.caption(f"· {os.path.basename(path)} — no existe")
-
-    # rutas base
-    _cfg_path = os.path.join(os.path.dirname(DATA_DIR), "config.json")  # ajusta si tu config vive en otra carpeta
-    _meta_path = os.path.join(DATA_DIR, "meta.json")                    # cambia si tu meta tiene otro nombre
-    _log_path  = os.path.join(DATA_DIR, "admin_log.csv")
 
     st.markdown("#### 📦 Descargas directas")
     _dl_button("Descargar config.json", _cfg_path, "application/json", "dl_cfg")
@@ -1035,6 +1073,7 @@ def _show_archivos():
             )
 
     st.divider()
+
 
 # =========================
 # Router de vistas
