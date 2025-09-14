@@ -154,7 +154,7 @@ label[data-testid="stMarkdownContainer"] p {
 """
 st.markdown(_STICKY_MENU_CSS, unsafe_allow_html=True)
 
-MENU = ["📋 Resumen","🗂️ Archivos","🧾 Config","🧑‍🎓 Jugadores","🎲 Semilla R1","♟️ Generar","📅 Fechas","📣 Publicar","✏️ Resultados","🗑️ Eliminar"]
+MENU = ["📋 Resumen","🧑‍🎓 Jugadores","🎲 Semilla R1","♟️ Generar","📅 Fechas","📣 Publicar","✏️ Resultados","🗑️ Eliminar","🗂️ Archivos","🧾 Config"]
 st.session_state.setdefault("admin_view", "📋 Resumen")
 st.markdown('<div id="admin-local-nav">', unsafe_allow_html=True)
 st.radio("Menú", MENU, horizontal=True, key="admin_view")
