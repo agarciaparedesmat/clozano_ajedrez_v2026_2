@@ -1197,12 +1197,12 @@ def _show_archivos():
     
     # Botón: recalcular 'closed' según realidad (publicada y sin vacíos)
     if st.button("Recalcular 'closed' en meta.json", key="meta_recalc_closed"):
-    try:
-        cambios = recalc_closed_in_meta()
-        st.success(f"Campo 'closed' actualizado para {cambios} rondas.")
-        st.rerun()
-    except Exception as e:
-        st.error(f"No se pudo recalcular 'closed': {e}")
+        try:
+            cambios = recalc_closed_in_meta()
+            st.success(f"Campo 'closed' actualizado para {cambios} rondas.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"No se pudo recalcular 'closed': {e}")
 
 # ---------- Snapshot ZIP (opcional) ----------
     with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):
