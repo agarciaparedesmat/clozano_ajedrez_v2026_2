@@ -114,20 +114,43 @@ sidebar_title_and_nav(
 page_header("🛠️ Panel de Administración", "Gestión de rondas, publicación y resultados")
  
 
+
+
 # =========================
 # Acceso (contraseña) + nombre de usuario
 # =========================
-pwd = st.text_input("Contraseña", type="password")
-if not pwd or pwd != st.secrets.get("ADMIN_PASS", ""):
+AUTH_KEY = "admin_auth_ok"
+
+if AUTH_KEY not in st.session_state:
+    st.session_state[AUTH_KEY] = False
+
+if not st.session_state[AUTH_KEY]:
+    with st.form("admin_login_form", clear_on_submit=True):
+        pwd = st.text_input("Contraseña", type="password")
+        submitted = st.form_submit_button("Entrar")
+
+    if submitted:
+        if pwd == st.secrets.get("ADMIN_PASS", ""):
+            st.session_state[AUTH_KEY] = True
+            # rerun para ocultar inmediatamente el input de contraseña
+            st.rerun()
+        else:
+            st.error("Contraseña incorrecta")
+
+    # bloquea el resto de la página hasta autenticarse
     st.stop()
+
+# (ya autenticado)
 st.success("Acceso concedido ✅")
 
 # Nombre del actor para el registro de cambios
 actor = st.text_input(
     "Tu nombre (registro de cambios)",
-    value=st.session_state.get("actor_name", "Admin")
+    value=st.session_state.get("actor_name", "Admin"),
+    key="actor_name",
 )
-st.session_state["actor_name"] = actor
+# (opcional) variable 'actor' a nivel de módulo para compatibilidad con código previo
+actor = st.session_state.get("actor_name", "Admin")
 
 
 # =========================
