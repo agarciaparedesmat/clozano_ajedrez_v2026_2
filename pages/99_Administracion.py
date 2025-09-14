@@ -941,13 +941,43 @@ def _show_eliminar():
 
 
 # =========================
-# Archivos (descarga)
+# Archivos (inspector + descargas)
 # =========================
 def _show_archivos():
-    import os, io, zipfile
+    import os, io, zipfile, pandas as pd, datetime as _dt
     st.markdown("### 🗂️ Archivos")
 
-    # helpers de descarga
+    # ---------- Inspector rápido de /data ----------
+    st.markdown("#### 🗂️ Archivos en `data/` (inspector rápido)")
+    def _lm(p: str) -> str:
+        try:
+            return _dt.datetime.fromtimestamp(os.path.getmtime(p)).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return "—"
+
+    try:
+        files = sorted(os.listdir(DATA_DIR))
+    except Exception as e:
+        st.error(f"No se puede listar DATA_DIR: {e}")
+        files = []
+
+    if files:
+        rows = []
+        for f in files:
+            p = os.path.join(DATA_DIR, f)
+            try:
+                sz = os.path.getsize(p)
+                mt = _lm(p)
+            except Exception:
+                sz, mt = 0, "—"
+            rows.append({"archivo": f, "tamaño_bytes": sz, "modificado": mt})
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    else:
+        st.caption("No hay ficheros en `data/` o no es accesible.")
+
+    st.markdown("---")
+
+    # ---------- Descargas ----------
     def _dl_button(label, path, mime, key):
         if os.path.exists(path):
             with open(path, "rb") as f:
@@ -956,51 +986,42 @@ def _show_archivos():
             st.caption(f"· {os.path.basename(path)} — no existe")
 
     # rutas base
-    _cfg_path = os.path.join(os.path.dirname(DATA_DIR), "config.json")  # config.json al lado de /data
-    n = get_n_rounds() if 'get_n_rounds' in globals() else 0
+    _cfg_path = os.path.join(os.path.dirname(DATA_DIR), "config.json")  # ajusta si tu config vive en otra carpeta
+    _meta_path = os.path.join(DATA_DIR, "meta.json")                    # cambia si tu meta tiene otro nombre
+    _log_path  = os.path.join(DATA_DIR, "admin_log.csv")
 
     st.markdown("#### 📦 Descargas directas")
     _dl_button("Descargar config.json", _cfg_path, "application/json", "dl_cfg")
     _dl_button("Descargar jugadores.csv", os.path.join(DATA_DIR, "jugadores.csv"), "text/csv", "dl_jug")
     _dl_button("Descargar standings.csv", os.path.join(DATA_DIR, "standings.csv"), "text/csv", "dl_std")
-
-    # Meta/publicación (ajusta el nombre si tu proyecto usa otro fichero)
-    _meta_path = os.path.join(DATA_DIR, "meta.json")
     if os.path.exists(_meta_path):
         _dl_button("Descargar meta de publicación (meta.json)", _meta_path, "application/json", "dl_meta")
-
-    # Log de administración
-    _log_path = os.path.join(DATA_DIR, "admin_log.csv")
     if os.path.exists(_log_path):
         _dl_button("Descargar log de administración", _log_path, "text/csv", "dl_log")
 
-    # Rondas: selector + descarga
+    # ---------- Rondas ----------
     st.markdown("#### ♟️ Rondas")
+    n = get_n_rounds() if 'get_n_rounds' in globals() else 0
     if n > 0:
-        rondas_exist = [i for i in range(1, n+1) if os.path.exists(round_file(i))]
+        rondas_exist = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
         if rondas_exist:
-            r_sel = st.selectbox("Ronda", rondas_exist, index=len(rondas_exist)-1, key="dl_r_sel")
+            r_sel = st.selectbox("Ronda", rondas_exist, index=len(rondas_exist) - 1, key="dl_r_sel")
             _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel), "text/csv", f"dl_r{r_sel}")
         else:
             st.caption("No hay rondas generadas.")
     else:
         st.caption("No hay rondas planificadas.")
 
-    # Snapshot ZIP con lo más importante (opcional)
+    # ---------- Snapshot ZIP (opcional) ----------
     with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):
         if st.button("Crear snapshot.zip", use_container_width=True):
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-                for p in [
-                    _cfg_path,
-                    os.path.join(DATA_DIR, "jugadores.csv"),
-                    os.path.join(DATA_DIR, "standings.csv"),
-                    _meta_path,
-                    _log_path,
-                ]:
+                for p in [_cfg_path, os.path.join(DATA_DIR, "jugadores.csv"),
+                          os.path.join(DATA_DIR, "standings.csv"), _meta_path, _log_path]:
                     if os.path.exists(p):
                         z.write(p, arcname=os.path.basename(p))
-                for i in range(1, n+1):
+                for i in range(1, n + 1):
                     p = round_file(i)
                     if os.path.exists(p):
                         z.write(p, arcname=os.path.basename(p))
