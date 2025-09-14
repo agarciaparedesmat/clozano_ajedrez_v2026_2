@@ -557,11 +557,21 @@ def _show_fechas():
     else:
         st.info("No hay rondas en borrador para editar fecha.")
     
+
 # =========================
 # Resultados y clasificación (solo PUBLICADAS)
 # =========================
 def _show_resultados():
+    import os
     st.markdown("### ✏️ Resultados y clasificación (solo PUBLICADAS)")
+
+    # Contexto local necesario para evitar NameError
+    actor = (st.session_state.get("actor_name") or st.session_state.get("actor") or "admin")
+    try:
+        _ = _log_msg
+    except NameError:
+        def _log_msg(x):
+            return str(x)
 
     pubs = published_rounds_list()
     if pubs:
@@ -714,28 +724,48 @@ def _show_resultados():
                     df_to_save["resultado"] = ""
                 df_to_save["resultado"] = _normalize_result_series(df_to_save["resultado"])
 
-                # Guardar CSV
-                df_to_save.to_csv(outp, index=False, encoding="utf-8")
-                add_log("save_results", sel_r, actor, _log_msg("Resultados actualizados"))
+                try:
+                    with st.spinner("Guardando resultados y recalculando clasificación..."):
+                        # Guardar CSV
+                        df_to_save.to_csv(outp, index=False, encoding="utf-8")
 
-                # Reset de selección en el buffer tras guardar
-                df_after = read_csv_safe(outp)
-                if df_after is None:
-                    df_after = df_to_save.copy()
-                df_after["seleccionar"] = False
-                st.session_state[buf_key] = df_after
+                        # Log (no debe romper)
+                        try:
+                            add_log("save_results", sel_r, actor, _log_msg("Resultados actualizados"))
+                        except Exception:
+                            pass
 
-                # Recalcular clasificación
-                ok, path = recalc_and_save_standings(bye_points=1.0)
-                if ok:
-                    st.success(f"Resultados guardados. Clasificación recalculada en `{path}`.")
-                else:
-                    st.warning("Resultados guardados, pero no se pudo recalcular la clasificación.")
-                st.rerun()
+                        # Recalcular standings (mismo patrón que en 📣 Publicar)
+                        players = read_players_from_csv(os.path.join(DATA_DIR, "jugadores.csv"))
+                        pubs = published_rounds_list()
+                        for r in pubs:
+                            dfp_pub = read_csv_safe(round_file(r))
+                            if dfp_pub is not None:
+                                players = apply_results(players, dfp_pub, bye_points=1.0)
+                        standings = compute_standings(players)
+                        out_csv = os.path.join(DATA_DIR, "standings.csv")
+                        try:
+                            standings.to_csv(out_csv, index=False, encoding="utf-8-sig")
+                        except Exception:
+                            standings.to_csv(out_csv, index=False)
+
+                    # Reset de selección en el buffer tras guardar
+                    df_after = read_csv_safe(outp)
+                    if df_after is None:
+                        df_after = df_to_save.copy()
+                    df_after["seleccionar"] = False
+                    st.session_state[buf_key] = df_after
+
+                    st.success(f"Resultados guardados. Clasificación recalculada en `{out_csv}`.")
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"No se pudo guardar/recalcular: {e}")
     else:
         st.info("No hay rondas publicadas todavía.")
 
     st.divider()
+
 
 # =========================
 # Eliminar ronda (solo la última generada)
