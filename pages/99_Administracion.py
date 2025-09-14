@@ -1106,9 +1106,13 @@ def _show_archivos():
     # meta.json → JSON + (opcional) tabla de rondas si hay estructura 'rounds'
     if os.path.exists(_meta_path):
         st.markdown("**meta.json**")
+        meta_obj = None
         try:
             with open(_meta_path, "r", encoding="utf-8") as f:
                 meta_obj = json.load(f)
+        except Exception as e:
+            st.caption(f"No se puede leer meta.json: {e}")
+        else:
             st.json(meta_obj)
 
         # Tabla comparativa real vs meta (incluye date(meta))
@@ -1117,6 +1121,7 @@ def _show_archivos():
             n_max = get_n_rounds()
         except Exception:
             n_max = 0
+
         existing = [i for i in range(1, n_max + 1) if os.path.exists(round_file(i))]
         rows_meta = []
         for i in existing:
@@ -1145,9 +1150,10 @@ def _show_archivos():
                 "closed(real)": closed_real,
                 "desviación_closed": (closed_meta != closed_real),
             })
+
         if rows_meta:
             st.dataframe(pd.DataFrame(rows_meta), use_container_width=True, hide_index=True)
-
+# --- aquí ya continúa tu st.markdown("---") original de la sección ---
     st.markdown("---")
 
     # ---------- Descargas ----------
