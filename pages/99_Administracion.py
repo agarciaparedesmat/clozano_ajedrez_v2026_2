@@ -441,22 +441,11 @@ if existing_rounds:
         if st.button("Publicar ronda seleccionada", use_container_width=True):
             set_pub(sel_pub, True, seed=(r1_seed() if sel_pub == 1 else None))
             add_log("publish_round", sel_pub, actor, _log_msg("Publicada desde Admin"))
-            try:
-                _ = recalc_closed_in_meta()
-            except Exception:
-                pass
             ok, path = recalc_and_save_standings(bye_points=1.0)
             if ok:
                 st.success(f"Ronda {sel_pub} publicada. Clasificación recalculada en `{path}`.")
             else:
                 st.warning("Ronda publicada, pero no se pudo recalcular la clasificación.")
-            # Actualizar 'closed' en meta.json según estado real
-            try:
-                ch = recalc_closed_in_meta()
-                if ch:
-                    st.toast(f\"meta.json: 'closed' actualizado ({ch})\")
-            except Exception:
-                pass
             st.rerun()
     else:
         st.info("No hay rondas pendientes de publicar.")
@@ -469,22 +458,11 @@ if existing_rounds:
         if st.button(f"Despublicar Ronda {last_pub}", use_container_width=True):
             set_pub(last_pub, False)
             add_log("unpublish_round", last_pub, actor, _log_msg("Despublicada (última publicada)"))
-            try:
-                _ = recalc_closed_in_meta()
-            except Exception:
-                pass
             ok, path = recalc_and_save_standings(bye_points=1.0)
             if ok:
                 st.success(f"Ronda {last_pub} despublicada. Clasificación recalculada en `{path}`.")
             else:
                 st.warning("Ronda despublicada, pero no se pudo recalcular la clasificación.")
-            # Actualizar 'closed' en meta.json según estado real
-            try:
-                ch = recalc_closed_in_meta()
-                if ch:
-                    st.toast(f\"meta.json: 'closed' actualizado ({ch})\")
-            except Exception:
-                pass
             st.rerun()
     else:
         st.info("No hay rondas publicadas actualmente.")
@@ -666,13 +644,6 @@ if pubs:
                 st.success(f"Resultados guardados. Clasificación recalculada en `{path}`.")
             else:
                 st.warning("Resultados guardados, pero no se pudo recalcular la clasificación.")
-            # Actualizar 'closed' en meta.json según estado real
-            try:
-                ch = recalc_closed_in_meta()
-                if ch:
-                    st.toast(f\"meta.json: 'closed' actualizado ({ch})\")
-            except Exception:
-                pass
             st.rerun()
 else:
     st.info("No hay rondas publicadas todavía.")
@@ -732,106 +703,3 @@ try:
         st.info("`data/` está vacío.")
 except Exception as e:
     st.warning(f"No se pudo listar `data/`: {e}")
-
-# ---------- Visores rápidos (solo admin_log.csv y meta.json) ----------
-st.markdown("#### 👀 Visores rápidos")
-import json as _json
-
-_log_path = os.path.join(DATA_DIR, "admin_log.csv")
-_meta_path = os.path.join(DATA_DIR, "meta.json")
-
-# admin_log.csv
-if os.path.exists(_log_path):
-    st.markdown("**admin_log.csv**")
-    try:
-        dflog = pd.read_csv(_log_path)
-        st.dataframe(dflog, use_container_width=True, hide_index=True)
-    except Exception as e:
-        st.caption(f"No se puede leer admin_log.csv: {e}")
-
-# meta.json
-if os.path.exists(_meta_path):
-    st.markdown("**meta.json**")
-    try:
-        with open(_meta_path, "r", encoding="utf-8") as f:
-            meta_obj = _json.load(f)
-        st.json(meta_obj)
-        # Tabla comparativa con 'closed (real)'
-        existing = [i for i in range(1, (N_ROUNDS if 'N_ROUNDS' in globals() else 0) + 1) if os.path.exists(round_file(i))]
-        rows_meta = []
-        rounds_meta = (meta_obj.get("rounds", {}) if isinstance(meta_obj, dict) else {}) or {}
-        for i in existing:
-            v = rounds_meta.get(str(i), {})
-            pub_meta = v.get("published")
-            closed_meta = v.get("closed")
-            pub_real = is_pub(i)
-            dfp = read_csv_safe(round_file(i))
-            vac = results_empty_count(dfp)
-            closed_real = bool(pub_real and (vac == 0))
-            rows_meta.append({
-                "ronda": i,
-                "published(meta)": pub_meta,
-                "published(real)": pub_real,
-                "closed(meta)": closed_meta,
-                "closed(real)": closed_real,
-                "desviación_closed": (closed_meta != closed_real),
-            })
-        if rows_meta:
-            st.dataframe(pd.DataFrame(rows_meta), use_container_width=True, hide_index=True)
-    except Exception as e:
-        st.caption(f"No se puede leer meta.json: {e}")
-
-st.markdown("---")
-
-# ---------- 🛠️ Utilidades meta.json ----------
-st.markdown("#### 🛠️ Utilidades meta.json")
-existing = [i for i in range(1, (N_ROUNDS if 'N_ROUNDS' in globals() else 0) + 1) if os.path.exists(round_file(i))]
-# 1) Completar rondas faltantes
-try:
-    with open(_meta_path, "r", encoding="utf-8") as f:
-        _meta_cur = _json.load(f)
-except Exception:
-    _meta_cur = {}
-_rounds = (_meta_cur.get("rounds", {}) if isinstance(_meta_cur, dict) else {}) or {}
-faltan = [i for i in existing if str(i) not in _rounds]
-if faltan:
-    st.warning(f"Rondas existentes sin entrada en meta.json: {faltan}")
-    if st.button("Completar meta.json con rondas faltantes", key="meta_fill_missing"):
-        meta_w = _meta_cur if isinstance(_meta_cur, dict) else {}
-        rounds_w = meta_w.setdefault("rounds", {})
-        for i in faltan:
-            rounds_w.setdefault(str(i), {"published": False, "date": "", "closed": False})
-        try:
-            save_meta(meta_w)
-            st.success("meta.json completado.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"No se pudo guardar meta.json: {e}")
-
-# 2) Sincronizar 'published' con flags reales
-if st.button("Sincronizar meta.json con flags de publicación", key="meta_sync_flags"):
-    try:
-        meta_w = _meta_cur if isinstance(_meta_cur, dict) else {}
-        rounds_w = meta_w.setdefault("rounds", {})
-        cambios = 0
-        for i in existing:
-            r = rounds_w.setdefault(str(i), {})
-            was = bool(r.get("published", False))
-            now = os.path.exists(os.path.join(DATA_DIR, f"published_R{i}.flag"))
-            if was != now:
-                r["published"] = now
-                cambios += 1
-        save_meta(meta_w)
-        st.success(f"meta.json actualizado ({cambios} cambio/s).")
-        st.rerun()
-    except Exception as e:
-        st.error(f"No se pudo sincronizar meta.json: {e}")
-
-# 3) Recalcular 'closed' con helper
-if st.button("Recalcular 'closed' en meta.json", key="meta_recalc_closed"):
-    try:
-        cambios = recalc_closed_in_meta()
-        st.success(f"Campo 'closed' actualizado para {cambios} rondas.")
-        st.rerun()
-    except Exception as e:
-        st.error(f"No se pudo recalcular 'closed': {e}")
