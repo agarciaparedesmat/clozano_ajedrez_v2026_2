@@ -737,13 +737,13 @@ def _show_resultados():
 
     st.divider()
 
-
 # =========================
 # Eliminar ronda (solo la última generada)
 # =========================
 def _show_eliminar():
-    actor = (st.session_state.get("actor_name") or st.session_state.get("actor") or "admin")
+    import os
     st.markdown("### 🗑️ Eliminar ronda")
+    actor = (st.session_state.get("actor_name") or st.session_state.get("actor") or "admin")
 
     # Fallback local por si _log_msg aún no está definido en este punto del archivo
     try:
@@ -752,29 +752,95 @@ def _show_eliminar():
         def _log_msg(x):
             return str(x)
 
-    # Asegurar lista de rondas existentes
+    # Fallback local si no existe `recalc_and_save_standings`
+    try:
+        _ = recalc_and_save_standings  # noqa: F401
+    except NameError:
+        def recalc_and_save_standings(bye_points: float = 1.0):
+            """Recalcula standings con las rondas PUBLICADAS y guarda en data/standings.csv.
+            Devuelve (ok: bool, path_csv: str | None).
+            """
+            try:
+                import os
+                from lib.tournament import (
+                    DATA_DIR, round_file, read_csv_safe,
+                    read_players_from_csv, apply_results, compute_standings,
+                )
+                from lib.ui2 import is_pub
+            except Exception:
+                pass
+
+            try:
+                players = read_players_from_csv(os.path.join(DATA_DIR, "jugadores.csv"))
+            except Exception:
+                return (False, None)
+
+            try:
+                n = get_n_rounds()
+            except Exception:
+                n = 0
+
+            pubs = []
+            for i in range(1, n + 1):
+                try:
+                    if os.path.exists(round_file(i)) and is_pub(i):
+                        pubs.append(i)
+                except Exception:
+                    continue
+
+            for r in pubs:
+                try:
+                    dfp = read_csv_safe(round_file(r))
+                    if dfp is not None and not getattr(dfp, "empty", True):
+                        players = apply_results(players, dfp, bye_points=bye_points)
+                except Exception:
+                    pass
+
+            try:
+                standings = compute_standings(players)
+                out_csv = os.path.join(DATA_DIR, "standings.csv")
+                try:
+                    standings.to_csv(out_csv, index=False, encoding="utf-8-sig")
+                except Exception:
+                    standings.to_csv(out_csv, index=False)
+                return (True, out_csv)
+            except Exception:
+                return (False, None)
+
+    # Asegurar lista de rondas existentes (solo las que tienen CSV en data/)
     n = get_n_rounds()
     existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
 
-    if existing_rounds:
-        last_exist = max(existing_rounds)
-        st.caption(f"Solo se puede **eliminar** la **última ronda generada**: **Ronda {last_exist}**.")
-        warn = st.text_input(f'Escribe **ELIMINAR R{last_exist}** para confirmar', "")
-        pressed = st.button(f"Eliminar definitivamente Ronda {last_exist}", use_container_width=True)
+    if not existing_rounds:
+        st.info("No hay rondas para eliminar.")
+        st.divider()
+        return
 
-        if pressed:
-            if warn.strip().upper() == f"ELIMINAR R{last_exist}":
-                path = round_file(last_exist)
-                try:
-                    os.remove(path)
+    last_exist = max(existing_rounds)
+    st.caption(f"Solo se puede **eliminar** la **última ronda generada**: **Ronda {last_exist}**.")
 
-                    # Limpieza de meta si existe entrada de esa ronda
-                    meta = load_meta()
-                    if str(last_exist) in meta.get("rounds", {}):
-                        meta["rounds"].pop(str(last_exist), None)
-                        save_meta(meta)
+    warn = st.text_input(f'Escribe **ELIMINAR R{last_exist}** para confirmar', "")
+    pressed = st.button(f"Eliminar definitivamente Ronda {last_exist}", use_container_width=True)
 
-                    # Log (no debe romper si algo falla)
+    if pressed:
+        if warn.strip().upper() == f"ELIMINAR R{last_exist}":
+            path = round_file(last_exist)
+            try:
+                with st.spinner("Eliminando ronda y recalculando clasificación..."):
+                    # Borrar CSV de la ronda
+                    if os.path.exists(path):
+                        os.remove(path)
+
+                    # Limpiar meta (si existe)
+                    try:
+                        meta = load_meta()
+                        if str(last_exist) in meta.get("rounds", {}):
+                            meta["rounds"].pop(str(last_exist), None)
+                            save_meta(meta)
+                    except Exception:
+                        pass  # meta opcional
+
+                    # Log (no debe romper si falla)
                     try:
                         add_log("delete_round", last_exist, actor, _log_msg(f"{os.path.basename(path)} eliminado"))
                     except Exception:
@@ -782,21 +848,21 @@ def _show_eliminar():
 
                     # Recalcular clasificación
                     ok, path2 = recalc_and_save_standings(bye_points=1.0)
-                    if ok:
-                        st.success(f"Ronda R{last_exist} eliminada. Clasificación recalculada en `{path2}`.")
-                    else:
-                        st.info("Ronda eliminada. No se pudo recalcular la clasificación (¿sin jugadores?).")
 
-                    st.rerun()
+                if ok:
+                    st.success(f"Ronda R{last_exist} eliminada. Clasificación recalculada en `{path2}`.")
+                else:
+                    st.info("Ronda eliminada. No se pudo recalcular la clasificación (¿sin jugadores?).")
 
-                except Exception as e:
-                    st.error(f"No se pudo eliminar: {e}")
-            else:
-                st.warning(f'Debes escribir exactamente "ELIMINAR R{last_exist}" para confirmar.')
-    else:
-        st.info("No hay rondas para eliminar.")
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"No se pudo eliminar: {e}")
+        else:
+            st.warning(f'Debes escribir exactamente "ELIMINAR R{last_exist}" para confirmar.')
 
     st.divider()
+
 
 # =========================
 # Inspector de data/
