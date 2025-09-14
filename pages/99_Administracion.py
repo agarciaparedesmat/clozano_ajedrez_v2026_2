@@ -742,40 +742,45 @@ def _show_resultados():
 # Eliminar ronda (solo la última generada)
 # =========================
 def _show_eliminar():
-    # Prefacio local: rondas existentes y _log_msg seguro
-    n = get_n_rounds()
-    existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
-    try:
-        _ = _log_msg  # ¿definido globalmente?
-    except NameError:
-        def _log_msg(x):
-            return str(x)
-
     actor = (st.session_state.get("actor_name") or st.session_state.get("actor") or "admin")
     st.markdown("### 🗑️ Eliminar ronda")
+
+    # Asegurar lista de rondas existentes
+    n = get_n_rounds()
+    existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
+
     if existing_rounds:
         last_exist = max(existing_rounds)
         st.caption(f"Solo se puede **eliminar** la **última ronda generada**: **Ronda {last_exist}**.")
         warn = st.text_input(f'Escribe **ELIMINAR R{last_exist}** para confirmar', "")
-        if st.button(f"Eliminar definitivamente Ronda {last_exist}", use_container_width=True) and warn.strip().upper() == f"ELIMINAR R{last_exist}":
-            path = round_file(last_exist)
-            try:
-                os.remove(path)
-                # Limpieza de meta si existe entrada de esa ronda
-                meta = load_meta()
-                if str(last_exist) in meta.get("rounds", {}):
-                    meta["rounds"].pop(str(last_exist), None)
-                    save_meta(meta)
-                add_log("delete_round", last_exist, actor, _log_msg(f"{os.path.basename(path)} eliminado"))
+        pressed = st.button(f"Eliminar definitivamente Ronda {last_exist}", use_container_width=True)
 
-                ok, path2 = recalc_and_save_standings(bye_points=1.0)
-                if ok:
-                    st.success(f"Ronda R{last_exist} eliminada. Clasificación recalculada en `{path2}`.")
-                else:
-                    st.info("Ronda eliminada. No se pudo recalcular la clasificación (¿sin jugadores?).")
-                st.rerun()
-            except Exception as e:
-                st.error(f"No se pudo eliminar: {e}")
+        if pressed:
+            if warn.strip().upper() == f"ELIMINAR R{last_exist}":
+                path = round_file(last_exist)
+                try:
+                    os.remove(path)
+                    # Limpieza de meta si existe entrada de esa ronda
+                    meta = load_meta()
+                    if str(last_exist) in meta.get("rounds", {}):
+                        meta["rounds"].pop(str(last_exist), None)
+                        save_meta(meta)
+
+                    add_log("delete_round", last_exist, actor, _log_msg(f"{os.path.basename(path)} eliminado"))
+
+                    ok, path2 = recalc_and_save_standings(bye_points=1.0)
+                    if ok:
+                        st.success(f"Ronda R{last_exist} eliminada. Clasificación recalculada en `{path2}`.")
+                    else:
+                        st.info("Ronda eliminada. No se pudo recalcular la clasificación (¿sin jugadores?).")
+
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"No se pudo eliminar: {e}")
+
+            else:
+                st.warning(f'Debes escribir exactamente "ELIMINAR R{last_exist}" para confirmar.')
     else:
         st.info("No hay rondas para eliminar.")
 
