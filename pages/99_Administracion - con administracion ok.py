@@ -114,20 +114,51 @@ sidebar_title_and_nav(
 page_header("🛠️ Panel de Administración", "Gestión de rondas, publicación y resultados")
  
 
+
+
 # =========================
 # Acceso (contraseña) + nombre de usuario
 # =========================
-pwd = st.text_input("Contraseña", type="password")
-if not pwd or pwd != st.secrets.get("ADMIN_PASS", ""):
+AUTH_KEY = "admin_auth_ok"
+
+if AUTH_KEY not in st.session_state:
+    st.session_state[AUTH_KEY] = False
+
+if not st.session_state[AUTH_KEY]:
+    with st.form("admin_login_form", clear_on_submit=True):
+        pwd = st.text_input("Contraseña", type="password")
+        submitted = st.form_submit_button("Entrar")
+
+    if submitted:
+        if pwd == st.secrets.get("ADMIN_PASS", ""):
+            st.session_state[AUTH_KEY] = True
+            # rerun para ocultar inmediatamente el input de contraseña
+            st.rerun()
+        else:
+            st.error("Contraseña incorrecta")
+
+    # bloquea el resto de la página hasta autenticarse
     st.stop()
+
+# (ya autenticado)
 st.success("Acceso concedido ✅")
 
 # Nombre del actor para el registro de cambios
 actor = st.text_input(
     "Tu nombre (registro de cambios)",
-    value=st.session_state.get("actor_name", "Admin")
+    value=st.session_state.get("actor_name", "Admin"),
+    key="actor_name",
 )
-st.session_state["actor_name"] = actor
+# (opcional) variable 'actor' a nivel de módulo para compatibilidad con código previo
+actor = st.session_state.get("actor_name", "Admin")
+
+# Botón "Cerrar sesión"
+
+if st.button("🔒 Cerrar sesión", key="logout_btn"):
+    # quitar claves gestionadas por widgets y flags de login
+    for k in ("admin_auth_ok", "admin_pwd", "actor_name"):
+        st.session_state.pop(k, None)
+    st.rerun()
 
 
 # =========================
@@ -910,27 +941,139 @@ def _show_eliminar():
 
 
 # =========================
-# Inspector de data/
+# Archivos (inspector + visores + descargas)
 # =========================
 def _show_archivos():
-    st.markdown("### 🗂️ Archivos en `data/` (inspector rápido)")
+    import os, io, zipfile, pandas as pd, datetime as _dt, json
+    st.markdown("### 🗂️ Archivos")
+
+    # ---------- Inspector rápido de /data ----------
+    st.markdown("#### 🗂️ Archivos en `data/` (inspector rápido)")
+    def _lm(p: str) -> str:
+        try:
+            return _dt.datetime.fromtimestamp(os.path.getmtime(p)).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return "—"
+
     try:
-        files = os.listdir(DATA_DIR)
-        if files:
-            rows = []
-            for f in sorted(files):
-                p = os.path.join(DATA_DIR, f)
-                try:
-                    sz = os.path.getsize(p)
-                    mt = last_modified(p)
-                except Exception:
-                    sz, mt = 0, "—"
-                rows.append({"archivo": f, "tamaño_bytes": sz, "modificado": mt})
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-        else:
-            st.info("`data/` está vacío.")
+        files = sorted(os.listdir(DATA_DIR))
     except Exception as e:
-        st.warning(f"No se pudo listar `data/`: {e}")
+        st.error(f"No se puede listar DATA_DIR: {e}")
+        files = []
+
+    if files:
+        rows = []
+        for f in files:
+            p = os.path.join(DATA_DIR, f)
+            try:
+                sz = os.path.getsize(p)
+                mt = _lm(p)
+            except Exception:
+                sz, mt = 0, "—"
+            rows.append({"archivo": f, "tamaño_bytes": sz, "modificado": mt})
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    else:
+        st.caption("No hay ficheros en `data/` o no es accesible.")
+
+    # Rutas base que usaremos abajo
+    _cfg_path = os.path.join(os.path.dirname(DATA_DIR), "config.json")  # ajusta si tu config vive en otra carpeta
+    _meta_path = os.path.join(DATA_DIR, "meta.json")                    # cambia si tu meta tiene otro nombre
+    _log_path  = os.path.join(DATA_DIR, "admin_log.csv")
+
+    st.markdown("---")
+
+    # ---------- Visores rápidos (solo para ficheros no visualizados en otros módulos) ----------
+    st.markdown("#### 👀 Visores rápidos")
+
+    # admin_log.csv → tabla
+    if os.path.exists(_log_path):
+        st.markdown("**admin_log.csv**")
+        try:
+            dflog = pd.read_csv(_log_path)
+            st.dataframe(dflog, use_container_width=True, hide_index=True)
+        except Exception as e:
+            st.caption(f"No se puede leer admin_log.csv: {e}")
+
+    # meta.json → JSON + (opcional) tabla de rondas si hay estructura 'rounds'
+    if os.path.exists(_meta_path):
+        st.markdown("**meta.json**")
+        try:
+            with open(_meta_path, "r", encoding="utf-8") as f:
+                meta_obj = json.load(f)
+            st.json(meta_obj)
+            # Tabla auxiliar si hay 'rounds' con estructura de publicación/estado
+            rounds = meta_obj.get("rounds") if isinstance(meta_obj, dict) else None
+            if isinstance(rounds, dict) and rounds:
+                rows_meta = []
+                for k, v in rounds.items():
+                    row = {"ronda": k}
+                    if isinstance(v, dict):
+                        # extrae campos típicos si existen
+                        for kk in ("published", "date", "closed"):
+                            if kk in v:
+                                row[kk] = v[kk]
+                    rows_meta.append(row)
+                if rows_meta:
+                    st.dataframe(pd.DataFrame(rows_meta), use_container_width=True, hide_index=True)
+        except Exception as e:
+            st.caption(f"No se puede leer meta.json: {e}")
+
+    st.markdown("---")
+
+    # ---------- Descargas ----------
+    def _dl_button(label, path, mime, key):
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                st.download_button(label, f.read(), file_name=os.path.basename(path), mime=mime, key=key)
+        else:
+            st.caption(f"· {os.path.basename(path)} — no existe")
+
+    st.markdown("#### 📦 Descargas directas")
+    _dl_button("Descargar config.json", _cfg_path, "application/json", "dl_cfg")
+    _dl_button("Descargar jugadores.csv", os.path.join(DATA_DIR, "jugadores.csv"), "text/csv", "dl_jug")
+    _dl_button("Descargar standings.csv", os.path.join(DATA_DIR, "standings.csv"), "text/csv", "dl_std")
+    if os.path.exists(_meta_path):
+        _dl_button("Descargar meta de publicación (meta.json)", _meta_path, "application/json", "dl_meta")
+    if os.path.exists(_log_path):
+        _dl_button("Descargar log de administración", _log_path, "text/csv", "dl_log")
+
+    # ---------- Rondas ----------
+    st.markdown("#### ♟️ Rondas")
+    n = get_n_rounds() if 'get_n_rounds' in globals() else 0
+    if n > 0:
+        rondas_exist = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
+        if rondas_exist:
+            r_sel = st.selectbox("Ronda", rondas_exist, index=len(rondas_exist) - 1, key="dl_r_sel")
+            _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel), "text/csv", f"dl_r{r_sel}")
+        else:
+            st.caption("No hay rondas generadas.")
+    else:
+        st.caption("No hay rondas planificadas.")
+
+    # ---------- Snapshot ZIP (opcional) ----------
+    with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):
+        if st.button("Crear snapshot.zip", use_container_width=True):
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+                for p in [_cfg_path, os.path.join(DATA_DIR, "jugadores.csv"),
+                          os.path.join(DATA_DIR, "standings.csv"), _meta_path, _log_path]:
+                    if os.path.exists(p):
+                        z.write(p, arcname=os.path.basename(p))
+                for i in range(1, n + 1):
+                    p = round_file(i)
+                    if os.path.exists(p):
+                        z.write(p, arcname=os.path.basename(p))
+            st.download_button(
+                "Descargar snapshot.zip",
+                buf.getvalue(),
+                file_name="snapshot_torneo.zip",
+                mime="application/zip",
+                key="dl_zip_all",
+                use_container_width=True,
+            )
+
+    st.divider()
+
 
 # =========================
 # Router de vistas

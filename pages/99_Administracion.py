@@ -1,4 +1,4 @@
-from __future__ import annotations
+rom __future__ import annotations
 import os
 import pandas as pd
 import streamlit as st
@@ -1085,7 +1085,7 @@ def _show_archivos():
         rondas_exist = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
         if rondas_exist:
             r_sel = st.selectbox("Ronda", rondas_exist, index=len(rondas_exist) - 1, key="dl_r_sel")
-            _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel)
+            _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel), "text/csv", f"dl_r{r_sel}")
     st.markdown("---")
     # ---------- 🛠️ Utilidades meta.json ----------
     st.markdown("#### 🛠️ Utilidades meta.json")
