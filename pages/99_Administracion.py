@@ -1110,22 +1110,43 @@ def _show_archivos():
             with open(_meta_path, "r", encoding="utf-8") as f:
                 meta_obj = json.load(f)
             st.json(meta_obj)
-            # Tabla auxiliar si hay 'rounds' con estructura de publicación/estado
-            rounds = meta_obj.get("rounds") if isinstance(meta_obj, dict) else None
-            if isinstance(rounds, dict) and rounds:
-                rows_meta = []
-                for k, v in rounds.items():
-                    row = {"ronda": k}
-                    if isinstance(v, dict):
-                        # extrae campos típicos si existen
-                        for kk in ("published", "date", "closed"):
-                            if kk in v:
-                                row[kk] = v[kk]
-                    rows_meta.append(row)
-                if rows_meta:
-                    st.dataframe(pd.DataFrame(rows_meta), use_container_width=True, hide_index=True)
-        except Exception as e:
-            st.caption(f"No se puede leer meta.json: {e}")
+
+        # Tabla comparativa real vs meta (incluye date(meta))
+        rounds_meta = (meta_obj.get("rounds", {}) if isinstance(meta_obj, dict) else {}) or {}
+        try:
+            n_max = get_n_rounds()
+        except Exception:
+            n_max = 0
+        existing = [i for i in range(1, n_max + 1) if os.path.exists(round_file(i))]
+        rows_meta = []
+        for i in existing:
+            v = rounds_meta.get(str(i), {})
+            pub_meta    = v.get("published")
+            date_meta   = v.get("date")
+            closed_meta = v.get("closed")
+
+            try:
+                pub_real = is_pub(i)
+            except Exception:
+                pub_real = False
+            try:
+                dfp = read_csv_safe(round_file(i))
+                vac = results_empty_count(dfp)
+            except Exception:
+                vac = None
+            closed_real = bool(pub_real and (vac == 0))
+
+            rows_meta.append({
+                "ronda": i,
+                "date(meta)": date_meta,
+                "published(meta)": pub_meta,
+                "published(real)": pub_real,
+                "closed(meta)": closed_meta,
+                "closed(real)": closed_real,
+                "desviación_closed": (closed_meta != closed_real),
+            })
+        if rows_meta:
+            st.dataframe(pd.DataFrame(rows_meta), use_container_width=True, hide_index=True)
 
     st.markdown("---")
 
