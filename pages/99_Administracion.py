@@ -745,6 +745,13 @@ def _show_eliminar():
     actor = (st.session_state.get("actor_name") or st.session_state.get("actor") or "admin")
     st.markdown("### 🗑️ Eliminar ronda")
 
+    # Fallback local por si _log_msg aún no está definido en este punto del archivo
+    try:
+        _ = _log_msg
+    except NameError:
+        def _log_msg(x):
+            return str(x)
+
     # Asegurar lista de rondas existentes
     n = get_n_rounds()
     existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
@@ -760,14 +767,20 @@ def _show_eliminar():
                 path = round_file(last_exist)
                 try:
                     os.remove(path)
+
                     # Limpieza de meta si existe entrada de esa ronda
                     meta = load_meta()
                     if str(last_exist) in meta.get("rounds", {}):
                         meta["rounds"].pop(str(last_exist), None)
                         save_meta(meta)
 
-                    add_log("delete_round", last_exist, actor, _log_msg(f"{os.path.basename(path)} eliminado"))
+                    # Log (no debe romper si algo falla)
+                    try:
+                        add_log("delete_round", last_exist, actor, _log_msg(f"{os.path.basename(path)} eliminado"))
+                    except Exception:
+                        pass
 
+                    # Recalcular clasificación
                     ok, path2 = recalc_and_save_standings(bye_points=1.0)
                     if ok:
                         st.success(f"Ronda R{last_exist} eliminada. Clasificación recalculada en `{path2}`.")
@@ -778,14 +791,12 @@ def _show_eliminar():
 
                 except Exception as e:
                     st.error(f"No se pudo eliminar: {e}")
-
             else:
                 st.warning(f'Debes escribir exactamente "ELIMINAR R{last_exist}" para confirmar.')
     else:
         st.info("No hay rondas para eliminar.")
 
     st.divider()
-
 
 # =========================
 # Inspector de data/
