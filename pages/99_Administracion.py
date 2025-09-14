@@ -1,4 +1,4 @@
-rom __future__ import annotations
+from __future__ import annotations
 import os
 import pandas as pd
 import streamlit as st
@@ -1133,7 +1133,6 @@ def _show_archivos():
             st.rerun()
         except Exception as e:
             st.error(f"No se pudo sincronizar meta.json: {e}")
-    , "text/csv", f"dl_r{r_sel}")
         else:
             st.caption("No hay rondas generadas.")
     else:
