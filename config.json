@@ -7,16 +7,9 @@
   "rondas": "auto",
   "min_rondas": 5,
   "max_rondas": 7,
-  "cabecera_pdf": "",
   "auto_refresh_seconds": 0,
   "genially_url": "https://view.genially.com/68bfc66a46b5ebd63d00b9b0",
-  "nivel_urls": {
-    "1ESO": "",
-    "2-3ESO": "",
-    "4ESO-BACH": ""
-  },
   "bg_color": "linear-gradient(180deg,#f9f7f3,#f1efe8)",
-  "pdf_fecha": "Miércoles 10/11/2025",
   "pdf_hora_lugar":"11:15 Aula Multimedia",
   "pdf_header_bg": "#F3F3F0",
   "pdf_header_border": "#C9C9C9",
