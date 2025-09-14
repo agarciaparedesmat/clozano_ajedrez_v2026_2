@@ -161,6 +161,47 @@ if st.button("🔒 Cerrar sesión", key="logout_btn"):
     st.rerun()
 
 
+
+# =========================
+# Helpers de publicación robustos (meta.json + flag-file)
+# =========================
+def _pub_flag_path(i: int) -> str:
+    return os.path.join(DATA_DIR, f"published_R{i}.flag")
+
+def set_pub_safe(i: int, val: bool, seed=None):
+    """Envuelve set_pub para asegurar que meta.json y el flag-file queden consistentes."""
+    ok_meta = False
+    # 1) Camino oficial
+    try:
+        set_pub(i, val, seed=seed)
+        ok_meta = True
+    except Exception:
+        # 2) Fallback manual sobre meta.json
+        try:
+            meta = load_meta()
+        except Exception:
+            meta = {}
+        rounds = meta.setdefault("rounds", {})
+        r = rounds.setdefault(str(i), {})
+        r["published"] = bool(val)
+        if seed is not None:
+            r["seed"] = seed
+        try:
+            save_meta(meta)
+            ok_meta = True
+        except Exception:
+            pass
+    # 3) Flag-file para published (fuente de verdad operativa)
+    try:
+        fp = _pub_flag_path(i)
+        if val:
+            open(fp, "w").close()
+        else:
+            if os.path.exists(fp):
+                os.remove(fp)
+    except Exception:
+        pass
+    return ok_meta
 # =========================
 # Barra de menú interna (sticky)
 # =========================
@@ -510,7 +551,7 @@ def _show_publicar():
         if st.button(f"📣 Publicar Ronda {sel}", use_container_width=True, key=f"btn_publicar_R{sel}"):
             try:
                 with st.spinner("Publicando y recalculando clasificación..."):
-                    set_pub(sel, True)
+                    set_pub_safe(sel, True)
                     # Recalcular clasificación tras publicar
                     from lib.tournament import read_players_from_csv, read_csv_safe, apply_results, compute_standings
                     players = read_players_from_csv(os.path.join(DATA_DIR, "jugadores.csv"))
@@ -540,7 +581,7 @@ def _show_publicar():
         if st.button(f"↩️ Despublicar última (Ronda {ultima_pub})", use_container_width=True, key=f"btn_despublicar_{ultima_pub}"):
             try:
                 with st.spinner("Despublicando y recalculando clasificación..."):
-                    set_pub(ultima_pub, False)
+                    set_pub_safe(ultima_pub, False)
                     # Tras despublicar, recalcular clasificación con las restantes publicadas
                     from lib.tournament import read_players_from_csv, read_csv_safe, apply_results, compute_standings
                     players = read_players_from_csv(os.path.join(DATA_DIR, "jugadores.csv"))
@@ -1044,7 +1085,55 @@ def _show_archivos():
         rondas_exist = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
         if rondas_exist:
             r_sel = st.selectbox("Ronda", rondas_exist, index=len(rondas_exist) - 1, key="dl_r_sel")
-            _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel), "text/csv", f"dl_r{r_sel}")
+            _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel)
+    st.markdown("---")
+    # ---------- 🛠️ Utilidades meta.json ----------
+    st.markdown("#### 🛠️ Utilidades meta.json")
+    # Detectar rondas existentes y rondas en meta
+    n_local = get_n_rounds() if 'get_n_rounds' in globals() else 0
+    rondas_exist = [i for i in range(1, n_local + 1) if os.path.exists(round_file(i))]
+    try:
+        meta_cur = load_meta()
+    except Exception:
+        meta_cur = {}
+    rounds_meta = meta_cur.get("rounds", {}) if isinstance(meta_cur, dict) else {}
+    rondas_meta = sorted([int(k) for k in rounds_meta.keys() if str(k).isdigit()])
+    # Diagnóstico
+    st.caption(f"Rondas con CSV: {rondas_exist} · Rondas en meta.json: {rondas_meta}")
+    faltan = [i for i in rondas_exist if str(i) not in rounds_meta]
+    if faltan:
+        st.warning(f"Rondas existentes sin entrada en meta.json: {faltan}")
+    # Botón: completar meta.json con entradas por defecto
+    if faltan and st.button("Completar meta.json con rondas faltantes", key="meta_fill_missing"):
+        meta_w = meta_cur if isinstance(meta_cur, dict) else {}
+        rounds_w = meta_w.setdefault("rounds", {})
+        for i in faltan:
+            rounds_w.setdefault(str(i), {"published": False, "date": "", "closed": False})
+        try:
+            save_meta(meta_w)
+            st.success("meta.json completado. Refrescando…")
+            st.rerun()
+        except Exception as e:
+            st.error(f"No se pudo guardar meta.json: {e}")
+    # Botón: sincronizar meta.json con flags de publicación
+    if st.button("Sincronizar meta.json con flags de publicación", key="meta_sync_flags"):
+        try:
+            meta_w = meta_cur if isinstance(meta_cur, dict) else {}
+            rounds_w = meta_w.setdefault("rounds", {})
+            cambios = 0
+            for i in rondas_exist:
+                r = rounds_w.setdefault(str(i), {})
+                was = bool(r.get("published", False))
+                now = os.path.exists(_pub_flag_path(i))
+                if was != now:
+                    r["published"] = now
+                    cambios += 1
+            save_meta(meta_w)
+            st.success(f"meta.json actualizado ({cambios} cambio/s).")
+            st.rerun()
+        except Exception as e:
+            st.error(f"No se pudo sincronizar meta.json: {e}")
+    , "text/csv", f"dl_r{r_sel}")
         else:
             st.caption("No hay rondas generadas.")
     else:
