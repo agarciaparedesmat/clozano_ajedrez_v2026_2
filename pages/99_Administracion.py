@@ -1106,13 +1106,9 @@ def _show_archivos():
     # meta.json → JSON + (opcional) tabla de rondas si hay estructura 'rounds'
     if os.path.exists(_meta_path):
         st.markdown("**meta.json**")
-        meta_obj = None
         try:
             with open(_meta_path, "r", encoding="utf-8") as f:
                 meta_obj = json.load(f)
-        except Exception as e:
-            st.caption(f"No se puede leer meta.json: {e}")
-        else:
             st.json(meta_obj)
 
         # Tabla comparativa real vs meta (incluye date(meta))
@@ -1121,14 +1117,13 @@ def _show_archivos():
             n_max = get_n_rounds()
         except Exception:
             n_max = 0
-
         existing = [i for i in range(1, n_max + 1) if os.path.exists(round_file(i))]
         rows_meta = []
         for i in existing:
             v = rounds_meta.get(str(i), {})
-            pub_meta    = v.get("published")
-            date_meta   = v.get("date")
-            closed_meta = v.get("closed")
+            pub_meta    = bool(v.get("published", False))
+            date_meta   = v.get("date") or ""
+            closed_meta = bool(v.get("closed", False))
 
             try:
                 pub_real = is_pub(i)
@@ -1150,10 +1145,9 @@ def _show_archivos():
                 "closed(real)": closed_real,
                 "desviación_closed": (closed_meta != closed_real),
             })
-
         if rows_meta:
             st.dataframe(pd.DataFrame(rows_meta), use_container_width=True, hide_index=True)
-# --- aquí ya continúa tu st.markdown("---") original de la sección ---
+
     st.markdown("---")
 
     # ---------- Descargas ----------
@@ -1254,6 +1248,50 @@ def _show_archivos():
                 vacios = None
             closed_now = bool(pub and (vacios == 0))
 
+
+# Reparar meta.json (published + closed)
+if st.button("🧯 Reparar meta.json (published + closed)", key="meta_fix_all"):
+    try:
+        meta = load_meta()
+    except Exception:
+        meta = {}
+    rounds = meta.setdefault("rounds", {})
+
+    try:
+        n_max = get_n_rounds()
+    except Exception:
+        n_max = 0
+    existing = [i for i in range(1, n_max + 1) if os.path.exists(round_file(i))]
+
+    cambios = 0
+    for i in existing:
+        r = rounds.setdefault(str(i), {})
+        # Real: publicado
+        try:
+            real_pub = is_pub(i)
+        except Exception:
+            real_pub = False
+        # Real: closed = publicado y sin resultados vacíos
+        try:
+            dfp = read_csv_safe(round_file(i))
+            vac = results_empty_count(dfp)
+        except Exception:
+            vac = None
+        real_closed = bool(real_pub and (vac == 0))
+
+        if r.get("published") != real_pub:
+            r["published"] = real_pub
+            cambios += 1
+        if r.get("closed") != real_closed:
+            r["closed"] = real_closed
+            cambios += 1
+
+    try:
+        save_meta(meta)
+        st.success(f"meta.json actualizado ({cambios} cambio/s).")
+        st.rerun()
+    except Exception as e:
+        st.error(f"No se pudo actualizar meta.json: {e}")
             r = rounds_w.setdefault(str(i), {})
             if r.get("closed") != closed_now:
                 r["closed"] = closed_now
