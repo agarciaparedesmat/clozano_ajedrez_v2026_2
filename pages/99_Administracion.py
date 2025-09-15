@@ -1112,7 +1112,8 @@ def _show_archivos():
             st.json(meta_obj)
 
         # Tabla comparativa real vs meta (incluye date(meta))
-        rounds_meta = (meta_obj.get("rounds", {}) if isinstance(meta_obj, dict) else {}) or {}
+        rounds_meta = (meta_obj.get("rounds", {}) 
+        if isinstance(meta_obj, dict) else {}) or {}
         try:
             n_max = get_n_rounds()
         except Exception:
