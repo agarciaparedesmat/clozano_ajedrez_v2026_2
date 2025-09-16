@@ -1130,7 +1130,8 @@ def _show_archivos():
             existing = [i for i in range(1, n_max + 1) if os.path.exists(round_file(i))]
             for i in existing:
                 v = rounds_meta.get(str(i), {})
-                # Valores robustos (evita None en la tabla)
+
+                # Valores desde meta (con defaults robustos)
                 pub_meta    = bool(v.get("published", False))
                 date_meta   = v.get("date") or ""
                 closed_meta = bool(v.get("closed", False))
@@ -1142,23 +1143,33 @@ def _show_archivos():
                     pub_real = False
                 try:
                     dfp = read_csv_safe(round_file(i))
-                    vac  = results_empty_count(dfp)
+                    vac  = results_empty_count(dfp) if dfp is not None else None
                 except Exception:
                     vac  = None
                 closed_real = bool(pub_real and (vac == 0))
 
+                # Fecha "real": lo más fideligno que tenemos es get_round_date (guarda en meta)
+                try:
+                    date_real = get_round_date(i) or ""
+                except Exception:
+                    date_real = ""
+
                 rows_meta.append({
                     "ronda": i,
                     "date(meta)": date_meta,
+                    "date(real)": date_real,
                     "published(meta)": pub_meta,
                     "published(real)": pub_real,
                     "closed(meta)": closed_meta,
                     "closed(real)": closed_real,
                     "desviación_closed": (closed_meta != closed_real),
+                    "⚠️": "🔴" if (closed_meta != closed_real) else "",
                 })
 
         if rows_meta:
-            st.dataframe(pd.DataFrame(rows_meta), use_container_width=True, hide_index=True)
+            dfm = pd.DataFrame(rows_meta)
+            st.dataframe(dfm, use_container_width=True, hide_index=True)
+
 
     st.markdown("---")
 

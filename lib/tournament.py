@@ -743,3 +743,37 @@ def swiss_pair_round(players: Dict[str, dict], round_no: int, forced_bye_id: Opt
 
     df = pd.DataFrame(rows, columns=["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"])
     return df
+
+# --------------------------
+# NUEVO: Seguimiento de progreso ronda a ronda
+# --------------------------
+
+def get_rank_progress(max_rondas: int = 7) -> dict[str, list[int]]:
+    """
+    Devuelve un diccionario:
+        { "IDJugador1": [posición R1, R2, ...], ... }
+
+    Si no hay datos suficientes para una ronda, se omite esa posición.
+    """
+    from lib.tournament import get_standings
+    progress = {}
+    for ronda in range(1, max_rondas + 1):
+        try:
+            standings = get_standings(upto_round=ronda)
+            for pos, row in enumerate(standings.itertuples(), start=1):
+                pid = str(row.id)
+                if pid not in progress:
+                    progress[pid] = []
+                progress[pid].append(pos)
+        except Exception:
+            # Si hay error (ej: no hay datos suficientes), salta
+            continue
+    return progress
+
+def format_rank_progress(rank_list: list[int]) -> str:
+    """
+    Convierte [4, 2, 1, 2] → "4→2→1→2"
+    """
+    if not rank_list:
+        return ""
+    return "→".join(str(x) for x in rank_list)
