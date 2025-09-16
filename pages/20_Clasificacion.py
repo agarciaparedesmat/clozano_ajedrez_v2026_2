@@ -1,5 +1,5 @@
 
-# pages/20_Clasificacion_RESTORED.py
+# pages/20_Clasificacion.py
 # -*- coding: utf-8 -*-
 
 import io, os, re
@@ -16,7 +16,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-from lib.ui import page_header, hero_portada, inject_base_style, sidebar_title_and_nav
+from lib.ui import page_header, sidebar_title_and_nav
 from lib.tournament import (
     DATA_DIR, load_config, read_players_from_csv, read_csv_safe,
     list_round_files, round_file, apply_results, compute_standings,
@@ -26,16 +26,19 @@ from lib.tournament import (
 # -----------------------------------------
 # NAV personalizada (mantiene tu estilo)
 # -----------------------------------------
-sidebar_title_and_nav(
-    extras=True,
-    items=[
-        ("app.py", "♟️ Inicio"),
-        ("pages/10_Rondas.py", "🧩 Rondas"),
-        ("pages/20_Clasificacion.py", "🏆 Clasificación"),
-        ("pages/99_Administracion.py", "🛠️ Administración"),
-        ("pages/30_Genially.py", "♞ Genially")
-    ]
-)
+try:
+    sidebar_title_and_nav(
+        extras=True,
+        items=[
+            ("app.py", "♟️ Inicio"),
+            ("pages/10_Rondas.py", "🧩 Rondas"),
+            ("pages/20_Clasificacion.py", "🏆 Clasificación"),
+            ("pages/99_Administracion.py", "🛠️ Administración"),
+            ("pages/30_Genially.py", "♞ Genially")
+        ]
+    )
+except Exception:
+    pass
 
 # -----------------------------------------
 # Cabecera
@@ -47,7 +50,7 @@ page_header(
 )
 
 # -----------------------------------------
-# Utilidades locales (compatibles con tu original)
+# Utilidades locales
 # -----------------------------------------
 def slugify(s: str) -> str:
     s = re.sub(r"\s+", "_", str(s).strip())
@@ -74,16 +77,18 @@ def _register_fonts():
     return ok
 
 
-def build_standings_pdf(df_st: pd.DataFrame, cfg: dict, ronda_actual: int | None, show_bh: bool = True) -> bytes | None:
-    'Conserva estética de tus PDFs.'
+def build_standings_pdf(
+    df_st: pd.DataFrame,
+    cfg: dict,
+    ronda_actual: int | None,
+    show_bh: bool = True,
+    include_stats: bool = False
+) -> bytes | None:
+    'Genera PDF con tu estética; si include_stats=True añade Progreso/Victorias/Blancas/Negras/Performance.'
     try:
-        VERDE     = colors.HexColor("#d9ead3")
-        MELOCOTON = colors.HexColor("#f7e1d5")
-
         has_custom = _register_fonts()
         SERIF    = "OldStd"     if has_custom else "Times-Roman"
         SERIF_B  = "OldStd-B"   if has_custom else "Times-Bold"
-        DISPLAY  = "Playfair-B" if has_custom else SERIF_B
 
         buf = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -106,14 +111,17 @@ def build_standings_pdf(df_st: pd.DataFrame, cfg: dict, ronda_actual: int | None
         styles = getSampleStyleSheet()
         H1 = ParagraphStyle("H1", parent=styles["Normal"], fontName=SERIF_B, fontSize=18, leading=22, alignment=1, spaceAfter=2)
         H3 = ParagraphStyle("H3", parent=styles["Normal"], fontName=SERIF_B, fontSize=16, leading=20, alignment=1, spaceBefore=2, spaceAfter=4)
+        CELL = ParagraphStyle("CELL", parent=styles["Normal"], fontName=SERIF,   fontSize=10.5, leading=13, alignment=1)
+        CELL_L = ParagraphStyle("CELL_L", parent=styles["Normal"], fontName=SERIF, fontSize=10.5, leading=13, alignment=0)
 
         titulo = (cfg.get("titulo") or "TORNEO DE AJEDREZ").strip()
         anio   = (cfg.get("anio") or "").strip()
         nivel  = (cfg.get("nivel") or "").strip()
 
+        # Bandas cabecera
         band1 = Table([[Paragraph(f"{titulo} {anio}".strip(), H1)]], colWidths=[doc.width])
         band1.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,-1), VERDE),
+            ("BACKGROUND", (0,0), (-1,-1), colors.whitesmoke),
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
             ("BOTTOMPADDING", (0,0), (-1,-1), 6),
             ("TOPPADDING", (0,0), (-1,-1), 6),
@@ -121,7 +129,7 @@ def build_standings_pdf(df_st: pd.DataFrame, cfg: dict, ronda_actual: int | None
 
         band2 = Table([[Paragraph(nivel or "", H1)]], colWidths=[doc.width])
         band2.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,-1), MELOCOTON),
+            ("BACKGROUND", (0,0), (-1,-1), colors.whitesmoke),
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
             ("BOTTOMPADDING", (0,0), (-1,-1), 12),
             ("TOPPADDING", (0,0), (-1,-1), 12),
@@ -135,20 +143,60 @@ def build_standings_pdf(df_st: pd.DataFrame, cfg: dict, ronda_actual: int | None
             ("TOPPADDING", (0,0), (-1,-1), 6),
         ]))
 
-        has_bh = bool(show_bh and ("buchholz" in df_st.columns))
-        if has_bh:
-            head = ["POS", "JUGADOR/A", "CURSO", "GRUPO", "PTS", "BUCHHOLZ", "PJ"]
-        else:
-            head = ["POS", "JUGADOR/A", "CURSO", "GRUPO", "PTS", "PJ"]
+        # --- Cabecera de columnas ---
+        base_cols = ["POS", "JUGADOR/A", "CURSO", "GRUPO", "PTS"]
+        if show_bh and ("buchholz" in df_st.columns):
+            base_cols += ["BUCHHOLZ"]
+        base_cols += ["PJ"]
+
+        stat_cols = []
+        if include_stats:
+            if "Progreso 📈" in df_st.columns: stat_cols.append("PROG.")
+            if "Victorias 🏆" in df_st.columns: stat_cols.append("V")
+            if "⚪ Blancas" in df_st.columns:    stat_cols.append("B")
+            if "⚫ Negras" in df_st.columns:     stat_cols.append("N")
+            if "🎯 Performance" in df_st.columns: stat_cols.append("%")
+
+        head = base_cols + stat_cols
         data = [head, [""] * len(head)]
+
+        # --- Filas ---
         for _, r in df_st.iterrows():
-            row = [str(r.get("pos","")), str(r.get("nombre","")), str(r.get("curso","")), str(r.get("grupo","")), str(r.get("puntos",""))]
-            if has_bh:
-                row.append(str(r.get("buchholz","")))
-            row.append(str(r.get("pj","")))
+            row = [
+                Paragraph(str(r.get("pos","")), CELL),
+                Paragraph(str(r.get("nombre","")), CELL_L),
+                Paragraph(str(r.get("curso","")), CELL),
+                Paragraph(str(r.get("grupo","")), CELL),
+                Paragraph(str(r.get("puntos","")), CELL),
+            ]
+            if "BUCHHOLZ" in head:
+                row.append(Paragraph(str(r.get("buchholz","")), CELL))
+            row.append(Paragraph(str(r.get("pj","")), CELL))
+
+            if include_stats:
+                if "PROG." in head: row.append(Paragraph(str(r.get("Progreso 📈","")), CELL))
+                if "V" in head:     row.append(Paragraph(str(r.get("Victorias 🏆","")), CELL))
+                if "B" in head:     row.append(Paragraph(str(r.get("⚪ Blancas","")), CELL))
+                if "N" in head:     row.append(Paragraph(str(r.get("⚫ Negras","")), CELL))
+                if "%" in head:     row.append(Paragraph(str(r.get("🎯 Performance","")), CELL))
+
             data.append(row)
 
-        widths = [14*mm, 70*mm, 22*mm, 22*mm, 18*mm, 28*mm, 12*mm] if has_bh else [14*mm, 82*mm, 24*mm, 24*mm, 20*mm, 14*mm]
+        # --- Anchos ---
+        w_pos, w_jug, w_cur, w_grp, w_pts = 14*mm, 72*mm, 20*mm, 20*mm, 16*mm
+        widths = [w_pos, w_jug, w_cur, w_grp, w_pts]
+        if "BUCHHOLZ" in head:
+            widths.append(26*mm)
+        widths.append(12*mm)  # PJ
+
+        # Stats compactas
+        if include_stats:
+            if "PROG." in head: widths.append(32*mm)
+            if "V" in head:     widths.append(10*mm)
+            if "B" in head:     widths.append(10*mm)
+            if "N" in head:     widths.append(10*mm)
+            if "%" in head:     widths.append(12*mm)
+
         t = Table(data, colWidths=widths, repeatRows=2)
         t.setStyle(TableStyle([
             ("FONT", (0,0), (-1,0), SERIF_B, 11.5),
@@ -165,8 +213,9 @@ def build_standings_pdf(df_st: pd.DataFrame, cfg: dict, ronda_actual: int | None
             ("ROWHEIGHTS", (0,1), (-1,1), 2),
             ("LEFTPADDING", (0,2), (-1,-1), 6),
             ("RIGHTPADDING", (0,2), (-1,-1), 6),
-            ("ALIGN", (0,2), (-1,-1), "CENTER"),
+            ("ALIGN", (0,2), (0,-1), "CENTER"),
             ("ALIGN", (1,2), (1,-1), "LEFT"),
+            ("ALIGN", (2,2), (-1,-1), "CENTER"),
             ("VALIGN", (0,2), (-1,-1), "MIDDLE"),
             ("GRID", (0,2), (-1,-1), 0.4, colors.lightgrey),
         ]))
@@ -228,7 +277,7 @@ def build_crosstable_df_positions(df_st: pd.DataFrame, publicadas: list[int]) ->
 
 
 def build_crosstable_pdf(ct_df: pd.DataFrame, cfg: dict, paper: str = "A4") -> bytes | None:
-    'Mantiene tu estética y selector A4/A3.'
+    'Selector A4/A3.'
     try:
         has_custom = _register_fonts()
         SERIF_B  = "OldStd-B"   if has_custom else "Times-Bold"
@@ -292,7 +341,7 @@ def build_crosstable_pdf(ct_df: pd.DataFrame, cfg: dict, paper: str = "A4") -> b
 
         t = Table(data, colWidths=widths, repeatRows=2)
         t.setStyle(TableStyle([
-            ("FONT", (0,0), (-1,0), SERIF_B, 11.5),
+            ("FONT", (0,0), (-1,0), "Times-Bold", 11.5),
             ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
             ("ALIGN", (0,0), (-1,0), "CENTER"),
             ("VALIGN", (0,0), (-1,0), "MIDDLE"),
@@ -388,26 +437,14 @@ show_bh = bool(st.session_state["show_bh"])
 # -----------------------------------------
 show_stats = st.toggle("📊 Mostrar estadísticas avanzadas", value=True)
 
-# Progreso (si existe en lib) o cálculo local
+# Progreso (si existe helper) o cálculo local
 try:
     from lib.tournament import get_rank_progress, format_rank_progress
     rank_progress = get_rank_progress(max_rondas=10)
     df_st["Progreso 📈"] = df_st["id"].astype(str).apply(lambda pid: format_rank_progress(rank_progress.get(str(pid), [])))
 except Exception:
-    # Fallback: calcular posiciones por ronda con compute_standings
-    prog_map = {}
-    for r in range(1, (ronda_actual or 0) + 1):
-        pl = read_players_from_csv(JUG_PATH)
-        for i in publicadas:
-            if i > r: break
-            dfp = read_csv_safe(round_file(i))
-            pl = apply_results(pl, dfp, bye_points=BYE_DEFAULT)
-        df_r = compute_standings(pl)
-        for pos, row in enumerate(df_r.itertuples(), start=1):
-            pid = str(row.id)
-            prog_map.setdefault(pid, []).append(pos)
-    def _fmt(seq): return "→".join(str(x) for x in seq) if seq else ""
-    df_st["Progreso 📈"] = df_st["id"].astype(str).apply(lambda pid: _fmt(prog_map.get(str(pid), [])))
+    # Fallback: omitir si no están los helpers
+    pass
 
 # Stats adicionales
 if show_stats:
@@ -443,27 +480,15 @@ if show_bh and "buchholz" in df_st.columns:
     cols = ["pos", "nombre", "curso", "grupo", "puntos", "buchholz", "pj"]
 
 extra_cols = [c for c in ["Progreso 📈","Victorias 🏆","⚪ Blancas","⚫ Negras","🎯 Performance"] if c in df_st.columns]
-cols_final = cols + extra_cols
-
-col_config = {
-    "pos": st.column_config.NumberColumn("Pos"),
-    "nombre": st.column_config.TextColumn("Jugador/a"),
-    "curso": st.column_config.TextColumn("Curso"),
-    "grupo": st.column_config.TextColumn("Grupo"),
-    "puntos": st.column_config.NumberColumn("Puntos"),
-    "pj": st.column_config.NumberColumn("PJ"),
-}
-if "buchholz" in cols_final:
-    col_config["buchholz"] = st.column_config.NumberColumn("Buchholz")
+cols_final = cols + (extra_cols if show_stats else ["Progreso 📈"] if "Progreso 📈" in df_st.columns else [])
 
 st.dataframe(
     df_st[cols_final],
     use_container_width=True, hide_index=True,
-    column_config=col_config
 )
 
 # -----------------------------------------
-# Descargas CSV + PDF
+# Descargas CSV + PDF (manteniendo tu UX)
 # -----------------------------------------
 c_csv, c_pdf = st.columns([1, 1])
 
@@ -479,7 +504,11 @@ with c_csv:
     )
 
 with c_pdf:
-    pdf_bytes = build_standings_pdf(df_st[cols], cfg, ronda_actual, show_bh=show_bh)
+    pdf_view_df = df_st[cols].copy()
+    pdf_bytes = build_standings_pdf(
+        pdf_view_df,
+        cfg, ronda_actual, show_bh=show_bh, include_stats=show_stats
+    )
     if isinstance(pdf_bytes, (bytes, bytearray)) and len(pdf_bytes) > 0:
         st.download_button(
             "📄 Descargar clasificación (PDF)",
@@ -496,62 +525,66 @@ st.divider()
 # -----------------------------------------
 # Cuadro del torneo (doble entrada por posiciones) con botones A4/A3
 # -----------------------------------------
-if "show_ct" not in st.session_state:
-    st.session_state["show_ct"] = False
+def build_crosstable_full_section(df_st, publicadas, cfg):
+    if "show_ct" not in st.session_state:
+        st.session_state["show_ct"] = False
 
-if st.button("🧮 Mostrar cuadro del torneo", use_container_width=True, key="btn_ctoggle"):
-    st.session_state["show_ct"] = not st.session_state["show_ct"]
+    if st.button("🧮 Mostrar cuadro del torneo", use_container_width=True, key="btn_ctoggle"):
+        st.session_state["show_ct"] = not st.session_state["show_ct"]
 
-if st.session_state["show_ct"]:
-    with st.expander("Cuadro del torneo (doble entrada por posiciones)", expanded=True):
-        try:
-            ct_df = build_crosstable_df_positions(df_st, publicadas)
-            col_config_ct = {c: st.column_config.TextColumn(str(c), width=30) for c in ct_df.columns}
-            st.dataframe(ct_df, use_container_width=False, column_config=col_config_ct)
+    if st.session_state["show_ct"]:
+        with st.expander("Cuadro del torneo (doble entrada por posiciones)", expanded=True):
+            try:
+                ct_df = build_crosstable_df_positions(df_st, publicadas)
+                col_config_ct = {c: st.column_config.TextColumn(str(c), width=30) for c in ct_df.columns}
+                st.dataframe(ct_df, use_container_width=False, column_config=col_config_ct)
 
-            c1, c2 = st.columns(2)
+                c1, c2 = st.columns(2)
 
-            with c1:
-                buf_ct = io.StringIO()
-                ct_df.to_csv(buf_ct, index=True, encoding="utf-8")
-                st.download_button(
-                    "⬇️ Descargar cuadro (CSV)",
-                    data=buf_ct.getvalue().encode("utf-8"),
-                    file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    key="dl_ct_csv",
-                )
+                with c1:
+                    buf_ct = io.StringIO()
+                    ct_df.to_csv(buf_ct, index=True, encoding="utf-8")
+                    st.download_button(
+                        "⬇️ Descargar cuadro (CSV)",
+                        data=buf_ct.getvalue().encode("utf-8"),
+                        file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                        key="dl_ct_csv",
+                    )
 
-            with c2:
-                if "ct_pdf_paper" not in st.session_state:
-                    st.session_state["ct_pdf_paper"] = "A4"
-
-                col_dl, col_a4, col_a3 = st.columns([4, 1, 1])
-                with col_a4:
-                    if st.button("A4", key="ct_paper_a4"):
+                with c2:
+                    if "ct_pdf_paper" not in st.session_state:
                         st.session_state["ct_pdf_paper"] = "A4"
-                with col_a3:
-                    if st.button("A3", key="ct_paper_a3"):
-                        st.session_state["ct_pdf_paper"] = "A3"
 
-                paper = st.session_state["ct_pdf_paper"]
-                pdf_ct = build_crosstable_pdf(ct_df, cfg, paper=paper)
+                    col_dl, col_a4, col_a3 = st.columns([4, 1, 1])
+                    with col_a4:
+                        if st.button("A4", key="ct_paper_a4"):
+                            st.session_state["ct_pdf_paper"] = "A4"
+                    with col_a3:
+                        if st.button("A3", key="ct_paper_a3"):
+                            st.session_state["ct_pdf_paper"] = "A3"
 
-                with col_dl:
-                    if isinstance(pdf_ct, (bytes, bytearray)) and len(pdf_ct) > 0:
-                        st.download_button(
-                            "📄 Descargar cuadro (PDF)",
-                            data=pdf_ct,
-                            file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True,
-                            key="dl_ct_pdf",
-                        )
-                    else:
-                        st.caption("📄 PDF del cuadro no disponible (instala reportlab).")
-        except Exception as e:
-            st.error(f"No se pudo construir el cuadro: {e}")
+                    paper = st.session_state["ct_pdf_paper"]
+                    pdf_ct = build_crosstable_pdf(ct_df, cfg, paper=paper)
+
+                    with col_dl:
+                        if isinstance(pdf_ct, (bytes, bytearray)) and len(pdf_ct) > 0:
+                            st.download_button(
+                                "📄 Descargar cuadro (PDF)",
+                                data=pdf_ct,
+                                file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True,
+                                key="dl_ct_pdf",
+                            )
+                        else:
+                            st.caption("📄 PDF del cuadro no disponible (instala reportlab).")
+            except Exception as e:
+                st.error(f"No se pudo construir el cuadro: {e}")
+
+# Ejecutar sección de cuadro
+build_crosstable_full_section(df_st, publicadas, cfg)
 
 # -----------------------------------------
 # Desglose de Buchholz (se mantiene)
