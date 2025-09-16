@@ -673,10 +673,129 @@ def _show_publicar():
 
 # =========================
 # 📅 Fecha de celebración por ronda (solo borradores) — badges y edición solo en borradores
+
+# =========================
+# 🔎 Resumen rápido de fechas (check visual)
+# =========================
+def _resumen_fechas_panel():
+    import datetime as _dt
+    import pandas as pd
+
+    # Contexto
+    n = get_n_rounds()
+    if not n:
+        st.info("No hay rondas generadas todavía.")
+        return
+
+    existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
+    if not existing_rounds:
+        st.info("No hay rondas generadas todavía.")
+        return
+
+    # Helpers
+    def _is_pub_safe(i: int) -> bool:
+        try:
+            return is_pub(i)
+        except Exception:
+            return False
+
+    def _get_date_safe(i: int) -> str:
+        try:
+            return get_round_date(i) or ""
+        except Exception:
+            return ""
+
+    # Construcción del dataset
+    rows, by_date = [], {}
+    hoy = _dt.date.today()
+    for i in existing_rounds:
+        f_iso = _get_date_safe(i)
+        try:
+            f_dt = _dt.date.fromisoformat(f_iso) if f_iso else None
+        except Exception:
+            f_dt = None
+        publicado = _is_pub_safe(i)
+        estado = "✅ Publicada" if publicado else "📝 Borrador"
+        falta_fecha = (f_dt is None)
+        dias = None if f_dt is None else (f_dt - hoy).days
+
+        rows.append({
+            "Ronda": i,
+            "Estado": estado,
+            "Fecha": f_dt,
+            "Días": dias,
+            "Falta fecha": "Sí" if falta_fecha else "No",
+        })
+        if f_dt:
+            by_date.setdefault(f_dt, []).append((i, publicado))
+
+    df = pd.DataFrame(rows).sort_values("Ronda")
+
+    # Métricas
+    tot = len(df)
+    pub = (df["Estado"] == "✅ Publicada").sum()
+    bor = (df["Estado"] == "📝 Borrador").sum()
+    con_fecha = (df["Falta fecha"] == "No").sum()
+    sin_fecha = (df["Falta fecha"] == "Sí").sum()
+
+    # Conflictos: fechas duplicadas (multi-rondas mismo día)
+    conflictos = []
+    for d, lst in sorted(by_date.items()):
+        if len(lst) > 1:
+            conflictos.append((d, [r for r, _ in lst]))
+    n_conf = len(conflictos)
+
+    st.markdown("### 🔎 Resumen de fechas")
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Rondas", tot)
+    c2.metric("Publicadas", pub)
+    c3.metric("Borradores", bor)
+    c4.metric("Con fecha", con_fecha)
+    c5.metric("Sin fecha", sin_fecha)
+
+    if n_conf > 0:
+        with st.expander(f"⚠️ Conflictos de fecha: {n_conf}", expanded=True):
+            for d, lst in conflictos:
+                st.warning(f"{d.isoformat()} → Rondas {', '.join(map(str, lst))}")
+
+    # Tabla general (lectura)
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Ronda": st.column_config.NumberColumn(format="%d"),
+            "Estado": st.column_config.TextColumn(),
+            "Fecha": st.column_config.DateColumn("Fecha"),
+            "Días": st.column_config.NumberColumn(help="Días desde hoy (negativo = pasado)"),
+            "Falta fecha": st.column_config.TextColumn(),
+        },
+    )
+
+    # Descarga CSV
+    import io
+    buf = io.StringIO()
+    # Exportamos con Fecha ISO-friendly
+    df_export = df.copy()
+    df_export["Fecha"] = df_export["Fecha"].astype(str)
+    df_export.to_csv(buf, index=False, encoding="utf-8")
+    st.download_button(
+        "⬇️ Descargar resumen (CSV)",
+        data=buf.getvalue().encode("utf-8"),
+        file_name="resumen_fechas_rondas.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+# =========================
+# 📅 Fecha de celebración por ronda (solo borradores) — badges y edición solo en borradores
 # =========================
 def _show_fechas():
     import datetime as _dt
     import pandas as pd
+
+    # Panel de control visual primero
+    _resumen_fechas_panel()
 
     st.markdown("### 📅 Fecha de celebración (solo rondas en borrador)")
 
