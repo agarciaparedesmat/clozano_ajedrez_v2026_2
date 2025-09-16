@@ -672,10 +672,7 @@ def _show_publicar():
         st.caption("No hay rondas publicadas actualmente.")
 
 # =========================
-# 📅 Fecha de celebración por ronda (solo borradores) — con badges de estado
-# =========================
-# =========================
-# 📅 Fecha de celebración por ronda (solo borradores) — badges y sin columna "Publicada"
+# 📅 Fecha de celebración por ronda (solo borradores) — badges y edición solo en borradores
 # =========================
 def _show_fechas():
     import datetime as _dt
@@ -708,9 +705,9 @@ def _show_fechas():
             return ""
 
     # =========================
-    # A) Editor individual (solo rondas en borrador)
+    # 1) Editor individual (solo borradores)
     # =========================
-    st.subheader("A) Editor individual (solo borradores)")
+    st.subheader("Editor individual (solo borradores)")
     draft_rounds = [i for i in existing_rounds if not _is_pub_safe(i)]
     if not draft_rounds:
         st.info("No hay rondas en borrador para editar fecha.")
@@ -741,8 +738,8 @@ def _show_fechas():
             key=f"fecha_edit_R{sel_draft}"
         )
 
-        cols_btn = st.columns([1, 1])
-        with cols_btn[0]:
+        c1, c2 = st.columns(2)
+        with c1:
             if st.button("💾 Guardar fecha", use_container_width=True, key=f"save_fecha_R{sel_draft}"):
                 try:
                     set_round_date(sel_draft, new_date.isoformat())
@@ -754,7 +751,7 @@ def _show_fechas():
                     st.rerun()
                 except Exception as e:
                     st.error(f"No se pudo guardar la fecha: {e}")
-        with cols_btn[1]:
+        with c2:
             if st.button("🗑️ Borrar fecha", use_container_width=True, key=f"del_fecha_R{sel_draft}"):
                 try:
                     set_round_date(sel_draft, None)
@@ -766,10 +763,10 @@ def _show_fechas():
     st.divider()
 
     # =========================
-    # B) Editor rápido (tabla) — solo guarda cambios en borradores
+    # 2) Editor rápido (tabla) — SOLO BORRADORES (editable)
     # =========================
-    st.subheader("B) Editor rápido (tabla)")
-    rows = []
+    st.subheader("Editor rápido — Borradores (editable)")
+    rows_draft, rows_pub = [], []
     for i in existing_rounds:
         fecha_iso = _get_date_safe(i)
         try:
@@ -778,46 +775,64 @@ def _show_fechas():
             fecha_dt = None
         publicado = _is_pub_safe(i)
         estado_badge = "✅ Publicada" if publicado else "📝 Borrador"
-        rows.append({
-            "Ronda": i,
-            "Estado": estado_badge,   # badge visual
-            "Fecha": fecha_dt         # editable
-        })
+        row = {"Ronda": i, "Estado": estado_badge, "Fecha": fecha_dt}
+        (rows_pub if publicado else rows_draft).append(row)
 
-    df_table = pd.DataFrame(rows)
+    # ---- Tabla editable (solo borradores)
+    if rows_draft:
+        df_draft = pd.DataFrame(rows_draft).sort_values("Ronda")
+        ed = st.data_editor(
+            df_draft,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Ronda": st.column_config.NumberColumn(format="%d"),
+                "Estado": st.column_config.TextColumn(help="Estado de la ronda: ✅ Publicada · 📝 Borrador"),
+                "Fecha": st.column_config.DateColumn("Fecha (editable)"),
+            },
+            disabled=["Ronda", "Estado"],  # Solo Fecha editable
+            key="fechas_editor_tabla_borradores",
+        )
 
-    ed = st.data_editor(
-        df_table,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Ronda": st.column_config.NumberColumn(format="%d"),
-            "Estado": st.column_config.TextColumn(help="Estado de la ronda: ✅ Publicada · 📝 Borrador"),
-            "Fecha": st.column_config.DateColumn("Fecha (editable)")
-        },
-        disabled=["Ronda", "Estado"],  # Solo Fecha es editable
-        key="fechas_editor_tabla",
-    )
+        if st.button("💾 Guardar cambios (borradores)", use_container_width=True, key="save_fechas_tabla_borr"):
+            cambios = 0
+            try:
+                for _, r in ed.iterrows():
+                    i = int(r["Ronda"])
+                    v = r["Fecha"]
+                    if pd.isna(v):
+                        set_round_date(i, None)
+                        cambios += 1
+                    else:
+                        set_round_date(i, v.isoformat())  # v es datetime.date
+                        cambios += 1
+                st.success(f"Fechas actualizadas para {cambios} ronda(s) en borrador.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"No se pudo aplicar la actualización: {e}")
+    else:
+        st.info("No hay rondas en borrador.")
 
-    if st.button("💾 Guardar cambios de la tabla (solo borradores)", use_container_width=True, key="save_fechas_tabla"):
-        cambios = 0
-        try:
-            for _, r in ed.iterrows():
-                i = int(r["Ronda"])
-                # Solo rondas en borrador
-                if _is_pub_safe(i):
-                    continue
-                v = r["Fecha"]
-                if pd.isna(v):
-                    set_round_date(i, None)
-                    cambios += 1
-                else:
-                    set_round_date(i, v.isoformat())  # v es datetime.date
-                    cambios += 1
-            st.success(f"Fechas actualizadas para {cambios} ronda(s) (solo borradores).")
-            st.rerun()
-        except Exception as e:
-            st.error(f"No se pudo aplicar la actualización en tabla: {e}")
+    st.divider()
+
+    # =========================
+    # 3) Publicadas (solo lectura)
+    # =========================
+    st.subheader("Rondas publicadas (solo lectura)")
+    if rows_pub:
+        df_pub = pd.DataFrame(rows_pub).sort_values("Ronda")
+        st.dataframe(
+            df_pub,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Ronda": st.column_config.NumberColumn(format="%d"),
+                "Estado": st.column_config.TextColumn(),
+                "Fecha": st.column_config.DateColumn("Fecha"),
+            },
+        )
+    else:
+        st.caption("No hay rondas publicadas aún.")
 
 # =========================
 # Resultados y clasificación (solo PUBLICADAS)
