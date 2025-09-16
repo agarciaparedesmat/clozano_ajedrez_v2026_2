@@ -1569,75 +1569,77 @@ def _show_archivos():
         except Exception as e:
             st.error(f"No se pudo actualizar meta.json: {e}")
 
-
-
-# Reparar meta.json (published + closed)
-if st.button("🧯 Reparar meta.json (published + closed)", key="meta_fix_all"):
-    try:
-        meta = load_meta()
-    except Exception:
-        meta = {}
-    rounds = meta.setdefault("rounds", {})
-
-    try:
-        n_max = get_n_rounds()
-    except Exception:
-        n_max = 0
-    existing = [i for i in range(1, n_max + 1) if os.path.exists(round_file(i))]
-
-    cambios = 0
-    for i in existing:
-        r = rounds.setdefault(str(i), {})
-        # Real: publicado
+    # Botón: Reparar meta.json (published + closed)
+    if st.button("🧯 Reparar meta.json (published + closed)", key="meta_fix_all"):
         try:
-            real_pub = is_pub(i)
+            meta = load_meta()
         except Exception:
-            real_pub = False
-        # Real: closed = publicado y sin resultados vacíos
+            meta = {}
+        rounds = meta.setdefault("rounds", {})
+
         try:
-            dfp = read_csv_safe(round_file(i))
-            vac = results_empty_count(dfp)
+            n_max = get_n_rounds()
         except Exception:
-            vac = None
-        real_closed = bool(real_pub and (vac == 0))
+            n_max = 0
+        existing = [i for i in range(1, n_max + 1) if os.path.exists(round_file(i))]
 
-        if r.get("published") != real_pub:
-            r["published"] = real_pub
-            cambios += 1
-        if r.get("closed") != real_closed:
-            r["closed"] = real_closed
-            cambios += 1
+        cambios = 0
+        for i in existing:
+            r = rounds.setdefault(str(i), {})
+            # Real: publicado
+            try:
+                real_pub = is_pub(i)
+            except Exception:
+                real_pub = False
+            # Real: closed = publicado y sin resultados vacíos
+            try:
+                dfp = read_csv_safe(round_file(i))
+                vac = results_empty_count(dfp)
+            except Exception:
+                vac = None
+            real_closed = bool(real_pub and (vac == 0))
 
-    try:
-        save_meta(meta)
-        st.success(f"meta.json actualizado ({cambios} cambio/s).")
-        st.rerun()
-    except Exception as e:
-        st.error(f"No se pudo actualizar meta.json: {e}")
-       
-    # ---------- Snapshot ZIP (opcional) ----------
-    with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):
-        if st.button("Crear snapshot.zip", use_container_width=True):
-            buf = io.BytesIO()
-            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-                for p in [_cfg_path, os.path.join(DATA_DIR, "jugadores.csv"),
-                          os.path.join(DATA_DIR, "standings.csv"), _meta_path, _log_path]:
-                    if os.path.exists(p):
-                        z.write(p, arcname=os.path.basename(p))
-                for i in range(1, n + 1):
-                    p = round_file(i)
-                    if os.path.exists(p):
-                        z.write(p, arcname=os.path.basename(p))
-            st.download_button(
-                "Descargar snapshot.zip",
-                buf.getvalue(),
-                file_name="snapshot_torneo.zip",
-                mime="application/zip",
-                key="dl_zip_all",
-                use_container_width=True,
-            )
+            if r.get("published") != real_pub:
+                r["published"] = real_pub
+                cambios += 1
+            if r.get("closed") != real_closed:
+                r["closed"] = real_closed
+                cambios += 1
 
-    st.divider()
+        try:
+            save_meta(meta)
+            st.success(f"meta.json actualizado ({cambios} cambio/s).")
+            st.rerun()
+        except Exception as e:
+            st.error(f"No se pudo actualizar meta.json: {e}")
+
+        # ---------- Snapshot ZIP (opcional) ----------
+        with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):
+            if st.button("Crear snapshot.zip", use_container_width=True):
+                import io, zipfile
+                buf = io.BytesIO()
+                with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+                    for p in [_cfg_path,
+                              os.path.join(DATA_DIR, "jugadores.csv"),
+                              os.path.join(DATA_DIR, "standings.csv"),
+                              _meta_path, _log_path]:
+                        if os.path.exists(p):
+                            z.write(p, arcname=os.path.basename(p))
+                    for i in range(1, n + 1):
+                        p = round_file(i)
+                        if os.path.exists(p):
+                            z.write(p, arcname=os.path.basename(p))
+                st.download_button(
+                    "Descargar snapshot.zip",
+                    buf.getvalue(),
+                    file_name="snapshot_torneo.zip",
+                    mime="application/zip",
+                    key="dl_zip_all",
+                    use_container_width=True,
+                )
+
+        st.divider()
+
 
 
 # =========================
