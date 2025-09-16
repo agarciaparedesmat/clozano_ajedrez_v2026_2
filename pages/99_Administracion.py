@@ -1613,33 +1613,32 @@ def _show_archivos():
         except Exception as e:
             st.error(f"No se pudo actualizar meta.json: {e}")
 
-        # ---------- Snapshot ZIP (opcional) ----------
-        with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):
-            if st.button("Crear snapshot.zip", use_container_width=True):
-                import io, zipfile
-                buf = io.BytesIO()
-                with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-                    for p in [_cfg_path,
-                              os.path.join(DATA_DIR, "jugadores.csv"),
-                              os.path.join(DATA_DIR, "standings.csv"),
-                              _meta_path, _log_path]:
-                        if os.path.exists(p):
-                            z.write(p, arcname=os.path.basename(p))
-                    for i in range(1, n + 1):
-                        p = round_file(i)
-                        if os.path.exists(p):
-                            z.write(p, arcname=os.path.basename(p))
-                st.download_button(
-                    "Descargar snapshot.zip",
-                    buf.getvalue(),
-                    file_name="snapshot_torneo.zip",
-                    mime="application/zip",
-                    key="dl_zip_all",
-                    use_container_width=True,
-                )
-
         st.divider()
 
+    # ---------- Snapshot ZIP (opcional) ----------
+    with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):
+        if st.button("Crear snapshot.zip", use_container_width=True):
+            import io, zipfile
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+                for p in [_cfg_path,
+                            os.path.join(DATA_DIR, "jugadores.csv"),
+                            os.path.join(DATA_DIR, "standings.csv"),
+                            _meta_path, _log_path]:
+                    if os.path.exists(p):
+                        z.write(p, arcname=os.path.basename(p))
+                for i in range(1, n + 1):
+                    p = round_file(i)
+                    if os.path.exists(p):
+                        z.write(p, arcname=os.path.basename(p))
+            st.download_button(
+                "Descargar snapshot.zip",
+                buf.getvalue(),
+                file_name="snapshot_torneo.zip",
+                mime="application/zip",
+                key="dl_zip_all",
+                use_container_width=True,
+            )
 
 
 # =========================
@@ -1693,5 +1692,4 @@ def _debug_meta_persistencia():
         except Exception as e:
             st.error(f"Fallo al guardar: {e}")
 
-# Llama a la función donde quieras en Administración:
-# _debug_meta_persistencia()
+
