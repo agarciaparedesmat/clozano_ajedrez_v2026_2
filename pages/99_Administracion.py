@@ -1167,9 +1167,13 @@ def _show_archivos():
                 })
 
         if rows_meta:
-            dfm = pd.DataFrame(rows_meta)
-            st.dataframe(dfm, use_container_width=True, hide_index=True)
+#            dfm = pd.DataFrame(rows_meta)
+#            st.dataframe(dfm, use_container_width=True, hide_index=True)
 
+            dfm = pd.DataFrame(rows_meta)
+            def _row_style(r):
+                return ["background-color:#ffe5e5" if r["desviación_closed"] else "" for _ in r]
+            st.table(dfm.style.apply(_row_style, axis=1))
 
     st.markdown("---")
 
@@ -1258,18 +1262,34 @@ def _show_archivos():
             meta_w = {}
         rounds_w = meta_w.setdefault("rounds", {})
         cambios = 0
+
         for i in rondas_exist:
-            # Publicada real (preferimos helper; si falla, usamos flag-file)
+            # Publicada real (helper + fallback a flag-file)
             try:
                 pub = is_pub(i)
             except Exception:
                 pub = os.path.exists(_pub_flag_path(i))
-            # Vacíos reales
+
+            # Vacíos reales (usar DataFrame, no el número de ronda)
             try:
-                vacios = results_empty_count(i)
+                dfp = read_csv_safe(round_file(i))
+                vacios = results_empty_count(dfp) if dfp is not None else None
             except Exception:
                 vacios = None
+
             closed_now = bool(pub and (vacios == 0))
+            r = rounds_w.setdefault(str(i), {})
+            if r.get("closed") != closed_now:
+                r["closed"] = closed_now
+                cambios += 1
+
+        try:
+            save_meta(meta_w)
+            st.success(f"Campo 'closed' actualizado para {cambios} rondas.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"No se pudo actualizar meta.json: {e}")
+
 
 
 # Reparar meta.json (published + closed)
