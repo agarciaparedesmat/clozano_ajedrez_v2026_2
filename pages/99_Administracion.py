@@ -707,7 +707,7 @@ def _show_fechas():
     # =========================
     # A) Editor individual (solo rondas en borrador)
     # =========================
-    st.subheader("D) Editor individual (solo borradores)")
+    st.subheader("A) Editor individual (solo borradores)")
     draft_rounds = [i for i in existing_rounds if not _is_pub_safe(i)]
     if not draft_rounds:
         st.info("No hay rondas en borrador para editar fecha.")
@@ -766,7 +766,7 @@ def _show_fechas():
     # =========================
     # B) Editor rápido (tabla) — solo guarda cambios en borradores
     # =========================
-    st.subheader("A) Editor rápido (tabla)")
+    st.subheader("B) Editor rápido (tabla)")
     rows = []
     for i in existing_rounds:
         fecha_iso = _get_date_safe(i)
