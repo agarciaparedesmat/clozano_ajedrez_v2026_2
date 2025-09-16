@@ -1304,10 +1304,10 @@ if st.button("🧯 Reparar meta.json (published + closed)", key="meta_fix_all"):
         st.rerun()
     except Exception as e:
         st.error(f"No se pudo actualizar meta.json: {e}")
-            r = rounds_w.setdefault(str(i), {})
-            if r.get("closed") != closed_now:
-                r["closed"] = closed_now
-                cambios += 1
+        r = rounds_w.setdefault(str(i), {})
+        if r.get("closed") != closed_now:
+            r["closed"] = closed_now
+            cambios += 1
 
         try:
             save_meta(meta_w)
