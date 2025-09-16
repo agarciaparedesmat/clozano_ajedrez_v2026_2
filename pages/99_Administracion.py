@@ -466,7 +466,7 @@ label[data-testid="stMarkdownContainer"] p {
 """
 st.markdown(_STICKY_MENU_CSS, unsafe_allow_html=True)
 
-MENU = ["📋 Resumen","🧑‍🎓 Jugadores","🎲 Semilla R1","♟️ Generar","📅 Fechas","📣 Publicar","✏️ Resultados","🗑️ Eliminar","🗂️ Archivos","🧾 Config"]
+MENU = ["📋 Resumen","🧑‍🎓 Jugadores","🎲 Semilla R1","♟️ Generar","📅 Fechas","📣 Publicar","✏️ Resultados","🗑️ Eliminar","🗂️ Archivos","🧾 Config","💾 Backups"]
 st.session_state.setdefault("admin_view", "📋 Resumen")
 st.markdown('<div id="admin-local-nav">', unsafe_allow_html=True)
 st.radio("Menú", MENU, horizontal=True, key="admin_view")
@@ -1812,6 +1812,81 @@ def _show_archivos():
                 use_container_width=True,
             )
 
+# =========================
+# 💾 Copias y Restauración (local)
+# =========================
+def _show_backups():
+    st.markdown("## 💾 Copias y Restauración (local)")
+
+    # --- Crear backup ---
+    st.subheader("Crear backup")
+    col1, col2 = st.columns([2, 3])
+    with col1:
+        label = st.text_input("Etiqueta del backup (nivel/curso/grupo)", value="", help="p.ej. 'NivelA', 'Semifinales', 'Curso2025'")
+    with col2:
+        note = st.text_input("Nota breve (opcional)", value="", help="Descripción corta del motivo del backup")
+
+    if st.button("🧷 Crear backup ahora", use_container_width=True, type="primary"):
+        try:
+            out = _make_backup_local(label=label, note=note)
+            st.success(f"Backup creado: {os.path.basename(out)}")
+            with open(out, "rb") as f:
+                st.download_button("⬇️ Descargar backup", data=f.read(),
+                                   file_name=os.path.basename(out),
+                                   mime="application/zip", use_container_width=True)
+        except Exception as e:
+            st.error(f"No se pudo crear el backup: {e}")
+
+    st.divider()
+
+    # --- Restaurar desde backup existente ---
+    st.subheader("Restaurar desde backup existente")
+    bdir = _bk_dir()
+    files = sorted([f for f in os.listdir(bdir) if f.endswith(".zip")], reverse=True)
+    if files:
+        sel = st.selectbox("Selecciona backup", files, index=0, key="bk_sel")
+        path = os.path.join(bdir, sel)
+        # Mostrar manifest
+        try:
+            import zipfile, json
+            with zipfile.ZipFile(path, "r") as z:
+                if "manifest.json" in z.namelist():
+                    manifest = json.loads(z.read("manifest.json"))
+                    with st.expander("Ver manifest.json"):
+                        st.json(manifest)
+        except Exception:
+            pass
+
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            with open(path, "rb") as f:
+                st.download_button("⬇️ Descargar este backup", data=f.read(),
+                                   file_name=os.path.basename(path),
+                                   mime="application/zip", use_container_width=True)
+        with c2:
+            if st.button("⚠️ Restaurar este backup", use_container_width=True):
+                ok, msg = _restore_zip(path, preserve_dates=True)
+                (st.success if ok else st.error)(msg)
+                if ok:
+                    st.toast("Reinicia o recarga para ver los cambios")
+                    st.experimental_rerun()
+    else:
+        st.info("No hay backups locales aún. Crea uno arriba.")
+
+    st.divider()
+
+    # --- Restaurar desde un ZIP local subido ---
+    st.subheader("Restaurar desde ZIP local")
+    up = st.file_uploader("Sube un ZIP de backup", type=["zip"], accept_multiple_files=False)
+    if up is not None:
+        if st.button("⚠️ Restaurar desde ZIP subido", use_container_width=True, key="restore_uploaded"):
+            ok, msg = _restore_zip(up, preserve_dates=True)
+            (st.success if ok else st.error)(msg)
+            if ok:
+                st.toast("Reinicia o recarga para ver los cambios")
+                st.experimental_rerun()
+
+
 
 # =========================
 # Router de vistas
@@ -1826,6 +1901,7 @@ elif view == '📅 Fechas': _show_fechas()
 elif view == '✏️ Resultados': _show_resultados()
 elif view == '🗑️ Eliminar': _show_eliminar()
 elif view == '🗂️ Archivos': _show_archivos()
+elif view == '💾 Backups': _show_backups()
 
 
 def _debug_meta_persistencia():
