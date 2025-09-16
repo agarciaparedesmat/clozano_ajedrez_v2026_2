@@ -95,6 +95,178 @@ def get_n_rounds() -> int:
         return 0
 
 
+# ===== Helpers Copias/Restore =====
+def _bk_dir() -> str:
+    # Carpeta local de backups
+    d = os.path.join(DATA_DIR, "backups")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def _now_tag() -> str:
+    import datetime as _dt
+    # 2025-09-16_14-33-05
+    return _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+def _safe_zip_namelist(zf):
+    # Evita "zip-slip" (entradas con rutas absolutas o que suben directorios)
+    names = []
+    for n in zf.namelist():
+        if n.startswith("/") or ".." in n.replace("\\", "/"):
+            continue
+        names.append(n)
+    return names
+
+def _manifest(make: bool, label: str = "", note: str = "", extra: dict | None = None) -> dict:
+    # Metadatos del backup
+    m = {
+        "kind": "tournament-backup",
+        "version": 1,
+        "created_at": _now_tag(),
+        "label": label or "",
+        "note": note or "",
+    }
+    if extra:
+        m.update(extra)
+    return m
+
+def _collect_paths_for_backup(n_rounds: int | None = None) -> list[str]:
+    # Ficheros clave a incluir; rounds dinámicas
+    paths = [
+        os.path.join(BASE_DIR, "config.json"),
+        os.path.join(DATA_DIR, "jugadores.csv"),
+        os.path.join(DATA_DIR, "standings.csv"),
+        os.path.join(DATA_DIR, "meta.json"),
+        os.path.join(DATA_DIR, "admin_log.csv"),
+    ]
+    try:
+        if n_rounds is None:
+            n_rounds = get_n_rounds()
+    except Exception:
+        n_rounds = 0
+    for i in range(1, (n_rounds or 0) + 1):
+        p = round_file(i)
+        if os.path.exists(p):
+            paths.append(p)
+    # filtra existentes
+    return [p for p in paths if p and os.path.exists(p)]
+
+def _write_zip(paths: list[str], out_path: str, manifest: dict):
+    import zipfile, io, json
+    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
+        # manifest
+        z.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+        for p in paths:
+            try:
+                arc = os.path.relpath(p, BASE_DIR)  # relativo al proyecto
+                z.write(p, arcname=arc)
+            except Exception:
+                # fallback sin relpath
+                z.write(p, arcname=os.path.basename(p))
+
+def _restore_zip(fileobj, preserve_dates: bool = True) -> tuple[bool, str]:
+    """
+    Restaura desde un ZIP subido o abierto. Hace snapshot previo automáticamente.
+    Devuelve (ok, msg).
+    """
+    import zipfile, tempfile, shutil, json
+    # 1) Snapshot de seguridad ANTES de restaurar
+    try:
+        _make_backup_local(label="auto_pre_restore", note="Backup automático antes de restaurar.")
+    except Exception:
+        pass
+
+    # 2) Abrir zip y validar
+    try:
+        zf = zipfile.ZipFile(fileobj)
+    except Exception as e:
+        return False, f"ZIP inválido: {e}"
+    names = _safe_zip_namelist(zf)
+    if "manifest.json" not in names:
+        return False, "El ZIP no contiene manifest.json (no parece ser un backup válido)."
+    try:
+        manifest = json.loads(zf.read("manifest.json"))
+        if manifest.get("kind") != "tournament-backup":
+            return False, "El manifest no es de tipo 'tournament-backup'."
+    except Exception as e:
+        return False, f"Manifest ilegible: {e}"
+
+    # 3) Extraer en temp y copiar a ubicaciones reales
+    tmpdir = tempfile.mkdtemp(prefix="restore_")
+    try:
+        zf.extractall(tmpdir, members=names)
+        # Copiamos únicamente los ficheros esperados; mapeo -> destino
+        candidates = [
+            ("config.json", os.path.join(BASE_DIR, "config.json")),
+            (os.path.join("data", "jugadores.csv"), os.path.join(DATA_DIR, "jugadores.csv")),
+            (os.path.join("data", "standings.csv"), os.path.join(DATA_DIR, "standings.csv")),
+            (os.path.join("data", "meta.json"), os.path.join(DATA_DIR, "meta.json")),
+            (os.path.join("data", "admin_log.csv"), os.path.join(DATA_DIR, "admin_log.csv")),
+        ]
+        # rounds: cualquier data/pairings_R*.csv
+        for n in names:
+            if n.startswith("data/") and "pairings_" in n and n.endswith(".csv"):
+                src = os.path.join(tmpdir, n)
+                dest = os.path.join(DATA_DIR, os.path.basename(n))
+                candidates.append((n, dest))
+
+        # Si preservamos fechas, mezclar meta.json
+        meta_dest = os.path.join(DATA_DIR, "meta.json")
+        meta_new_path = os.path.join(tmpdir, "data", "meta.json")
+
+        for rel, dest in candidates:
+            src = os.path.join(tmpdir, rel) if not os.path.isabs(rel) else rel
+            if not os.path.exists(src):
+                continue
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+
+            if preserve_dates and dest == meta_dest and os.path.exists(dest):
+                # fusión no destructiva para 'date'
+                try:
+                    with open(dest, "r", encoding="utf-8") as f: cur = json.load(f)
+                except Exception:
+                    cur = {}
+                try:
+                    with open(src, "r", encoding="utf-8") as f: neu = json.load(f)
+                except Exception:
+                    neu = {}
+                cur_rounds = cur.get("rounds", {}) if isinstance(cur, dict) else {}
+                neu_rounds = neu.get("rounds", {}) if isinstance(neu, dict) else {}
+                for k, old_r in cur_rounds.items():
+                    if isinstance(old_r, dict) and "date" in old_r:
+                        nr = neu_rounds.setdefault(k, {})
+                        if not nr.get("date"):
+                            nr["date"] = old_r["date"]
+                neu["rounds"] = neu_rounds
+                # escritura atómica
+                tmpw = dest + ".tmp"
+                with open(tmpw, "w", encoding="utf-8") as f:
+                    json.dump(neu, f, ensure_ascii=False, indent=2)
+                os.replace(tmpw, dest)
+            else:
+                # copy (overwrite)
+                shutil.copy2(src, dest)
+
+        return True, "Restauración completada."
+    except Exception as e:
+        return False, f"Error al restaurar: {e}"
+    finally:
+        try:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        except Exception:
+            pass
+
+def _make_backup_local(label: str = "", note: str = "") -> str:
+    """
+    Crea un backup completo y devuelve la ruta del ZIP creado.
+    """
+    tag = _now_tag()
+    label_clean = re.sub(r"[^A-Za-z0-9_\-]+", "_", label.strip()) if label else "backup"
+    fname = f"{tag}__{label_clean}.zip"
+    out_path = os.path.join(_bk_dir(), fname)
+    paths = _collect_paths_for_backup()
+    mf = _manifest(True, label=label, note=note, extra={"files": len(paths)})
+    _write_zip(paths, out_path, mf)
+    return out_path
 
 
 
