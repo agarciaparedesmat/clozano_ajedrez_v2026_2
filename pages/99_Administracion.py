@@ -672,9 +672,8 @@ def _show_publicar():
         st.caption("No hay rondas publicadas actualmente.")
 
 # =========================
-# 📅 Fecha de celebración por ronda (vista enriquecida)
+# 📅 Fecha de celebración por ronda (solo borradores) — con badges de estado
 # =========================
-
 def _show_fechas():
     import datetime as _dt
     import pandas as pd
@@ -706,19 +705,25 @@ def _show_fechas():
             return ""
 
     # =========================
-    # D) Editor individual (solo rondas en borrador)
+    # A) Editor individual (solo rondas en borrador)
     # =========================
     st.subheader("D) Editor individual (solo borradores)")
     draft_rounds = [i for i in existing_rounds if not _is_pub_safe(i)]
     if not draft_rounds:
         st.info("No hay rondas en borrador para editar fecha.")
     else:
-        sel_draft = st.selectbox(
-            "Ronda en borrador a editar",
-            draft_rounds,
-            index=0,
-            key="fecha_sel_round_legacy",
-        )
+        col_sel, col_badge = st.columns([2, 1])
+        with col_sel:
+            sel_draft = st.selectbox(
+                "Ronda en borrador a editar",
+                draft_rounds,
+                index=0,
+                key="fecha_sel_round_legacy",
+            )
+        with col_badge:
+            # Badge para la ronda actualmente seleccionada (siempre borrador en este bloque)
+            st.markdown("**Estado:** 📝 Borrador")
+
         current_iso = _get_date_safe(sel_draft)
         default_date = _dt.date.today()
         if current_iso:
@@ -759,7 +764,7 @@ def _show_fechas():
     st.divider()
 
     # =========================
-    # A) Editor rápido (tabla) — solo guarda cambios en borradores
+    # B) Editor rápido (tabla) — solo guarda cambios en borradores
     # =========================
     st.subheader("A) Editor rápido (tabla)")
     rows = []
@@ -769,10 +774,13 @@ def _show_fechas():
             fecha_dt = _dt.date.fromisoformat(fecha_iso) if fecha_iso else None
         except Exception:
             fecha_dt = None
+        publicado = _is_pub_safe(i)
+        estado_badge = "✅ Publicada" if publicado else "📝 Borrador"
         rows.append({
             "Ronda": i,
-            "Publicada": "Sí" if _is_pub_safe(i) else "No",
-            "Fecha": fecha_dt  # editable
+            "Estado": estado_badge,          # NUEVO badge visual
+            "Publicada": "Sí" if publicado else "No",  # Campo informativo/bloqueado
+            "Fecha": fecha_dt                # editable
         })
 
     df_table = pd.DataFrame(rows)
@@ -783,10 +791,11 @@ def _show_fechas():
         hide_index=True,
         column_config={
             "Ronda": st.column_config.NumberColumn(format="%d"),
+            "Estado": st.column_config.TextColumn(help="Estado de la ronda: ✅ Publicada · 📝 Borrador"),
             "Publicada": st.column_config.TextColumn(),
             "Fecha": st.column_config.DateColumn("Fecha (editable)")
         },
-        disabled=["Ronda", "Publicada"],
+        disabled=["Ronda", "Estado", "Publicada"],
         key="fechas_editor_tabla",
     )
 
@@ -795,21 +804,20 @@ def _show_fechas():
         try:
             for _, r in ed.iterrows():
                 i = int(r["Ronda"])
+                # Solo rondas en borrador
                 if _is_pub_safe(i):
-                    continue  # No tocar publicadas
+                    continue
                 v = r["Fecha"]
                 if pd.isna(v):
                     set_round_date(i, None)
                     cambios += 1
                 else:
-                    # v es datetime.date
-                    set_round_date(i, v.isoformat())
+                    set_round_date(i, v.isoformat())  # v es datetime.date
                     cambios += 1
             st.success(f"Fechas actualizadas para {cambios} ronda(s) (solo borradores).")
             st.rerun()
         except Exception as e:
             st.error(f"No se pudo aplicar la actualización en tabla: {e}")
-
 
 # =========================
 # Resultados y clasificación (solo PUBLICADAS)
