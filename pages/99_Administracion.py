@@ -701,6 +701,33 @@ def _show_fechas():
         except Exception:
             return ""
 
+
+   # --------- D) Editor original (borradores individuales) ----------
+    st.subheader("D) Editor individual (tal como estaba)")
+    if draft_rounds:
+        sel_draft = st.selectbox("Ronda en borrador a editar", draft_rounds, index=0, key="fecha_sel_round_legacy")
+        current_iso = _get_date_safe(sel_draft)
+        default_date = _dt.date.today()
+        if current_iso:
+            try:
+                y, m_, d = map(int, current_iso.split("-"))
+                default_date = _dt.date(y, m_, d)
+            except Exception:
+                pass
+        new_date = st.date_input("Nueva fecha de celebración", value=default_date, key=f"fecha_edit_R{sel_draft}")
+        if st.button("💾 Guardar fecha de la ronda", use_container_width=True, key=f"save_fecha_R{sel_draft}"):
+            try:
+                set_round_date(sel_draft, new_date.isoformat())
+                try:
+                    pretty = format_date_es(new_date.isoformat())
+                except Exception:
+                    pretty = new_date.isoformat()
+                st.success(f"Fecha guardada para Ronda {sel_draft}: {pretty}")
+            except Exception as e:
+                st.error(f"No se pudo guardar la fecha: {e}")
+    else:
+        st.info("No hay rondas en borrador para editar fecha.")
+
     # --------- A) Editor rápido en tabla (fecha editable) ----------
     st.subheader("A) Editor rápido (tabla)")
     rows = []
@@ -841,31 +868,7 @@ def _show_fechas():
 
     st.divider()
 
-    # --------- D) Editor original (borradores individuales) ----------
-    st.subheader("D) Editor individual (tal como estaba)")
-    if draft_rounds:
-        sel_draft = st.selectbox("Ronda en borrador a editar", draft_rounds, index=0, key="fecha_sel_round_legacy")
-        current_iso = _get_date_safe(sel_draft)
-        default_date = _dt.date.today()
-        if current_iso:
-            try:
-                y, m_, d = map(int, current_iso.split("-"))
-                default_date = _dt.date(y, m_, d)
-            except Exception:
-                pass
-        new_date = st.date_input("Nueva fecha de celebración", value=default_date, key=f"fecha_edit_R{sel_draft}")
-        if st.button("💾 Guardar fecha de la ronda", use_container_width=True, key=f"save_fecha_R{sel_draft}"):
-            try:
-                set_round_date(sel_draft, new_date.isoformat())
-                try:
-                    pretty = format_date_es(new_date.isoformat())
-                except Exception:
-                    pretty = new_date.isoformat()
-                st.success(f"Fecha guardada para Ronda {sel_draft}: {pretty}")
-            except Exception as e:
-                st.error(f"No se pudo guardar la fecha: {e}")
-    else:
-        st.info("No hay rondas en borrador para editar fecha.")
+ 
 
 
 # =========================
