@@ -1691,5 +1691,5 @@ def _debug_meta_persistencia():
             st.json(load_meta())
         except Exception as e:
             st.error(f"Fallo al guardar: {e}")
-
+  
 
