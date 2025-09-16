@@ -82,17 +82,21 @@ def build_standings_pdf(
     cfg: dict,
     ronda_actual: int | None,
     show_bh: bool = True,
-    include_stats: bool = False
+    include_stats: bool = False,
+    paper: str = "A4"
 ) -> bytes | None:
-    'Genera PDF con tu estética; si include_stats=True añade Progreso/Victorias/Blancas/Negras/Performance.'
+    'Genera PDF con tu estética; si include_stats=True añade Progreso/Victorias/Blancas/Negras/Performance. Selector A4/A3.'
     try:
         has_custom = _register_fonts()
         SERIF    = "OldStd"     if has_custom else "Times-Roman"
         SERIF_B  = "OldStd-B"   if has_custom else "Times-Bold"
 
+        PAPER_RL = {"A4": A4, "A3": A3}
+        page_size = PAPER_RL.get(paper, A4)
+
         buf = io.BytesIO()
         doc = SimpleDocTemplate(
-            buf, pagesize=A4,
+            buf, pagesize=page_size,
             leftMargin=17*mm, rightMargin=17*mm,
             topMargin=14*mm, bottomMargin=14*mm
         )
@@ -443,7 +447,6 @@ try:
     rank_progress = get_rank_progress(max_rondas=10)
     df_st["Progreso 📈"] = df_st["id"].astype(str).apply(lambda pid: format_rank_progress(rank_progress.get(str(pid), [])))
 except Exception:
-    # Fallback: omitir si no están los helpers
     pass
 
 # Stats adicionales
@@ -488,9 +491,12 @@ st.dataframe(
 )
 
 # -----------------------------------------
-# Descargas CSV + PDF (manteniendo tu UX)
+# Descargas CSV + PDF (ahora con selector A4/A3 para CLASIFICACIÓN)
 # -----------------------------------------
-c_csv, c_pdf = st.columns([1, 1])
+if "cls_pdf_paper" not in st.session_state:
+    st.session_state["cls_pdf_paper"] = "A4"
+
+c_csv, c_pdf = st.columns([1, 2])
 
 with c_csv:
     csv_buf = io.StringIO()
@@ -504,16 +510,29 @@ with c_csv:
     )
 
 with c_pdf:
-    pdf_view_df = df_st[cols].copy()
+    col_title, col_a4, col_a3 = st.columns([3, 1, 1])
+    with col_title:
+        st.caption("📄 Tamaño de papel para la clasificación")
+    with col_a4:
+        label = "A4 ✅" if st.session_state["cls_pdf_paper"] == "A4" else "A4"
+        if st.button(label, key="cls_paper_a4"):
+            st.session_state["cls_pdf_paper"] = "A4"
+    with col_a3:
+        label = "A3 ✅" if st.session_state["cls_pdf_paper"] == "A3" else "A3"
+        if st.button(label, key="cls_paper_a3"):
+            st.session_state["cls_pdf_paper"] = "A3"
+
+    # Para el PDF con estadísticas, PASAMOS EL DF CON LAS COLUMNAS NUEVAS si show_stats
+    pdf_source_df = df_st[cols_final].copy() if show_stats else df_st[cols].copy()
     pdf_bytes = build_standings_pdf(
-        pdf_view_df,
-        cfg, ronda_actual, show_bh=show_bh, include_stats=show_stats
+        pdf_source_df,
+        cfg, ronda_actual, show_bh=show_bh, include_stats=show_stats, paper=st.session_state["cls_pdf_paper"]
     )
     if isinstance(pdf_bytes, (bytes, bytearray)) and len(pdf_bytes) > 0:
         st.download_button(
             "📄 Descargar clasificación (PDF)",
             data=pdf_bytes,
-            file_name=f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf",
+            file_name=f"clasificacion_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}_{st.session_state['cls_pdf_paper']}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
@@ -523,9 +542,12 @@ with c_pdf:
 st.divider()
 
 # -----------------------------------------
-# Cuadro del torneo (doble entrada por posiciones) con botones A4/A3
+# Cuadro del torneo (doble entrada por posiciones) con botones A4/A3 (resaltado)
 # -----------------------------------------
 def build_crosstable_full_section(df_st, publicadas, cfg):
+    if "ct_pdf_paper" not in st.session_state:
+        st.session_state["ct_pdf_paper"] = "A4"
+
     if "show_ct" not in st.session_state:
         st.session_state["show_ct"] = False
 
@@ -554,15 +576,14 @@ def build_crosstable_full_section(df_st, publicadas, cfg):
                     )
 
                 with c2:
-                    if "ct_pdf_paper" not in st.session_state:
-                        st.session_state["ct_pdf_paper"] = "A4"
-
                     col_dl, col_a4, col_a3 = st.columns([4, 1, 1])
                     with col_a4:
-                        if st.button("A4", key="ct_paper_a4"):
+                        label = "A4 ✅" if st.session_state["ct_pdf_paper"] == "A4" else "A4"
+                        if st.button(label, key="ct_paper_a4"):
                             st.session_state["ct_pdf_paper"] = "A4"
                     with col_a3:
-                        if st.button("A3", key="ct_paper_a3"):
+                        label = "A3 ✅" if st.session_state["ct_pdf_paper"] == "A3" else "A3"
+                        if st.button(label, key="ct_paper_a3"):
                             st.session_state["ct_pdf_paper"] = "A3"
 
                     paper = st.session_state["ct_pdf_paper"]
@@ -573,7 +594,7 @@ def build_crosstable_full_section(df_st, publicadas, cfg):
                             st.download_button(
                                 "📄 Descargar cuadro (PDF)",
                                 data=pdf_ct,
-                                file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}.pdf",
+                                file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}_{paper}.pdf",
                                 mime="application/pdf",
                                 use_container_width=True,
                                 key="dl_ct_pdf",
