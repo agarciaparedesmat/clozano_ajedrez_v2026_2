@@ -1105,47 +1105,58 @@ def _show_archivos():
 
     # meta.json → JSON + (opcional) tabla de rondas si hay estructura 'rounds'
     if os.path.exists(_meta_path):
+        # --- Visor de meta.json (seguro) ---
         st.markdown("**meta.json**")
+
+        meta_obj = None
+        import json  # import local para evitar dependencias en cabecera
         try:
             with open(_meta_path, "r", encoding="utf-8") as f:
                 meta_obj = json.load(f)
+        except Exception as e:
+            st.caption(f"No se puede leer meta.json: {e}")
+        else:
             st.json(meta_obj)
 
-        # Tabla comparativa real vs meta (incluye date(meta))
-        rounds_meta = (meta_obj.get("rounds", {}) 
-        if isinstance(meta_obj, dict) else {}) or {}
-        try:
-            n_max = get_n_rounds()
-        except Exception:
-            n_max = 0
-        existing = [i for i in range(1, n_max + 1) if os.path.exists(round_file(i))]
+        # Construir la tabla comparativa solo si cargó bien el JSON
         rows_meta = []
-        for i in existing:
-            v = rounds_meta.get(str(i), {})
-            pub_meta    = bool(v.get("published", False))
-            date_meta   = v.get("date") or ""
-            closed_meta = bool(v.get("closed", False))
-
+        if isinstance(meta_obj, dict):
+            rounds_meta = meta_obj.get("rounds", {}) or {}
             try:
-                pub_real = is_pub(i)
+                n_max = get_n_rounds()
             except Exception:
-                pub_real = False
-            try:
-                dfp = read_csv_safe(round_file(i))
-                vac = results_empty_count(dfp)
-            except Exception:
-                vac = None
-            closed_real = bool(pub_real and (vac == 0))
+                n_max = 0
 
-            rows_meta.append({
-                "ronda": i,
-                "date(meta)": date_meta,
-                "published(meta)": pub_meta,
-                "published(real)": pub_real,
-                "closed(meta)": closed_meta,
-                "closed(real)": closed_real,
-                "desviación_closed": (closed_meta != closed_real),
-            })
+            existing = [i for i in range(1, n_max + 1) if os.path.exists(round_file(i))]
+            for i in existing:
+                v = rounds_meta.get(str(i), {})
+                # Valores robustos (evita None en la tabla)
+                pub_meta    = bool(v.get("published", False))
+                date_meta   = v.get("date") or ""
+                closed_meta = bool(v.get("closed", False))
+
+                # Estado real
+                try:
+                    pub_real = is_pub(i)
+                except Exception:
+                    pub_real = False
+                try:
+                    dfp = read_csv_safe(round_file(i))
+                    vac  = results_empty_count(dfp)
+                except Exception:
+                    vac  = None
+                closed_real = bool(pub_real and (vac == 0))
+
+                rows_meta.append({
+                    "ronda": i,
+                    "date(meta)": date_meta,
+                    "published(meta)": pub_meta,
+                    "published(real)": pub_real,
+                    "closed(meta)": closed_meta,
+                    "closed(real)": closed_real,
+                    "desviación_closed": (closed_meta != closed_real),
+                })
+
         if rows_meta:
             st.dataframe(pd.DataFrame(rows_meta), use_container_width=True, hide_index=True)
 
