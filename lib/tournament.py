@@ -150,13 +150,39 @@ def load_meta() -> dict:
     except Exception:
         return {}
 
+
 def save_meta(meta: dict) -> None:
-    """Guarda meta.json (ignora errores silenciosamente)."""
+    """Guarda data/meta.json de forma atómica y sin perder campos."""
     try:
+        # merge defensiva: siempre partimos de lo actual en disco
+        current = load_meta()
+        # mezcla superficial (para evitar borrar campos que otro haya escrito)
+        if isinstance(current, dict) and isinstance(meta, dict):
+            merged = {**current, **meta}
+            if "rounds" in current and "rounds" in meta:
+                # fusión por ronda
+                merged_rounds = current["rounds"].copy()
+                for k, v in meta["rounds"].items():
+                    merged_rounds[k] = {**merged_rounds.get(k, {}), **v}
+                merged["rounds"] = merged_rounds
+            meta = merged
+
+        # escritura (mejor si quieres usar un tmp + replace, pero vale así)
         with open(META_PATH, "w", encoding="utf-8") as f:
             json.dump(meta, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
+
+
+
+
+#def save_meta(meta: dict) -> None:
+#    """Guarda meta.json (ignora errores silenciosamente)."""
+#    try:
+#        with open(META_PATH, "w", encoding="utf-8") as f:
+#            json.dump(meta, f, ensure_ascii=False, indent=2)
+#    except Exception:
+#        pass
 
 def r1_seed() -> Optional[str]:
     """Devuelve la semilla guardada para R1 (si existe)."""

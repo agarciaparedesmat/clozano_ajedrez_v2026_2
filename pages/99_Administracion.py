@@ -1344,6 +1344,20 @@ def _show_archivos():
         for i in faltan:
             rounds_w.setdefault(str(i), {"published": False, "date": "", "closed": False})
         try:
+            # Antes de save_meta(meta_w)
+            try:
+                meta_now = load_meta() or {}
+                old_rounds = meta_now.get("rounds", {})
+                new_rounds = meta_w.get("rounds", {})
+                for k, old_r in old_rounds.items():
+                    if isinstance(old_r, dict) and "date" in old_r:
+                        new_r = new_rounds.setdefault(k, {})
+                        # si la nueva versión carece de 'date', preserva la antigua
+                        if "date" not in new_r or not new_r.get("date"):
+                            new_r["date"] = old_r["date"]
+            except Exception:
+                pass
+            # -> ahora sí:
             save_meta(meta_w)
             st.success("meta.json completado. Refrescando…")
             st.rerun()
@@ -1362,6 +1376,20 @@ def _show_archivos():
                 if was != now:
                     r["published"] = now
                     cambios += 1
+            # Antes de save_meta(meta_w)
+            try:
+                meta_now = load_meta() or {}
+                old_rounds = meta_now.get("rounds", {})
+                new_rounds = meta_w.get("rounds", {})
+                for k, old_r in old_rounds.items():
+                    if isinstance(old_r, dict) and "date" in old_r:
+                        new_r = new_rounds.setdefault(k, {})
+                        # si la nueva versión carece de 'date', preserva la antigua
+                        if "date" not in new_r or not new_r.get("date"):
+                            new_r["date"] = old_r["date"]
+            except Exception:
+                pass
+            # -> ahora sí:
             save_meta(meta_w)
             st.success(f"meta.json actualizado ({cambios} cambio/s).")
             st.rerun()
@@ -1402,6 +1430,20 @@ def _show_archivos():
                 cambios += 1
 
         try:
+            # Antes de save_meta(meta_w)
+            try:
+                meta_now = load_meta() or {}
+                old_rounds = meta_now.get("rounds", {})
+                new_rounds = meta_w.get("rounds", {})
+                for k, old_r in old_rounds.items():
+                    if isinstance(old_r, dict) and "date" in old_r:
+                        new_r = new_rounds.setdefault(k, {})
+                        # si la nueva versión carece de 'date', preserva la antigua
+                        if "date" not in new_r or not new_r.get("date"):
+                            new_r["date"] = old_r["date"]
+            except Exception:
+                pass
+            # -> ahora sí:
             save_meta(meta_w)
             st.success(f"Campo 'closed' actualizado para {cambios} rondas.")
             st.rerun()
@@ -1459,6 +1501,20 @@ if st.button("🧯 Reparar meta.json (published + closed)", key="meta_fix_all"):
             cambios += 1
 
         try:
+            # Antes de save_meta(meta_w)
+            try:
+                meta_now = load_meta() or {}
+                old_rounds = meta_now.get("rounds", {})
+                new_rounds = meta_w.get("rounds", {})
+                for k, old_r in old_rounds.items():
+                    if isinstance(old_r, dict) and "date" in old_r:
+                        new_r = new_rounds.setdefault(k, {})
+                        # si la nueva versión carece de 'date', preserva la antigua
+                        if "date" not in new_r or not new_r.get("date"):
+                            new_r["date"] = old_r["date"]
+            except Exception:
+                pass
+            # -> ahora sí:
             save_meta(meta_w)
             st.success(f"Campo 'closed' actualizado para {cambios} rondas.")
             st.rerun()
@@ -1504,3 +1560,43 @@ elif view == '📅 Fechas': _show_fechas()
 elif view == '✏️ Resultados': _show_resultados()
 elif view == '🗑️ Eliminar': _show_eliminar()
 elif view == '🗂️ Archivos': _show_archivos()
+
+
+def _debug_meta_persistencia():
+    import os, json, datetime as _dt
+    from lib.tournament import DATA_DIR, config_path, config_debug, load_meta, save_meta
+
+    st.markdown("### 🧪 Diagnóstico de persistencia de meta.json")
+    st.code(f"DATA_DIR = {DATA_DIR}", language="bash")
+    st.code(f"config_path() = {config_path()}", language="bash")
+
+    meta_path = os.path.join(DATA_DIR, "meta.json")
+    st.code(f"meta.json en: {meta_path}", language="bash")
+
+    try:
+        mt = os.path.getmtime(meta_path)
+        st.caption(f"Última modificación de meta.json: { _dt.datetime.fromtimestamp(mt) }")
+    except Exception:
+        st.caption("meta.json aún no existe.")
+
+    meta_before = load_meta() or {}
+    st.json(meta_before)
+
+    st.markdown("#### Probar escritura/lectura (no destruye nada)")
+    if st.button("Probar escritura no destructiva en meta.json", use_container_width=True):
+        try:
+            # 1) leer lo actual
+            meta = load_meta() or {}
+            rounds = meta.setdefault("rounds", {})
+            # 2) escribir un marcador temporal bajo rounds.__diag (no afecta a rondas reales)
+            import time
+            rounds.setdefault("__diag", {})["ts"] = _dt.datetime.now().isoformat()
+            save_meta(meta)
+            # 3) releer y mostrar
+            st.success("Guardado OK. Releyendo…")
+            st.json(load_meta())
+        except Exception as e:
+            st.error(f"Fallo al guardar: {e}")
+
+# Llama a la función donde quieras en Administración:
+# _debug_meta_persistencia()
