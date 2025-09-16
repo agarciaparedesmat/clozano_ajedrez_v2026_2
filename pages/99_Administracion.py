@@ -1614,33 +1614,7 @@ if st.button("🧯 Reparar meta.json (published + closed)", key="meta_fix_all"):
         st.rerun()
     except Exception as e:
         st.error(f"No se pudo actualizar meta.json: {e}")
-        r = rounds_w.setdefault(str(i), {})
-        if r.get("closed") != closed_now:
-            r["closed"] = closed_now
-            cambios += 1
-
-        try:
-            # Antes de save_meta(meta_w)
-            try:
-                meta_now = load_meta() or {}
-                old_rounds = meta_now.get("rounds", {})
-                new_rounds = meta_w.get("rounds", {})
-                for k, old_r in old_rounds.items():
-                    if isinstance(old_r, dict) and "date" in old_r:
-                        new_r = new_rounds.setdefault(k, {})
-                        # si la nueva versión carece de 'date', preserva la antigua
-                        if "date" not in new_r or not new_r.get("date"):
-                            new_r["date"] = old_r["date"]
-            except Exception:
-                pass
-            # -> ahora sí:
-            save_meta(meta_w)
-            st.success(f"Campo 'closed' actualizado para {cambios} rondas.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"No se pudo actualizar meta.json: {e}")
-
-
+       
     # ---------- Snapshot ZIP (opcional) ----------
     with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):
         if st.button("Crear snapshot.zip", use_container_width=True):
