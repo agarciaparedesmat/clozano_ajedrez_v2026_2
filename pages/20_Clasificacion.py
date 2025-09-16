@@ -1,4 +1,3 @@
-
 # pages/20_Clasificacion.py
 # -*- coding: utf-8 -*-
 
@@ -130,7 +129,6 @@ def build_standings_pdf(
             ("BOTTOMPADDING", (0,0), (-1,-1), 6),
             ("TOPPADDING", (0,0), (-1,-1), 6),
         ]))
-
         band2 = Table([[Paragraph(nivel or "", H1)]], colWidths=[doc.width])
         band2.setStyle(TableStyle([
             ("BACKGROUND", (0,0), (-1,-1), colors.whitesmoke),
@@ -138,7 +136,6 @@ def build_standings_pdf(
             ("BOTTOMPADDING", (0,0), (-1,-1), 12),
             ("TOPPADDING", (0,0), (-1,-1), 12),
         ]))
-
         linea = f"CLASIFICACIÓN DEL TORNEO (tras ronda {ronda_actual})" if ronda_actual else "CLASIFICACIÓN DEL TORNEO"
         titulo_lista = Table([[Paragraph(linea, H3)]], colWidths=[doc.width])
         titulo_lista.setStyle(TableStyle([
@@ -192,8 +189,6 @@ def build_standings_pdf(
         if "BUCHHOLZ" in head:
             widths.append(26*mm)
         widths.append(12*mm)  # PJ
-
-        # Stats compactas
         if include_stats:
             if "PROG." in head: widths.append(32*mm)
             if "V" in head:     widths.append(10*mm)
@@ -321,7 +316,6 @@ def build_crosstable_pdf(ct_df: pd.DataFrame, cfg: dict, paper: str = "A4") -> b
             ("BOTTOMPADDING", (0,0), (-1,-1), 6),
             ("TOPPADDING", (0,0), (-1,-1), 6),
         ]))
-
         band2 = Table([[Paragraph(nivel or "", H1)]], colWidths=[doc.width])
         band2.setStyle(TableStyle([
             ("BACKGROUND", (0,0), (-1,-1), colors.whitesmoke),
@@ -491,13 +485,22 @@ st.dataframe(
 )
 
 # -----------------------------------------
-# Descargas CSV + PDF (ahora con selector A4/A3 para CLASIFICACIÓN)
+# Descargas CSV + PDF (ahora con selector A4/A3 para CLASIFICACIÓN con radio)
 # -----------------------------------------
 if "cls_pdf_paper" not in st.session_state:
     st.session_state["cls_pdf_paper"] = "A4"
 
-c_csv, c_pdf = st.columns([1, 2])
+cls_choice = st.radio(
+    "📄 Tamaño de papel para la clasificación",
+    ["A4", "A3"],
+    horizontal=True,
+    index=(0 if st.session_state["cls_pdf_paper"] == "A4" else 1),
+    key="cls_pdf_paper_radio"
+)
+st.session_state["cls_pdf_paper"] = cls_choice
+st.caption(f"Formato seleccionado: **{cls_choice} ✅**")
 
+c_csv, c_pdf = st.columns([1, 2])
 with c_csv:
     csv_buf = io.StringIO()
     df_st[cols_final].to_csv(csv_buf, index=False, encoding="utf-8")
@@ -510,19 +513,7 @@ with c_csv:
     )
 
 with c_pdf:
-    col_title, col_a4, col_a3 = st.columns([3, 1, 1])
-    with col_title:
-        st.caption("📄 Tamaño de papel para la clasificación")
-    with col_a4:
-        label = "A4 ✅" if st.session_state["cls_pdf_paper"] == "A4" else "A4"
-        if st.button(label, key="cls_paper_a4"):
-            st.session_state["cls_pdf_paper"] = "A4"
-    with col_a3:
-        label = "A3 ✅" if st.session_state["cls_pdf_paper"] == "A3" else "A3"
-        if st.button(label, key="cls_paper_a3"):
-            st.session_state["cls_pdf_paper"] = "A3"
-
-    # Para el PDF con estadísticas, PASAMOS EL DF CON LAS COLUMNAS NUEVAS si show_stats
+    # Para el PDF con estadísticas, pasamos el DF con extra cols si el toggle está activo
     pdf_source_df = df_st[cols_final].copy() if show_stats else df_st[cols].copy()
     pdf_bytes = build_standings_pdf(
         pdf_source_df,
@@ -542,7 +533,7 @@ with c_pdf:
 st.divider()
 
 # -----------------------------------------
-# Cuadro del torneo (doble entrada por posiciones) con botones A4/A3 (resaltado)
+# Cuadro del torneo (doble entrada por posiciones) con st.radio A4/A3 (mismo UX)
 # -----------------------------------------
 def build_crosstable_full_section(df_st, publicadas, cfg):
     if "ct_pdf_paper" not in st.session_state:
@@ -561,6 +552,17 @@ def build_crosstable_full_section(df_st, publicadas, cfg):
                 col_config_ct = {c: st.column_config.TextColumn(str(c), width=30) for c in ct_df.columns}
                 st.dataframe(ct_df, use_container_width=False, column_config=col_config_ct)
 
+                # Selector de papel con radio (un click)
+                ct_choice = st.radio(
+                    "📄 Tamaño de papel para el cuadro",
+                    ["A4", "A3"],
+                    horizontal=True,
+                    index=(0 if st.session_state["ct_pdf_paper"] == "A4" else 1),
+                    key="ct_pdf_paper_radio"
+                )
+                st.session_state["ct_pdf_paper"] = ct_choice
+                st.caption(f"Formato seleccionado para el cuadro: **{ct_choice} ✅**")
+
                 c1, c2 = st.columns(2)
 
                 with c1:
@@ -576,31 +578,19 @@ def build_crosstable_full_section(df_st, publicadas, cfg):
                     )
 
                 with c2:
-                    col_dl, col_a4, col_a3 = st.columns([4, 1, 1])
-                    with col_a4:
-                        label = "A4 ✅" if st.session_state["ct_pdf_paper"] == "A4" else "A4"
-                        if st.button(label, key="ct_paper_a4"):
-                            st.session_state["ct_pdf_paper"] = "A4"
-                    with col_a3:
-                        label = "A3 ✅" if st.session_state["ct_pdf_paper"] == "A3" else "A3"
-                        if st.button(label, key="ct_paper_a3"):
-                            st.session_state["ct_pdf_paper"] = "A3"
-
                     paper = st.session_state["ct_pdf_paper"]
                     pdf_ct = build_crosstable_pdf(ct_df, cfg, paper=paper)
-
-                    with col_dl:
-                        if isinstance(pdf_ct, (bytes, bytearray)) and len(pdf_ct) > 0:
-                            st.download_button(
-                                "📄 Descargar cuadro (PDF)",
-                                data=pdf_ct,
-                                file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}_{paper}.pdf",
-                                mime="application/pdf",
-                                use_container_width=True,
-                                key="dl_ct_pdf",
-                            )
-                        else:
-                            st.caption("📄 PDF del cuadro no disponible (instala reportlab).")
+                    if isinstance(pdf_ct, (bytes, bytearray)) and len(pdf_ct) > 0:
+                        st.download_button(
+                            "📄 Descargar cuadro (PDF)",
+                            data=pdf_ct,
+                            file_name=f"cuadro_{slugify(cfg.get('nivel',''))}_{slugify(cfg.get('anio',''))}_{paper}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                            key="dl_ct_pdf",
+                        )
+                    else:
+                        st.caption("📄 PDF del cuadro no disponible (instala reportlab).")
             except Exception as e:
                 st.error(f"No se pudo construir el cuadro: {e}")
 
