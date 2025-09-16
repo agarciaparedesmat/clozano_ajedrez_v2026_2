@@ -672,25 +672,180 @@ def _show_publicar():
         st.caption("No hay rondas publicadas actualmente.")
 
 # =========================
-# 📅 Fecha de celebración por ronda (solo borradores)
+# 📅 Fecha de celebración por ronda (vista enriquecida)
 # =========================
 def _show_fechas():
-    
-    # Estado local y utilidades
-    n = get_n_rounds()
-    states = get_states(n)
-    # Construir lista de rondas existentes
-    existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
+    import calendar as _cal
+    import datetime as _dt
+
     st.markdown("### 📅 Fecha de celebración (solo rondas en borrador)")
-    # Filtrar borradores (existen pero no publicadas)
-    draft_rounds = [i for i in existing_rounds if not is_pub(i)]
-    if draft_rounds:
-        sel_draft = st.selectbox("Ronda en borrador a editar", draft_rounds, index=0, key="fecha_sel_round")
-        # Fecha actual (ISO) si existe
+
+    # --- Contexto y estados ---
+    n = get_n_rounds()
+    states = get_states(n) if n else []
+    existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
+    if not existing_rounds:
+        st.info("No hay rondas generadas todavía.")
+        return
+
+    # Helper: estado de publicación y fecha actual
+    def _is_pub_safe(i: int) -> bool:
         try:
-            current_iso = get_round_date(sel_draft) or ""
+            return is_pub(i)
         except Exception:
-            current_iso = ""
+            return False
+
+    def _get_date_safe(i: int) -> str:
+        try:
+            return get_round_date(i) or ""
+        except Exception:
+            return ""
+
+    # --------- A) Editor rápido en tabla (fecha editable) ----------
+    st.subheader("A) Editor rápido (tabla)")
+    rows = []
+    for i in existing_rounds:
+        fecha_iso = _get_date_safe(i)
+        try:
+            fecha_dt = _dt.date.fromisoformat(fecha_iso) if fecha_iso else None
+        except Exception:
+            fecha_dt = None
+        rows.append({
+            "Ronda": i,
+            "Publicada": "Sí" if _is_pub_safe(i) else "No",
+            "Fecha": fecha_dt  # editable
+        })
+    df_table = pd.DataFrame(rows)
+
+    ed = st.data_editor(
+        df_table,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Ronda": st.column_config.NumberColumn(format="%d"),
+            "Publicada": st.column_config.TextColumn(),
+            "Fecha": st.column_config.DateColumn("Fecha (editable)")
+        },
+        disabled=["Ronda", "Publicada"],
+        key="fechas_editor_tabla",
+    )
+
+    if st.button("💾 Guardar cambios de la tabla (solo borradores)", use_container_width=True, key="save_fechas_tabla"):
+        cambios = 0
+        for _, r in ed.iterrows():
+            i = int(r["Ronda"])
+            if _is_pub_safe(i):
+                continue  # no tocar publicadas
+            v = r["Fecha"]
+            if pd.isna(v):
+                # borrar fecha si se ha dejado vacío
+                set_round_date(i, None)
+                cambios += 1
+            else:
+                # v es datetime.date
+                set_round_date(i, v.isoformat())
+                cambios += 1
+        st.success(f"Fechas actualizadas para {cambios} ronda(s) (solo borradores).")
+        st.rerun()
+
+    st.divider()
+
+    # --------- B) Planificador por calendario ----------
+    st.subheader("B) Planificador por calendario (mes vista + asignación)")
+
+    # Elegir ronda en borrador
+    draft_rounds = [i for i in existing_rounds if not _is_pub_safe(i)]
+    if not draft_rounds:
+        st.info("No hay rondas en borrador para editar fecha.")
+    else:
+        csel1, csel2 = st.columns([2, 1])
+        with csel1:
+            sel_draft = st.selectbox("Ronda en borrador a asignar", draft_rounds, index=0, key="fecha_sel_round_calendar")
+        with csel2:
+            base_month = st.date_input("Mes a mostrar", value=_dt.date.today().replace(day=1), key="calendar_month")
+
+        # Mapa fecha->lista de rondas asignadas (pub/borrador) para anotar en cada día
+        asignadas = {}
+        for i in existing_rounds:
+            f = _get_date_safe(i)
+            if not f:
+                continue
+            try:
+                d = _dt.date.fromisoformat(f)
+            except Exception:
+                continue
+            asignadas.setdefault(d, []).append((i, _is_pub_safe(i)))
+
+        # Render de calendario (7 columnas)
+        y, m = base_month.year, base_month.month
+        cal = _cal.Calendar(firstweekday=0)  # lunes=0 si prefieres monday: set firstweekday=0 or 6 según local
+        weeks = cal.monthdayscalendar(y, m)
+
+        st.caption("Haz clic en un día para asignar la fecha a la ronda seleccionada (solo borradores).")
+        for w_idx, week in enumerate(weeks):
+            cols = st.columns(7, gap="small")
+            for d_idx, day in enumerate(week):
+                with cols[d_idx]:
+                    if day == 0:
+                        st.markdown(" ")
+                        continue
+                    day_date = _dt.date(y, m, day)
+                    # Encabezado del día
+                    st.markdown(f"**{day}**")
+
+                    # Mostrar rondas ya asignadas ese día
+                    if day_date in asignadas:
+                        tags = []
+                        for rnd, pub in sorted(asignadas[day_date]):
+                            tags.append(f"R{rnd}{'✅' if pub else ''}")
+                        st.caption(" · ".join(tags))
+
+                    # Botón para asignar a la ronda seleccionada
+                    if st.button("Asignar", key=f"asig_{sel_draft}_{y}_{m}_{day}"):
+                        try:
+                            set_round_date(sel_draft, day_date.isoformat())
+                            pretty = format_date_es(day_date.isoformat()) if 'format_date_es' in globals() else day_date.isoformat()
+                            st.success(f"Ronda {sel_draft} → {pretty}")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"No se pudo asignar la fecha: {e}")
+
+    st.divider()
+
+    # --------- C) Asignación en bloque ----------
+    st.subheader("C) Asignación en bloque (secuencial)")
+    if not draft_rounds:
+        st.caption("No hay rondas en borrador para asignar en bloque.")
+        return
+
+    colb1, colb2, colb3 = st.columns([2, 1, 1])
+    with colb1:
+        start_dt = st.date_input("Fecha de inicio", value=_dt.date.today(), key="blk_start")
+    with colb2:
+        every_days = st.number_input("Periodicidad (días)", min_value=1, max_value=60, value=7, step=1, key="blk_step")
+    with colb3:
+        order = st.selectbox("Orden de asignación", ["Ascendente", "Descendente"], index=0, key="blk_order")
+
+    if st.button("📤 Asignar en bloque a todas las rondas en borrador", use_container_width=True, key="blk_assign_btn"):
+        try:
+            seq = sorted(draft_rounds)
+            if order == "Descendente":
+                seq = list(reversed(seq))
+            for idx, i in enumerate(seq):
+                dt = start_dt + _dt.timedelta(days=every_days * idx)
+                set_round_date(i, dt.isoformat())
+            st.success(f"Fechas asignadas a {len(seq)} ronda(s) en borrador (cada {every_days} días desde {start_dt.isoformat()}).")
+            st.rerun()
+        except Exception as e:
+            st.error(f"No se pudo completar la asignación en bloque: {e}")
+
+    st.divider()
+
+    # --------- D) Editor original (borradores individuales) ----------
+    st.subheader("D) Editor individual (tal como estaba)")
+    if draft_rounds:
+        sel_draft = st.selectbox("Ronda en borrador a editar", draft_rounds, index=0, key="fecha_sel_round_legacy")
+        current_iso = _get_date_safe(sel_draft)
         default_date = _dt.date.today()
         if current_iso:
             try:
@@ -711,7 +866,7 @@ def _show_fechas():
                 st.error(f"No se pudo guardar la fecha: {e}")
     else:
         st.info("No hay rondas en borrador para editar fecha.")
-    
+
 
 # =========================
 # Resultados y clasificación (solo PUBLICADAS)
