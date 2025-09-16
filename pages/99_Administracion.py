@@ -674,6 +674,9 @@ def _show_publicar():
 # =========================
 # 📅 Fecha de celebración por ronda (solo borradores) — con badges de estado
 # =========================
+# =========================
+# 📅 Fecha de celebración por ronda (solo borradores) — badges y sin columna "Publicada"
+# =========================
 def _show_fechas():
     import datetime as _dt
     import pandas as pd
@@ -721,7 +724,6 @@ def _show_fechas():
                 key="fecha_sel_round_legacy",
             )
         with col_badge:
-            # Badge para la ronda actualmente seleccionada (siempre borrador en este bloque)
             st.markdown("**Estado:** 📝 Borrador")
 
         current_iso = _get_date_safe(sel_draft)
@@ -778,9 +780,8 @@ def _show_fechas():
         estado_badge = "✅ Publicada" if publicado else "📝 Borrador"
         rows.append({
             "Ronda": i,
-            "Estado": estado_badge,          # NUEVO badge visual
-            "Publicada": "Sí" if publicado else "No",  # Campo informativo/bloqueado
-            "Fecha": fecha_dt                # editable
+            "Estado": estado_badge,   # badge visual
+            "Fecha": fecha_dt         # editable
         })
 
     df_table = pd.DataFrame(rows)
@@ -792,10 +793,9 @@ def _show_fechas():
         column_config={
             "Ronda": st.column_config.NumberColumn(format="%d"),
             "Estado": st.column_config.TextColumn(help="Estado de la ronda: ✅ Publicada · 📝 Borrador"),
-            "Publicada": st.column_config.TextColumn(),
             "Fecha": st.column_config.DateColumn("Fecha (editable)")
         },
-        disabled=["Ronda", "Estado", "Publicada"],
+        disabled=["Ronda", "Estado"],  # Solo Fecha es editable
         key="fechas_editor_tabla",
     )
 
