@@ -1167,9 +1167,6 @@ def _show_archivos():
                 })
 
         if rows_meta:
-#            dfm = pd.DataFrame(rows_meta)
-#            st.dataframe(dfm, use_container_width=True, hide_index=True)
-
             dfm = pd.DataFrame(rows_meta)
             def _row_style(r):
                 return ["background-color:#ffe5e5" if r["desviación_closed"] else "" for _ in r]
