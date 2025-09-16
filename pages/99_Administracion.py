@@ -674,21 +674,25 @@ def _show_publicar():
 # =========================
 # 📅 Fecha de celebración por ronda (vista enriquecida)
 # =========================
+
 def _show_fechas():
-    import calendar as _cal
     import datetime as _dt
+    import pandas as pd
 
     st.markdown("### 📅 Fecha de celebración (solo rondas en borrador)")
 
-    # --- Contexto y estados ---
+    # --- Contexto y rondas existentes ---
     n = get_n_rounds()
-    states = get_states(n) if n else []
+    if not n:
+        st.info("No hay rondas generadas todavía.")
+        return
+
     existing_rounds = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
     if not existing_rounds:
         st.info("No hay rondas generadas todavía.")
         return
 
-    # Helper: estado de publicación y fecha actual
+    # Helpers seguros
     def _is_pub_safe(i: int) -> bool:
         try:
             return is_pub(i)
@@ -701,11 +705,20 @@ def _show_fechas():
         except Exception:
             return ""
 
-
-   # --------- D) Editor original (borradores individuales) ----------
-    st.subheader("D) Editor individual (tal como estaba)")
-    if draft_rounds:
-        sel_draft = st.selectbox("Ronda en borrador a editar", draft_rounds, index=0, key="fecha_sel_round_legacy")
+    # =========================
+    # D) Editor individual (solo rondas en borrador)
+    # =========================
+    st.subheader("D) Editor individual (solo borradores)")
+    draft_rounds = [i for i in existing_rounds if not _is_pub_safe(i)]
+    if not draft_rounds:
+        st.info("No hay rondas en borrador para editar fecha.")
+    else:
+        sel_draft = st.selectbox(
+            "Ronda en borrador a editar",
+            draft_rounds,
+            index=0,
+            key="fecha_sel_round_legacy",
+        )
         current_iso = _get_date_safe(sel_draft)
         default_date = _dt.date.today()
         if current_iso:
@@ -714,21 +727,40 @@ def _show_fechas():
                 default_date = _dt.date(y, m_, d)
             except Exception:
                 pass
-        new_date = st.date_input("Nueva fecha de celebración", value=default_date, key=f"fecha_edit_R{sel_draft}")
-        if st.button("💾 Guardar fecha de la ronda", use_container_width=True, key=f"save_fecha_R{sel_draft}"):
-            try:
-                set_round_date(sel_draft, new_date.isoformat())
-                try:
-                    pretty = format_date_es(new_date.isoformat())
-                except Exception:
-                    pretty = new_date.isoformat()
-                st.success(f"Fecha guardada para Ronda {sel_draft}: {pretty}")
-            except Exception as e:
-                st.error(f"No se pudo guardar la fecha: {e}")
-    else:
-        st.info("No hay rondas en borrador para editar fecha.")
 
-    # --------- A) Editor rápido en tabla (fecha editable) ----------
+        new_date = st.date_input(
+            "Nueva fecha de celebración",
+            value=default_date,
+            key=f"fecha_edit_R{sel_draft}"
+        )
+
+        cols_btn = st.columns([1, 1])
+        with cols_btn[0]:
+            if st.button("💾 Guardar fecha", use_container_width=True, key=f"save_fecha_R{sel_draft}"):
+                try:
+                    set_round_date(sel_draft, new_date.isoformat())
+                    try:
+                        pretty = format_date_es(new_date.isoformat())
+                    except Exception:
+                        pretty = new_date.isoformat()
+                    st.success(f"Fecha guardada para Ronda {sel_draft}: {pretty}")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"No se pudo guardar la fecha: {e}")
+        with cols_btn[1]:
+            if st.button("🗑️ Borrar fecha", use_container_width=True, key=f"del_fecha_R{sel_draft}"):
+                try:
+                    set_round_date(sel_draft, None)
+                    st.success(f"Fecha borrada para Ronda {sel_draft}.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"No se pudo borrar la fecha: {e}")
+
+    st.divider()
+
+    # =========================
+    # A) Editor rápido (tabla) — solo guarda cambios en borradores
+    # =========================
     st.subheader("A) Editor rápido (tabla)")
     rows = []
     for i in existing_rounds:
@@ -742,6 +774,7 @@ def _show_fechas():
             "Publicada": "Sí" if _is_pub_safe(i) else "No",
             "Fecha": fecha_dt  # editable
         })
+
     df_table = pd.DataFrame(rows)
 
     ed = st.data_editor(
@@ -759,116 +792,23 @@ def _show_fechas():
 
     if st.button("💾 Guardar cambios de la tabla (solo borradores)", use_container_width=True, key="save_fechas_tabla"):
         cambios = 0
-        for _, r in ed.iterrows():
-            i = int(r["Ronda"])
-            if _is_pub_safe(i):
-                continue  # no tocar publicadas
-            v = r["Fecha"]
-            if pd.isna(v):
-                # borrar fecha si se ha dejado vacío
-                set_round_date(i, None)
-                cambios += 1
-            else:
-                # v es datetime.date
-                set_round_date(i, v.isoformat())
-                cambios += 1
-        st.success(f"Fechas actualizadas para {cambios} ronda(s) (solo borradores).")
-        st.rerun()
-
-    st.divider()
-
-    # --------- B) Planificador por calendario ----------
-    st.subheader("B) Planificador por calendario (mes vista + asignación)")
-
-    # Elegir ronda en borrador
-    draft_rounds = [i for i in existing_rounds if not _is_pub_safe(i)]
-    if not draft_rounds:
-        st.info("No hay rondas en borrador para editar fecha.")
-    else:
-        csel1, csel2 = st.columns([2, 1])
-        with csel1:
-            sel_draft = st.selectbox("Ronda en borrador a asignar", draft_rounds, index=0, key="fecha_sel_round_calendar")
-        with csel2:
-            base_month = st.date_input("Mes a mostrar", value=_dt.date.today().replace(day=1), key="calendar_month")
-
-        # Mapa fecha->lista de rondas asignadas (pub/borrador) para anotar en cada día
-        asignadas = {}
-        for i in existing_rounds:
-            f = _get_date_safe(i)
-            if not f:
-                continue
-            try:
-                d = _dt.date.fromisoformat(f)
-            except Exception:
-                continue
-            asignadas.setdefault(d, []).append((i, _is_pub_safe(i)))
-
-        # Render de calendario (7 columnas)
-        y, m = base_month.year, base_month.month
-        cal = _cal.Calendar(firstweekday=0)  # lunes=0 si prefieres monday: set firstweekday=0 or 6 según local
-        weeks = cal.monthdayscalendar(y, m)
-
-        st.caption("Haz clic en un día para asignar la fecha a la ronda seleccionada (solo borradores).")
-        for w_idx, week in enumerate(weeks):
-            cols = st.columns(7, gap="small")
-            for d_idx, day in enumerate(week):
-                with cols[d_idx]:
-                    if day == 0:
-                        st.markdown(" ")
-                        continue
-                    day_date = _dt.date(y, m, day)
-                    # Encabezado del día
-                    st.markdown(f"**{day}**")
-
-                    # Mostrar rondas ya asignadas ese día
-                    if day_date in asignadas:
-                        tags = []
-                        for rnd, pub in sorted(asignadas[day_date]):
-                            tags.append(f"R{rnd}{'✅' if pub else ''}")
-                        st.caption(" · ".join(tags))
-
-                    # Botón para asignar a la ronda seleccionada
-                    if st.button("Asignar", key=f"asig_{sel_draft}_{y}_{m}_{day}"):
-                        try:
-                            set_round_date(sel_draft, day_date.isoformat())
-                            pretty = format_date_es(day_date.isoformat()) if 'format_date_es' in globals() else day_date.isoformat()
-                            st.success(f"Ronda {sel_draft} → {pretty}")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"No se pudo asignar la fecha: {e}")
-
-    st.divider()
-
-    # --------- C) Asignación en bloque ----------
-    st.subheader("C) Asignación en bloque (secuencial)")
-    if not draft_rounds:
-        st.caption("No hay rondas en borrador para asignar en bloque.")
-        return
-
-    colb1, colb2, colb3 = st.columns([2, 1, 1])
-    with colb1:
-        start_dt = st.date_input("Fecha de inicio", value=_dt.date.today(), key="blk_start")
-    with colb2:
-        every_days = st.number_input("Periodicidad (días)", min_value=1, max_value=60, value=7, step=1, key="blk_step")
-    with colb3:
-        order = st.selectbox("Orden de asignación", ["Ascendente", "Descendente"], index=0, key="blk_order")
-
-    if st.button("📤 Asignar en bloque a todas las rondas en borrador", use_container_width=True, key="blk_assign_btn"):
         try:
-            seq = sorted(draft_rounds)
-            if order == "Descendente":
-                seq = list(reversed(seq))
-            for idx, i in enumerate(seq):
-                dt = start_dt + _dt.timedelta(days=every_days * idx)
-                set_round_date(i, dt.isoformat())
-            st.success(f"Fechas asignadas a {len(seq)} ronda(s) en borrador (cada {every_days} días desde {start_dt.isoformat()}).")
+            for _, r in ed.iterrows():
+                i = int(r["Ronda"])
+                if _is_pub_safe(i):
+                    continue  # No tocar publicadas
+                v = r["Fecha"]
+                if pd.isna(v):
+                    set_round_date(i, None)
+                    cambios += 1
+                else:
+                    # v es datetime.date
+                    set_round_date(i, v.isoformat())
+                    cambios += 1
+            st.success(f"Fechas actualizadas para {cambios} ronda(s) (solo borradores).")
             st.rerun()
         except Exception as e:
-            st.error(f"No se pudo completar la asignación en bloque: {e}")
-
-    st.divider()
-
- 
+            st.error(f"No se pudo aplicar la actualización en tabla: {e}")
 
 
 # =========================
