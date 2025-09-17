@@ -174,17 +174,21 @@ def _write_zip(paths: list[str], out_path: str, manifest: dict):
                 # fallback sin relpath
                 z.write(p, arcname=os.path.basename(p))
 
-def _restore_zip(fileobj, preserve_dates: bool = True) -> tuple[bool, str]:
+def _restore_zip(fileobj, pre_snapshot: bool = True, preserve_dates: bool = True, clean_extra: bool = True) -> tuple[bool, str]:
     """
-    Restaura desde un ZIP subido o abierto. Hace snapshot previo automáticamente.
-    Devuelve (ok, msg).
+    Restaura desde un ZIP subido o una ruta de archivo.
+    - pre_snapshot: si True, crea un backup automático antes de restaurar
+    - preserve_dates: si True, fusiona meta.json preservando 'date' actuales cuando el ZIP no las trae
+    - clean_extra: si True, elimina pairings_R*.csv existentes que no estén en el ZIP
     """
-    import zipfile, tempfile, shutil, json
+    import zipfile, tempfile, shutil, json, re
+
     # 1) Snapshot de seguridad ANTES de restaurar
-    try:
-        _make_backup_local(label="auto_pre_restore", note="Backup automático antes de restaurar.")
-    except Exception:
-        pass
+    if pre_snapshot:
+        try:
+            _make_backup_local(label="auto_pre_restore", note="Backup automático antes de restaurar.")
+        except Exception:
+            pass
 
     # 2) Abrir zip y validar
     try:
@@ -201,11 +205,12 @@ def _restore_zip(fileobj, preserve_dates: bool = True) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Manifest ilegible: {e}"
 
-    # 3) Extraer en temp y copiar a ubicaciones reales
+    # 3) Extraer en temp
     tmpdir = tempfile.mkdtemp(prefix="restore_")
     try:
         zf.extractall(tmpdir, members=names)
-        # Copiamos únicamente los ficheros esperados; mapeo -> destino
+
+        # --- Construir listado de destinos a copiar
         candidates = [
             ("config.json", os.path.join(BASE_DIR, "config.json")),
             (os.path.join("data", "jugadores.csv"), os.path.join(DATA_DIR, "jugadores.csv")),
@@ -213,17 +218,29 @@ def _restore_zip(fileobj, preserve_dates: bool = True) -> tuple[bool, str]:
             (os.path.join("data", "meta.json"), os.path.join(DATA_DIR, "meta.json")),
             (os.path.join("data", "admin_log.csv"), os.path.join(DATA_DIR, "admin_log.csv")),
         ]
-        # rounds: cualquier data/pairings_R*.csv
+
+        # rounds en el ZIP
+        pairings_in_zip = set()
         for n in names:
-            if n.startswith("data/") and "pairings_" in n and n.endswith(".csv"):
-                src = os.path.join(tmpdir, n)
-                dest = os.path.join(DATA_DIR, os.path.basename(n))
-                candidates.append((n, dest))
+            if n.startswith("data/") and re.match(r"data/pairings_R\d+\.csv$", n):
+                pairings_in_zip.add(os.path.basename(n))
+                candidates.append((n, os.path.join(DATA_DIR, os.path.basename(n))))
 
-        # Si preservamos fechas, mezclar meta.json
+        # --- Limpieza de sobrantes (si se pide)
+        if clean_extra:
+            try:
+                existing = [f for f in os.listdir(DATA_DIR) if re.match(r"pairings_R\d+\.csv$", f)]
+                to_remove = [f for f in existing if f not in pairings_in_zip]
+                for f in to_remove:
+                    try:
+                        os.remove(os.path.join(DATA_DIR, f))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        # --- Copiar/mezclar
         meta_dest = os.path.join(DATA_DIR, "meta.json")
-        meta_new_path = os.path.join(tmpdir, "data", "meta.json")
-
         for rel, dest in candidates:
             src = os.path.join(tmpdir, rel) if not os.path.isabs(rel) else rel
             if not os.path.exists(src):
@@ -231,7 +248,7 @@ def _restore_zip(fileobj, preserve_dates: bool = True) -> tuple[bool, str]:
             os.makedirs(os.path.dirname(dest), exist_ok=True)
 
             if preserve_dates and dest == meta_dest and os.path.exists(dest):
-                # fusión no destructiva para 'date'
+                # fusionar 'date' desde el meta actual
                 try:
                     with open(dest, "r", encoding="utf-8") as f: cur = json.load(f)
                 except Exception:
@@ -248,13 +265,12 @@ def _restore_zip(fileobj, preserve_dates: bool = True) -> tuple[bool, str]:
                         if not nr.get("date"):
                             nr["date"] = old_r["date"]
                 neu["rounds"] = neu_rounds
-                # escritura atómica
                 tmpw = dest + ".tmp"
                 with open(tmpw, "w", encoding="utf-8") as f:
                     json.dump(neu, f, ensure_ascii=False, indent=2)
                 os.replace(tmpw, dest)
             else:
-                # copy (overwrite)
+                # overwrite directo
                 shutil.copy2(src, dest)
 
         return True, "Restauración completada."
@@ -265,6 +281,7 @@ def _restore_zip(fileobj, preserve_dates: bool = True) -> tuple[bool, str]:
             shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception:
             pass
+
 
 def _make_backup_local(label: str = "", note: str = "") -> str:
     """
@@ -1829,6 +1846,12 @@ def _show_archivos():
 def _show_backups():
     st.markdown("## 💾 Copias y Restauración (local)")
 
+    # (En _show_backups)
+    st.subheader("Opciones de restauración")
+    pre_snapshot = st.checkbox("Crear snapshot automático antes de restaurar (recomendado)", value=True, key="opt_pre_snap")
+    preserve_dates = st.checkbox("Preservar fechas actuales si el backup no las trae", value=True, key="opt_preserve_dates")
+    clean_extra = st.checkbox("Limpiar pairings que no estén en el ZIP (evita mezclar estados)", value=Tru
+    
     # --- Crear backup ---
     st.subheader("Crear backup")
     col1, col2 = st.columns([2, 3])
@@ -1876,11 +1899,12 @@ def _show_backups():
                                    mime="application/zip", use_container_width=True)
         with c2:
             if st.button("⚠️ Restaurar este backup", use_container_width=True):
-                ok, msg = _restore_zip(path, preserve_dates=True)
+                ok, msg = _restore_zip(path, pre_snapshot=pre_snapshot, preserve_dates=preserve_dates, clean_extra=clean_extra)
                 (st.success if ok else st.error)(msg)
                 if ok:
-                    st.toast("Reinicia o recarga para ver los cambios")
+                    st.toast("Restaurado. Recargando…")
                     st.experimental_rerun()
+
     else:
         st.info("No hay backups locales aún. Crea uno arriba.")
 
@@ -1890,11 +1914,12 @@ def _show_backups():
     st.subheader("Restaurar desde ZIP local")
     up = st.file_uploader("Sube un ZIP de backup", type=["zip"], accept_multiple_files=False)
     if up is not None:
+# ... y en “Restaurar desde ZIP local”
         if st.button("⚠️ Restaurar desde ZIP subido", use_container_width=True, key="restore_uploaded"):
-            ok, msg = _restore_zip(up, preserve_dates=True)
+            ok, msg = _restore_zip(up, pre_snapshot=pre_snapshot, preserve_dates=preserve_dates, clean_extra=clean_extra)
             (st.success if ok else st.error)(msg)
             if ok:
-                st.toast("Reinicia o recarga para ver los cambios")
+                st.toast("Restaurado. Recargando…")
                 st.experimental_rerun()
 
 
