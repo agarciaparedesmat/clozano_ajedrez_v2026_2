@@ -19,6 +19,17 @@ from lib.tournament import (
 
 from lib.ui import page_header
 
+# --- Fix para backups ---
+import re  # necesario para re.sub en _make_backup_local
+
+# Asegurar BASE_DIR para rutas relativas dentro del ZIP
+try:
+    from lib.tournament import BASE_DIR as _TB_BASE_DIR
+    BASE_DIR = _TB_BASE_DIR
+except Exception:
+    # Fallback: carpeta padre de data/
+    BASE_DIR = os.path.dirname(DATA_DIR)
+
 # Normaliza la serie de resultados para que None/nan/espacios queden como vacío ""
 def _normalize_result_series(s):
     return (
