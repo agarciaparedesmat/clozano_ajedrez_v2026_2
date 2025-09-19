@@ -159,6 +159,16 @@ def _collect_paths_for_backup(n_rounds: int | None = None) -> list[str]:
         if os.path.exists(p):
             paths.append(p)
     # filtra existentes
+    # incluir flags de publicación si existen (opcional)
+    try:
+        import re
+        for i in range(1, (n_rounds or 0) + 1):
+            pflag = os.path.join(DATA_DIR, f"published_R{i}.flag")
+            if os.path.exists(pflag):
+                paths.append(pflag)
+    except Exception:
+        pass
+    
     return [p for p in paths if p and os.path.exists(p)]
 
 def _write_zip(paths: list[str], out_path: str, manifest: dict):
@@ -174,30 +184,40 @@ def _write_zip(paths: list[str], out_path: str, manifest: dict):
                 # fallback sin relpath
                 z.write(p, arcname=os.path.basename(p))
 
-def _restore_zip(fileobj, pre_snapshot: bool = True, preserve_dates: bool = True, clean_extra: bool = True) -> tuple[bool, str]:
+def _restore_zip(
+    fileobj,
+    pre_snapshot: bool = True,
+    preserve_dates: bool = True,
+    clean_extra_pairings: bool = True,
+    clean_extra_flags: bool = True,
+    recalc_closed: bool = True,
+) -> tuple[bool, str]:
     """
-    Restaura desde un ZIP subido o una ruta de archivo.
-    - pre_snapshot: si True, crea un backup automático antes de restaurar
-    - preserve_dates: si True, fusiona meta.json preservando 'date' actuales cuando el ZIP no las trae
-    - clean_extra: si True, elimina pairings_R*.csv existentes que no estén en el ZIP
+    Restaura desde un ZIP subido o una ruta.
+    - pre_snapshot: crea un backup automático antes de restaurar.
+    - preserve_dates: si el ZIP no trae 'date', preserva la actual.
+    - clean_extra_pairings: elimina pairings_R*.csv que no estén en el ZIP.
+    - clean_extra_flags: elimina published_R*.flag que no correspondan al meta restaurado.
+    - recalc_closed: recalcula el campo 'closed' en meta.json restaurado.
     """
     import zipfile, tempfile, shutil, json, re
 
-    # 1) Snapshot de seguridad ANTES de restaurar
+    # 0) Snapshot de seguridad
     if pre_snapshot:
         try:
             _make_backup_local(label="auto_pre_restore", note="Backup automático antes de restaurar.")
         except Exception:
             pass
 
-    # 2) Abrir zip y validar
+    # 1) Abrir y validar ZIP
     try:
         zf = zipfile.ZipFile(fileobj)
     except Exception as e:
         return False, f"ZIP inválido: {e}"
+
     names = _safe_zip_namelist(zf)
     if "manifest.json" not in names:
-        return False, "El ZIP no contiene manifest.json (no parece ser un backup válido)."
+        return False, "El ZIP no contiene manifest.json (no parece un backup válido)."
     try:
         manifest = json.loads(zf.read("manifest.json"))
         if manifest.get("kind") != "tournament-backup":
@@ -205,12 +225,12 @@ def _restore_zip(fileobj, pre_snapshot: bool = True, preserve_dates: bool = True
     except Exception as e:
         return False, f"Manifest ilegible: {e}"
 
-    # 3) Extraer en temp
+    # 2) Extraer en tmp
     tmpdir = tempfile.mkdtemp(prefix="restore_")
     try:
         zf.extractall(tmpdir, members=names)
 
-        # --- Construir listado de destinos a copiar
+        # --- Mapa de ficheros estándar a restaurar
         candidates = [
             ("config.json", os.path.join(BASE_DIR, "config.json")),
             (os.path.join("data", "jugadores.csv"), os.path.join(DATA_DIR, "jugadores.csv")),
@@ -219,27 +239,34 @@ def _restore_zip(fileobj, pre_snapshot: bool = True, preserve_dates: bool = True
             (os.path.join("data", "admin_log.csv"), os.path.join(DATA_DIR, "admin_log.csv")),
         ]
 
-        # rounds en el ZIP
+        # Pairings del ZIP
         pairings_in_zip = set()
         for n in names:
             if n.startswith("data/") and re.match(r"data/pairings_R\d+\.csv$", n):
                 pairings_in_zip.add(os.path.basename(n))
                 candidates.append((n, os.path.join(DATA_DIR, os.path.basename(n))))
 
-        # --- Limpieza de sobrantes (si se pide)
-        if clean_extra:
+        # Flags del ZIP (si existen en el backup)
+        flags_in_zip = set()
+        for n in names:
+            if n.startswith("data/") and re.match(r"data/published_R\d+\.flag$", n):
+                flags_in_zip.add(os.path.basename(n))
+                candidates.append((n, os.path.join(DATA_DIR, os.path.basename(n))))
+
+        # Limpieza de pairings sobrantes
+        if clean_extra_pairings:
             try:
                 existing = [f for f in os.listdir(DATA_DIR) if re.match(r"pairings_R\d+\.csv$", f)]
-                to_remove = [f for f in existing if f not in pairings_in_zip]
-                for f in to_remove:
-                    try:
-                        os.remove(os.path.join(DATA_DIR, f))
-                    except Exception:
-                        pass
+                for f in existing:
+                    if f not in pairings_in_zip:
+                        try:
+                            os.remove(os.path.join(DATA_DIR, f))
+                        except Exception:
+                            pass
             except Exception:
                 pass
 
-        # --- Copiar/mezclar
+        # Copiar/mezclar ficheros
         meta_dest = os.path.join(DATA_DIR, "meta.json")
         for rel, dest in candidates:
             src = os.path.join(tmpdir, rel) if not os.path.isabs(rel) else rel
@@ -272,6 +299,81 @@ def _restore_zip(fileobj, pre_snapshot: bool = True, preserve_dates: bool = True
             else:
                 # overwrite directo
                 shutil.copy2(src, dest)
+
+        # 3) Re‐sincronizar FLAGS con el meta restaurado
+        #    (esto garantiza que is_pub() refleje el estado del backup)
+        #    Nota: aunque hayamos copiado flags desde el ZIP, este paso los rehace
+        #    según meta restaurado, que es la fuente de verdad del backup.
+        try:
+            import json
+            with open(meta_dest, "r", encoding="utf-8") as f:
+                meta_after = json.load(f)
+        except Exception:
+            meta_after = {}
+
+        rounds_meta = meta_after.get("rounds", {}) if isinstance(meta_after, dict) else {}
+        # Rondas existentes según CSVs actuales
+        existing_pairings = []
+        try:
+            existing_pairings = [
+                int(re.findall(r"\d+", f)[0])
+                for f in os.listdir(DATA_DIR)
+                if re.match(r"pairings_R\d+\.csv$", f)
+            ]
+        except Exception:
+            existing_pairings = []
+
+        # Limpiar flags sobrantes si procede
+        if clean_extra_flags:
+            try:
+                for f in os.listdir(DATA_DIR):
+                    if re.match(r"published_R\d+\.flag$", f):
+                        i = int(re.findall(r"\d+", f)[0])
+                        # Si la ronda no existe o en meta no está publicada, eliminar flag
+                        published_meta = bool(rounds_meta.get(str(i), {}).get("published", False))
+                        if (i not in existing_pairings) or not published_meta:
+                            try:
+                                os.remove(os.path.join(DATA_DIR, f))
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+
+        # Crear/asegurar flags que dicta el meta restaurado
+        for i in existing_pairings:
+            published_meta = bool(rounds_meta.get(str(i), {}).get("published", False))
+            fp = os.path.join(DATA_DIR, f"published_R{i}.flag")
+            try:
+                if published_meta:
+                    open(fp, "w").close()
+                else:
+                    if os.path.exists(fp):
+                        os.remove(fp)
+            except Exception:
+                pass
+
+        # 4) Recalcular 'closed' para que cuadre con (published + sin vacíos)
+        if recalc_closed:
+            cambios = 0
+            for i in existing_pairings:
+                pub = bool(rounds_meta.get(str(i), {}).get("published", False))
+                try:
+                    dfp = read_csv_safe(round_file(i))
+                    vacios = results_empty_count(dfp) if dfp is not None else None
+                except Exception:
+                    vacios = None
+                closed_real = bool(pub and (vacios == 0))
+                r = rounds_meta.setdefault(str(i), {})
+                if r.get("closed") != closed_real:
+                    r["closed"] = closed_real
+                    cambios += 1
+            # Escribir meta ajustado
+            try:
+                with open(meta_dest, "w", encoding="utf-8") as f:
+                    json.dump({"rounds": rounds_meta, **{k:v for k,v in meta_after.items() if k!="rounds"}},
+                              f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
 
         return True, "Restauración completada."
     except Exception as e:
@@ -1847,11 +1949,18 @@ def _show_backups():
     st.markdown("## 💾 Copias y Restauración (local)")
 
     # (En _show_backups)
+       
     st.subheader("Opciones de restauración")
-    pre_snapshot = st.checkbox("Crear snapshot automático antes de restaurar (recomendado)", value=True, key="opt_pre_snap")
+    pre_snapshot = st.checkbox("Snapshot automático antes de restaurar", value=True, key="opt_pre_snap")
     preserve_dates = st.checkbox("Preservar fechas actuales si el backup no las trae", value=True, key="opt_preserve_dates")
-    clean_extra = st.checkbox("Limpiar pairings que no estén en el ZIP (evita mezclar estados)", value=Tru
-    
+    # clean_extra = st.checkbox("Limpiar pairings que no estén en el ZIP (evita mezclar estados)", value=True 
+    clean_extra_pairings = st.checkbox("Limpiar pairings no incluidos en el ZIP", value=True, key="opt_clean_pair")
+    clean_extra_flags = st.checkbox("Limpiar flags de publicación no incluidos / no coherentes", value=True, key="opt_clean_flags")
+    recalc_closed = st.checkbox("Recalcular 'closed' tras restaurar", 
+    value=True, key="opt_recalc_closed")
+
+
+
     # --- Crear backup ---
     st.subheader("Crear backup")
     col1, col2 = st.columns([2, 3])
@@ -1899,7 +2008,17 @@ def _show_backups():
                                    mime="application/zip", use_container_width=True)
         with c2:
             if st.button("⚠️ Restaurar este backup", use_container_width=True):
-                ok, msg = _restore_zip(path, pre_snapshot=pre_snapshot, preserve_dates=preserve_dates, clean_extra=clean_extra)
+                # ... en “Restaurar este backup”
+                ok, msg = _restore_zip(
+                    path,
+                    pre_snapshot=pre_snapshot,
+                    preserve_dates=preserve_dates,
+                    clean_extra_pairings=clean_extra_pairings,
+                    clean_extra_flags=clean_extra_flags,
+                    recalc_closed=recalc_closed
+                )
+
+            
                 (st.success if ok else st.error)(msg)
                 if ok:
                     st.toast("Restaurado. Recargando…")
@@ -1916,7 +2035,15 @@ def _show_backups():
     if up is not None:
 # ... y en “Restaurar desde ZIP local”
         if st.button("⚠️ Restaurar desde ZIP subido", use_container_width=True, key="restore_uploaded"):
-            ok, msg = _restore_zip(up, pre_snapshot=pre_snapshot, preserve_dates=preserve_dates, clean_extra=clean_extra)
+
+            ok, msg = _restore_zip(
+                up,
+                pre_snapshot=pre_snapshot,
+                preserve_dates=preserve_dates,
+                clean_extra_pairings=clean_extra_pairings,
+                clean_extra_flags=clean_extra_flags,
+                recalc_closed=recalc_closed
+            )
             (st.success if ok else st.error)(msg)
             if ok:
                 st.toast("Restaurado. Recargando…")
