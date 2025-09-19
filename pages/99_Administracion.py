@@ -72,7 +72,28 @@ if 'is_pub' not in globals():
         except Exception:
             pass
         return os.path.exists(os.path.join(DATA_DIR, f"published_R{i}.flag"))
+
 from lib.tournament import DATA_DIR, load_config, config_path, planned_rounds, round_file
+
+
+def _save_meta_preserving_dates(meta_new: dict):
+    """Guarda meta.json preservando dates ya existentes si meta_new no las trae."""
+    try:
+        current = load_meta() or {}
+        cur_rounds = current.get("rounds", {}) if isinstance(current, dict) else {}
+        new_rounds = meta_new.setdefault("rounds", {}) if isinstance(meta_new, dict) else {}
+
+        # Preservar date existentes si la nueva versión no trae valor
+        for k, old_r in cur_rounds.items():
+            if isinstance(old_r, dict) and "date" in old_r:
+                nr = new_rounds.setdefault(k, {})
+                if not nr.get("date"):
+                    nr["date"] = old_r["date"]
+
+        save_meta(meta_new)
+    except Exception as e:
+        st.error(f"Fallo al guardar meta preservando fechas: {e}")
+
 
 # =========================
 # Helpers robustos de configuración/estado
@@ -489,7 +510,7 @@ def set_pub_safe(i: int, val: bool, seed=None):
         if seed is not None:
             r["seed"] = seed
         try:
-            save_meta(meta)
+            _save_meta_preserving_dates(meta)
             ok_meta = True
         except Exception:
             pass
@@ -570,7 +591,7 @@ def set_round_date(i: int, dt: _date | str | None) -> None:
         r["date"] = p.isoformat() if p else dt.strip()
     else:
         r.pop("date", None)
-    save_meta(meta)
+    _save_meta_preserving_dates(meta)
 
 # =========================
 # Barra de menú interna (sticky)
@@ -760,7 +781,7 @@ def _show_semilla():
                     # Guardar semilla en meta
                     meta = load_meta()
                     meta.setdefault("rounds", {}).setdefault("1", {})["seed"] = seed_used
-                    save_meta(meta)
+                    _save_meta_preserving_dates(meta)
 
                     add_log("regen_round1", 1, actor, _log_msg(f"R1 regenerada con seed={seed_used}"))
                     st.success(f"✅ Ronda 1 regenerada con semilla `{seed_used}`.")
@@ -869,7 +890,7 @@ def _show_generar():
                         if next_round == 1 and seed_used is not None:
                             meta = load_meta()
                             meta.setdefault("rounds", {}).setdefault("1", {})["seed"] = seed_used
-                            save_meta(meta)
+                            _save_meta_preserving_dates(meta)
 
                         add_log("generate_round", next_round, actor, _log_msg(f"pairings guardado en {outp}"))
 
@@ -1563,7 +1584,7 @@ def _show_eliminar():
                         meta = load_meta()
                         if str(last_exist) in meta.get("rounds", {}):
                             meta["rounds"].pop(str(last_exist), None)
-                            save_meta(meta)
+                            _save_meta_preserving_dates(meta)
                     except Exception:
                         pass  # meta opcional
 
@@ -1765,7 +1786,7 @@ def _show_archivos():
         for i in faltan:
             rounds_w.setdefault(str(i), {"published": False, "date": "", "closed": False})
         try:
-            # Antes de save_meta(meta_w)
+            # Antes de _save_meta_preserving_dates(meta_w)
             try:
                 meta_now = load_meta() or {}
                 old_rounds = meta_now.get("rounds", {})
@@ -1779,7 +1800,7 @@ def _show_archivos():
             except Exception:
                 pass
             # -> ahora sí:
-            save_meta(meta_w)
+            _save_meta_preserving_dates(meta_w)
             st.success("meta.json completado. Refrescando…")
             st.rerun()
         except Exception as e:
@@ -1797,7 +1818,7 @@ def _show_archivos():
                 if was != now:
                     r["published"] = now
                     cambios += 1
-            # Antes de save_meta(meta_w)
+            # Antes de _save_meta_preserving_dates(meta_w)
             try:
                 meta_now = load_meta() or {}
                 old_rounds = meta_now.get("rounds", {})
@@ -1811,7 +1832,7 @@ def _show_archivos():
             except Exception:
                 pass
             # -> ahora sí:
-            save_meta(meta_w)
+            _save_meta_preserving_dates(meta_w)
             st.success(f"meta.json actualizado ({cambios} cambio/s).")
             st.rerun()
         except Exception as e:
@@ -1851,7 +1872,7 @@ def _show_archivos():
                 cambios += 1
 
         try:
-            # Antes de save_meta(meta_w)
+            # Antes de _save_meta_preserving_dates(meta_w)
             try:
                 meta_now = load_meta() or {}
                 old_rounds = meta_now.get("rounds", {})
@@ -1865,7 +1886,7 @@ def _show_archivos():
             except Exception:
                 pass
             # -> ahora sí:
-            save_meta(meta_w)
+            _save_meta_preserving_dates(meta_w)
             st.success(f"Campo 'closed' actualizado para {cambios} rondas.")
             st.rerun()
         except Exception as e:
@@ -1909,7 +1930,7 @@ def _show_archivos():
                 cambios += 1
 
         try:
-            save_meta(meta)
+            _save_meta_preserving_dates(meta)
             st.success(f"meta.json actualizado ({cambios} cambio/s).")
             st.rerun()
         except Exception as e:
@@ -2096,7 +2117,7 @@ def _debug_meta_persistencia():
             # 2) escribir un marcador temporal bajo rounds.__diag (no afecta a rondas reales)
             import time
             rounds.setdefault("__diag", {})["ts"] = _dt.datetime.now().isoformat()
-            save_meta(meta)
+            _save_meta_preserving_dates(meta)
             # 3) releer y mostrar
             st.success("Guardado OK. Releyendo…")
             st.json(load_meta())
