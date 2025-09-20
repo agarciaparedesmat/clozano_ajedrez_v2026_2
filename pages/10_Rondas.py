@@ -271,69 +271,7 @@ def _accumulate_points(hist_df: pd.DataFrame) -> pd.DataFrame:
     base["puntos_acum"] = base["puntos_ronda"].cumsum()
     return base
 
-# ---------- UI de filtros ----------
-st.markdown("### 🔍 Filtros dinámicos")
-cat = _load_players_catalog()
 
-# Selector de jugador: selectbox con búsqueda (por nombre) + caja de texto libre
-col_sel, col_txt = st.columns([2, 1], gap="small")
-
-with col_sel:
-    opciones = ["—"] + [f'{row["id"]} · {row["nombre_completo"]} ({row["curso_grupo"]})' for _, row in cat.iterrows()]
-    sel_opt = st.selectbox("Buscar jugador (catálogo)", options=opciones, index=0, help="Selecciona por catálogo o usa el cuadro de texto libre de la derecha.")
-    if sel_opt and sel_opt != "—" and "·" in sel_opt:
-        selected_id = sel_opt.split("·", 1)[0].strip()
-    else:
-        selected_id = ""
-
-with col_txt:
-    text_query = st.text_input("…o buscar por nombre (texto libre)", value="", placeholder="Ej.: Lucía García")
-
-df_all = _load_all_rounds_df(publicadas)
-if df_all.empty:
-    st.info("Aún no hay emparejamientos publicados para explorar.")
-    st.divider()
-else:
-    # Historial del jugador (por id si existe; si no, por nombre)
-    pname = text_query if text_query.strip() else None
-    pid = selected_id if selected_id else None
-    hist_df = _player_history(df_all, pid, pname)
-
-    t1, t2 = st.tabs(["👥 Emparejamientos pasados", "📈 Evolución"])
-    with t1:
-        if hist_df.empty:
-            st.warning("Sin resultados para ese jugador (¿aún no aparece en rondas publicadas?).")
-        else:
-            # Tabla clara
-            st.dataframe(
-                hist_df.rename(columns={
-                    "ronda": "Ronda", "mesa": "Mesa", "color": "Color",
-                    "rival": "Rival", "resultado": "Resultado", "puntos": "Puntos"
-                }),
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Ronda": st.column_config.NumberColumn("Ronda"),
-                    "Mesa": st.column_config.NumberColumn("Mesa"),
-                    "Color": st.column_config.TextColumn("Color"),
-                    "Rival": st.column_config.TextColumn("Rival"),
-                    "Resultado": st.column_config.TextColumn("Resultado"),
-                    "Puntos": st.column_config.NumberColumn("Puntos", help="1 victoria, 0.5 tablas, 0 derrota"),
-                },
-            )
-    with t2:
-        evo = _accumulate_points(hist_df)
-        if evo.empty:
-            st.warning("Sin evolución disponible para ese jugador.")
-        else:
-            # Línea simple de puntos acumulados por ronda
-            st.line_chart(
-                evo.set_index("ronda")[["puntos_acum"]],
-                height=220,
-            )
-            st.caption("Puntos acumulados por ronda.")
-
-st.divider()
 # ========================== FIN NUEVO: FILTROS DINÁMICOS ==========================
 
 
@@ -768,4 +706,68 @@ def render_round(i: int):
 render_round(sel)
 
 st.divider()
+# ---------- UI de filtros ----------
+st.markdown("### 🔍 Filtros dinámicos")
+cat = _load_players_catalog()
+
+# Selector de jugador: selectbox con búsqueda (por nombre) + caja de texto libre
+col_sel, col_txt = st.columns([2, 1], gap="small")
+
+with col_sel:
+    opciones = ["—"] + [f'{row["id"]} · {row["nombre_completo"]} ({row["curso_grupo"]})' for _, row in cat.iterrows()]
+    sel_opt = st.selectbox("Buscar jugador (catálogo)", options=opciones, index=0, help="Selecciona por catálogo o usa el cuadro de texto libre de la derecha.")
+    if sel_opt and sel_opt != "—" and "·" in sel_opt:
+        selected_id = sel_opt.split("·", 1)[0].strip()
+    else:
+        selected_id = ""
+
+with col_txt:
+    text_query = st.text_input("…o buscar por nombre (texto libre)", value="", placeholder="Ej.: Lucía García")
+
+df_all = _load_all_rounds_df(publicadas)
+if df_all.empty:
+    st.info("Aún no hay emparejamientos publicados para explorar.")
+    st.divider()
+else:
+    # Historial del jugador (por id si existe; si no, por nombre)
+    pname = text_query if text_query.strip() else None
+    pid = selected_id if selected_id else None
+    hist_df = _player_history(df_all, pid, pname)
+
+    t1, t2 = st.tabs(["👥 Emparejamientos pasados", "📈 Evolución"])
+    with t1:
+        if hist_df.empty:
+            st.warning("Sin resultados para ese jugador (¿aún no aparece en rondas publicadas?).")
+        else:
+            # Tabla clara
+            st.dataframe(
+                hist_df.rename(columns={
+                    "ronda": "Ronda", "mesa": "Mesa", "color": "Color",
+                    "rival": "Rival", "resultado": "Resultado", "puntos": "Puntos"
+                }),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Ronda": st.column_config.NumberColumn("Ronda"),
+                    "Mesa": st.column_config.NumberColumn("Mesa"),
+                    "Color": st.column_config.TextColumn("Color"),
+                    "Rival": st.column_config.TextColumn("Rival"),
+                    "Resultado": st.column_config.TextColumn("Resultado"),
+                    "Puntos": st.column_config.NumberColumn("Puntos", help="1 victoria, 0.5 tablas, 0 derrota"),
+                },
+            )
+    with t2:
+        evo = _accumulate_points(hist_df)
+        if evo.empty:
+            st.warning("Sin evolución disponible para ese jugador.")
+        else:
+            # Línea simple de puntos acumulados por ronda
+            st.line_chart(
+                evo.set_index("ronda")[["puntos_acum"]],
+                height=220,
+            )
+            st.caption("Puntos acumulados por ronda.")
+
+st.divider()
+
 st.caption(format_with_cfg("Vista pública de emparejamientos y resultados — {nivel} ({anio})", cfg))
