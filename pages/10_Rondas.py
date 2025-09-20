@@ -761,11 +761,25 @@ else:
         if evo.empty:
             st.warning("Sin evolución disponible para ese jugador.")
         else:
-            # Línea simple de puntos acumulados por ronda
-            st.line_chart(
-                evo.set_index("ronda")[["puntos_acum"]],
-                height=220,
+            evo = evo.sort_values("ronda").reset_index(drop=True)
+            # Aseguramos enteros y etiquetas discretas por ronda
+            evo["Ronda"] = evo["ronda"].astype(int)
+
+            import altair as alt
+            chart = (
+                alt.Chart(evo)
+                .mark_line(point=True)
+                .encode(
+                    x=alt.X(
+                        "Ronda:O",              # Ordinal → ticks 1,2,3… (sin decimales)
+                        sort="ascending",
+                        axis=alt.Axis(title="Ronda", labelAngle=0)
+                    ),
+                    y=alt.Y("puntos_acum:Q", title="Puntos acumulados")
+                )
+                .properties(height=220)
             )
+            st.altair_chart(chart, use_container_width=True)
             st.caption("Puntos acumulados por ronda.")
 
 st.divider()
