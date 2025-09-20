@@ -107,7 +107,8 @@ def get_states(n_rounds: int) -> List[Dict[str, object]]:
     return [round_status(i) for i in range(1, int(n_rounds) + 1)]
 
 
-# --- Auth: Modo Profesor / Alumno -------------------------------------------
+
+# --- Auth: Modo Profesor / Alumno (con badge y separador) -------------------
 import os, hashlib, streamlit as st
 
 # Claves de sesión y roles
@@ -160,6 +161,16 @@ def is_teacher() -> bool:
 def set_role(role: str) -> None:
     st.session_state[SESSION_ROLE_KEY] = role
 
+def _safe_rerun():
+    # Asegura refresco inmediato (evita "doble clic")
+    try:
+        st.rerun()
+    except Exception:
+        try:
+            st.experimental_rerun()
+        except Exception:
+            pass
+
 def _admin_login_on_change():
     """Valida cuando se pulsa Enter en el input de contraseña."""
     pwd = st.session_state.get("admin_pwd", "")
@@ -168,26 +179,46 @@ def _admin_login_on_change():
         st.session_state[SHOW_LOGIN_FORM_KEY] = False   # oculta formulario tras validar
         st.session_state["admin_pwd"] = ""
         st.session_state[AUTH_ERROR_KEY] = ""
+        _safe_rerun()  # refresca menú/navegación inmediatamente
     else:
         st.session_state[AUTH_ERROR_KEY] = "Contraseña incorrecta."
 
-def login_widget():
-    """Coloca esto al PRINCIPIO de la sidebar en TODAS las páginas visibles."""
-    _ensure_state()
+def _logout():
+    set_role(ROLE_ALUMNO)
+    st.session_state[SHOW_LOGIN_FORM_KEY] = False
+    st.session_state["admin_pwd"] = ""
+    st.session_state[AUTH_ERROR_KEY] = ""
+    _safe_rerun()  # ⬅️ evita tener que pulsar dos veces
 
+_BADGE_CSS = """
+<style>
+.badge {display:inline-flex; align-items:center; gap:.35rem; padding:.22rem .60rem;
+        border-radius:999px; font-weight:700; font-size:0.86rem; line-height:1;}
+.badge.profe {background:#e7f7ec; border:1px solid #7bd58b;}
+.badge.alumno {background:#eaf2ff; border:1px solid #8ab4ff;}
+.sep-thin {height:1px; background:rgba(0,0,0,.08); border:0; margin:.6rem 0 1rem;}
+</style>
+"""
+
+def login_widget():
+    """Coloca esto al PRINCIPIO de la sidebar en TODAS las páginas."""
+    _ensure_state()
+    st.markdown(_BADGE_CSS, unsafe_allow_html=True)
+
+    # Encabezado de sesión + badge
     st.markdown("#### 👥 Sesión")
+
     if is_teacher():
-        # Indicador de modo + botón salir
-        st.success("👩‍🏫 **Modo Profesor**")
-        if st.button("SALIR", key="logout_btn", use_container_width=True):
-            set_role(ROLE_ALUMNO)
-            st.session_state[SHOW_LOGIN_FORM_KEY] = False
-            st.session_state["admin_pwd"] = ""
-            st.session_state[AUTH_ERROR_KEY] = ""
+        st.markdown('<span class="badge profe">👩‍🏫 Modo Profesor</span>', unsafe_allow_html=True)
+        st.markdown('<hr class="sep-thin">', unsafe_allow_html=True)
+        # Botón SALIR: ahora funciona a la primera
+        st.button("SALIR", key="logout_btn", use_container_width=True, on_click=_logout)
         return
 
     # Modo alumno (por defecto)
-    st.info("🎓 **Modo Alumno**")
+    st.markdown('<span class="badge alumno">🎓 Modo Alumno</span>', unsafe_allow_html=True)
+    st.markdown('<hr class="sep-thin">', unsafe_allow_html=True)
+
     # Botón para solicitar acceso de profesor
     if not st.session_state[SHOW_LOGIN_FORM_KEY]:
         st.button("Modo profesor", key="go_prof_btn", use_container_width=True,
@@ -198,7 +229,7 @@ def login_widget():
         st.caption("Pulsa **Enter** para validar.")
         if st.session_state[AUTH_ERROR_KEY]:
             st.error(st.session_state[AUTH_ERROR_KEY])
-        # Opción de cancelar y volver a modo alumno sin validar
+        # Cancelar → volver a modo alumno sin validar
         st.button("Cancelar", key="cancel_prof_btn", use_container_width=True,
                   on_click=lambda: st.session_state.update({SHOW_LOGIN_FORM_KEY: False, "admin_pwd": "", AUTH_ERROR_KEY: ""}))
 
