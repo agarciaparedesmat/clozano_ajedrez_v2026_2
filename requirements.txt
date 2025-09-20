@@ -3,3 +3,4 @@ pandas>=2.2.0
 qrcode[pil]>=7.4
 reportlab==4.2.2
 fpdf2>=2.7
+altair>=5
