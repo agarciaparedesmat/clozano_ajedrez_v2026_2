@@ -1,0 +1,16 @@
+# Pre-entrega: verificación pasiva con HTML + CSV
+REPORT_DIR := reports
+HTML := $(REPORT_DIR)/verify_report.html
+CSV  := $(REPORT_DIR)/rounds_summary.csv
+
+.PHONY: check
+check:
+	@mkdir -p $(REPORT_DIR)
+	@python verify_tournament.py --strict --html $(HTML) --rounds-csv $(CSV) || { \
+		echo ""; \
+		echo "[!] Incidencias detectadas. Revisa $(HTML) y $(CSV)"; \
+		exit 1; \
+	}
+	@echo ""
+	@echo "[OK] Verificación superada. Abriendo informe..."
+	@python -c "import webbrowser,sys; webbrowser.open(sys.argv[1])" $(HTML)

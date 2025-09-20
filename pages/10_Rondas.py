@@ -171,7 +171,171 @@ with c_chips:
             args=(i,),
         )
 
+# ============================ NUEVO: FILTROS DINÁMICOS ============================
+def _load_all_rounds_df(round_indices: list[int]) -> pd.DataFrame:
+    """Carga todas las rondas publicadas en un único DataFrame con la columna 'ronda'."""
+    rows = []
+    for r in round_indices:
+        df_r = read_csv_safe(round_file(r))
+        if df_r is None or df_r.empty:
+            continue
+        df_r = df_r.copy()
+        # columnas mínimas
+        for col in ["mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]:
+            if col not in df_r.columns:
+                df_r[col] = ""
+        df_r["ronda"] = r
+        rows.append(df_r[["ronda", "mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"]])
+    if not rows:
+        return pd.DataFrame(columns=["ronda", "mesa", "blancas_id", "blancas_nombre", "negras_id", "negras_nombre", "resultado"])
+    out = pd.concat(rows, ignore_index=True)
+    # normaliza resultados para poder calcular puntos
+    out["resultado"] = _normalize_result_series(out["resultado"])
+    return out
+
+def _load_players_catalog() -> pd.DataFrame:
+    """Catálogo de jugadores (id, nombre completo, curso/grupo) desde data/jugadores.csv."""
+    jdf = read_csv_safe(JUG_PATH)
+    if jdf is None or jdf.empty:
+        return pd.DataFrame(columns=["id", "nombre_completo", "curso_grupo"])
+    jdf = jdf.copy()
+    jdf["id"] = jdf["id"].astype(str).str.strip()
+    ap1 = jdf.get("apellido1", "").astype(str).str.strip() if "apellido1" in jdf.columns else ""
+    ap2 = jdf.get("apellido2", "").astype(str).str.strip() if "apellido2" in jdf.columns else ""
+    nombre = jdf.get("nombre", "").astype(str).str.strip() if "nombre" in jdf.columns else ""
+    jdf["nombre_completo"] = (nombre + " " + ap1 + " " + ap2).str.replace(r"\s+", " ", regex=True).str.strip()
+    curso = jdf.get("curso", "").astype(str).str.strip() if "curso" in jdf.columns else ""
+    grupo = jdf.get("grupo", "").astype(str).str.strip() if "grupo" in jdf.columns else ""
+    jdf["curso_grupo"] = (curso + " " + grupo).str.replace(r"\s+", " ", regex=True).str.strip()
+    return jdf[["id", "nombre_completo", "curso_grupo"]]
+
+def _points_from_result(result: str, as_white: bool) -> float | None:
+    """
+    Puntos del jugador según el resultado de la partida:
+    - blancas ganan -> '1-0'  -> blancas 1.0, negras 0.0
+    - negras ganan  -> '0-1'  -> blancas 0.0, negras 1.0
+    - tablas        -> '1/2-1/2' o '½-½' -> ambos 0.5
+    - vacío         -> None
+    """
+    r = (result or "").strip()
+    if r == "":
+        return None
+    r = r.replace("½", "1/2").replace("–", "-").replace("—", "-")
+    if r in {"1-0", "1.0-0.0"}:
+        return 1.0 if as_white else 0.0
+    if r in {"0-1", "0.0-1.0"}:
+        return 0.0 if as_white else 1.0
+    if r in {"1/2-1/2", "0.5-0.5", "0,5-0,5"}:
+        return 0.5
+    return None
+
+def _player_history(df_all: pd.DataFrame, player_id: str | None, player_name: str | None) -> pd.DataFrame:
+    """
+    Devuelve un DataFrame con las partidas del jugador:
+    columnas: ronda, mesa, color, rival, resultado, puntos
+    El emparejamiento se detecta por id y, si no hay id, por nombre.
+    """
+    df = df_all.copy()
+    pid = (player_id or "").strip()
+    pname = (player_name or "").strip().lower()
+
+    # máscara si coincide por id o por nombre (en cualquiera de los dos lados)
+    mask_white = df["blancas_id"].astype(str).str.strip().eq(pid) | df["blancas_nombre"].astype(str).str.lower().str.contains(pname) if pname else df["blancas_id"].astype(str).str.strip().eq(pid)
+    mask_black = df["negras_id"].astype(str).str.strip().eq(pid) | df["negras_nombre"].astype(str).str.lower().str.contains(pname) if pname else df["negras_id"].astype(str).str.strip().eq(pid)
+
+    as_white = df[mask_white].copy()
+    as_white["color"] = "Blancas"
+    as_white["rival"] = as_white["negras_nombre"].astype(str)
+    as_white["puntos"] = as_white["resultado"].map(lambda r: _points_from_result(r, as_white=True))
+
+    as_black = df[mask_black].copy()
+    as_black["color"] = "Negras"
+    as_black["rival"] = as_black["blancas_nombre"].astype(str)
+    as_black["puntos"] = as_black["resultado"].map(lambda r: _points_from_result(r, as_white=False))
+
+    hist = pd.concat([as_white, as_black], ignore_index=True)
+    if hist.empty:
+        return pd.DataFrame(columns=["ronda", "mesa", "color", "rival", "resultado", "puntos"]).sort_values(by=["ronda", "mesa"])
+    return hist[["ronda", "mesa", "color", "rival", "resultado", "puntos"]].sort_values(by=["ronda", "mesa"])
+
+def _accumulate_points(hist_df: pd.DataFrame) -> pd.DataFrame:
+    """Devuelve evolución por ronda: puntos de la ronda y acumulados."""
+    if hist_df is None or hist_df.empty:
+        return pd.DataFrame(columns=["ronda", "puntos_ronda", "puntos_acum"])
+    base = (
+        hist_df.groupby("ronda", as_index=False)["puntos"]
+        .apply(lambda s: s.dropna().sum() if not s.dropna().empty else 0.0)
+        .rename(columns={"puntos": "puntos_ronda"})
+    )
+    base = base.sort_values("ronda")
+    base["puntos_acum"] = base["puntos_ronda"].cumsum()
+    return base
+
+# ---------- UI de filtros ----------
+st.markdown("### 🔍 Filtros dinámicos")
+cat = _load_players_catalog()
+
+# Selector de jugador: selectbox con búsqueda (por nombre) + caja de texto libre
+col_sel, col_txt = st.columns([2, 1], gap="small")
+
+with col_sel:
+    opciones = ["—"] + [f'{row["id"]} · {row["nombre_completo"]} ({row["curso_grupo"]})' for _, row in cat.iterrows()]
+    sel_opt = st.selectbox("Buscar jugador (catálogo)", options=opciones, index=0, help="Selecciona por catálogo o usa el cuadro de texto libre de la derecha.")
+    if sel_opt and sel_opt != "—" and "·" in sel_opt:
+        selected_id = sel_opt.split("·", 1)[0].strip()
+    else:
+        selected_id = ""
+
+with col_txt:
+    text_query = st.text_input("…o buscar por nombre (texto libre)", value="", placeholder="Ej.: Lucía García")
+
+df_all = _load_all_rounds_df(publicadas)
+if df_all.empty:
+    st.info("Aún no hay emparejamientos publicados para explorar.")
+    st.divider()
+else:
+    # Historial del jugador (por id si existe; si no, por nombre)
+    pname = text_query if text_query.strip() else None
+    pid = selected_id if selected_id else None
+    hist_df = _player_history(df_all, pid, pname)
+
+    t1, t2 = st.tabs(["👥 Emparejamientos pasados", "📈 Evolución"])
+    with t1:
+        if hist_df.empty:
+            st.warning("Sin resultados para ese jugador (¿aún no aparece en rondas publicadas?).")
+        else:
+            # Tabla clara
+            st.dataframe(
+                hist_df.rename(columns={
+                    "ronda": "Ronda", "mesa": "Mesa", "color": "Color",
+                    "rival": "Rival", "resultado": "Resultado", "puntos": "Puntos"
+                }),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Ronda": st.column_config.NumberColumn("Ronda"),
+                    "Mesa": st.column_config.NumberColumn("Mesa"),
+                    "Color": st.column_config.TextColumn("Color"),
+                    "Rival": st.column_config.TextColumn("Rival"),
+                    "Resultado": st.column_config.TextColumn("Resultado"),
+                    "Puntos": st.column_config.NumberColumn("Puntos", help="1 victoria, 0.5 tablas, 0 derrota"),
+                },
+            )
+    with t2:
+        evo = _accumulate_points(hist_df)
+        if evo.empty:
+            st.warning("Sin evolución disponible para ese jugador.")
+        else:
+            # Línea simple de puntos acumulados por ronda
+            st.line_chart(
+                evo.set_index("ronda")[["puntos_acum"]],
+                height=220,
+            )
+            st.caption("Puntos acumulados por ronda.")
+
 st.divider()
+# ========================== FIN NUEVO: FILTROS DINÁMICOS ==========================
+
 
 # ---------- PDF builder ----------
 def build_round_pdf(i: int, table_df: pd.DataFrame, cfg: dict, include_results: bool = True) -> bytes | None:
