@@ -22,7 +22,7 @@ from lib.ui import page_header
 # --- Fix para backups ---
 import re  # necesario para re.sub en _make_backup_local
 
-from ui2 import require_teacher
+from lib/ui2 import require_teacher
 require_teacher()   # <- bloquea la página si no hay sesión de profesor
 
 # Asegurar BASE_DIR para rutas relativas dentro del ZIP
