@@ -107,23 +107,32 @@ def get_states(n_rounds: int) -> List[Dict[str, object]]:
     return [round_status(i) for i in range(1, int(n_rounds) + 1)]
 
 
-# --- Auth: modo Profesor/Alumno (sidebar) -----------------------------------
+# --- Auth: Modo Profesor / Alumno -------------------------------------------
 import os, hashlib, streamlit as st
 
+# Claves de sesión y roles
 SESSION_ROLE_KEY = "rol_usuario"
 ROLE_ALUMNO = "Alumno"
 ROLE_PROFESOR = "Profesor"
+SHOW_LOGIN_FORM_KEY = "show_login_form"
+AUTH_ERROR_KEY = "auth_error"
+
+def _ensure_state():
+    st.session_state.setdefault(SESSION_ROLE_KEY, ROLE_ALUMNO)      # ⬅️ por defecto: Alumno
+    st.session_state.setdefault(SHOW_LOGIN_FORM_KEY, False)         # no mostrar login al inicio
+    st.session_state.setdefault("admin_pwd", "")
+    st.session_state.setdefault(AUTH_ERROR_KEY, "")
 
 def _sha256(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 def _admin_pass_hash() -> str:
     """
-    Orden de lectura:
-    1) st.secrets["auth"]["admin_pass_sha256"]  (hash)
-    2) ENV ADMIN_PASS_SHA256                     (hash)
-    3) st.secrets["ADMIN_PASS"]                 (PLAIN → se hashea aquí)
-    4) ENV ADMIN_PASS                           (PLAIN → se hashea aquí)
+    Orden de lectura (flexible):
+      1) st.secrets['auth']['admin_pass_sha256'] (hash)
+      2) ENV ADMIN_PASS_SHA256 (hash)
+      3) st.secrets['ADMIN_PASS'] (plano -> se hashea aquí)
+      4) ENV ADMIN_PASS (plano -> se hashea aquí)
     """
     h = ""
     try:
@@ -151,21 +160,50 @@ def is_teacher() -> bool:
 def set_role(role: str) -> None:
     st.session_state[SESSION_ROLE_KEY] = role
 
+def _admin_login_on_change():
+    """Valida cuando se pulsa Enter en el input de contraseña."""
+    pwd = st.session_state.get("admin_pwd", "")
+    if pwd and _sha256(pwd) == _admin_pass_hash():
+        set_role(ROLE_PROFESOR)
+        st.session_state[SHOW_LOGIN_FORM_KEY] = False   # oculta formulario tras validar
+        st.session_state["admin_pwd"] = ""
+        st.session_state[AUTH_ERROR_KEY] = ""
+    else:
+        st.session_state[AUTH_ERROR_KEY] = "Contraseña incorrecta."
+
 def login_widget():
-    st.markdown("#### 🔐 Acceso profesor")
-    pwd = st.text_input("Contraseña", type="password", key="admin_pwd")
-    c1, c2 = st.columns([1,1])
-    if c1.button("Entrar"):
-        if pwd and _sha256(pwd) == _admin_pass_hash():
-            set_role(ROLE_PROFESOR)
-            st.success("Sesión de profesor iniciada.")
-        else:
-            set_role(ROLE_ALUMNO)
-            st.error("Contraseña incorrecta.")
+    """Coloca esto al PRINCIPIO de la sidebar en TODAS las páginas visibles."""
+    _ensure_state()
+
+    st.markdown("#### 👥 Sesión")
     if is_teacher():
-        c2.button("Salir (modo alumno)", on_click=lambda: set_role(ROLE_ALUMNO))
+        # Indicador de modo + botón salir
+        st.success("👩‍🏫 **Modo Profesor**")
+        if st.button("SALIR", key="logout_btn", use_container_width=True):
+            set_role(ROLE_ALUMNO)
+            st.session_state[SHOW_LOGIN_FORM_KEY] = False
+            st.session_state["admin_pwd"] = ""
+            st.session_state[AUTH_ERROR_KEY] = ""
+        return
+
+    # Modo alumno (por defecto)
+    st.info("🎓 **Modo Alumno**")
+    # Botón para solicitar acceso de profesor
+    if not st.session_state[SHOW_LOGIN_FORM_KEY]:
+        st.button("Modo profesor", key="go_prof_btn", use_container_width=True,
+                  on_click=lambda: st.session_state.update({SHOW_LOGIN_FORM_KEY: True, AUTH_ERROR_KEY: ""}))
+    else:
+        # Formulario de contraseña (validación al pulsar Enter)
+        st.text_input("Contraseña de profesor", type="password", key="admin_pwd", on_change=_admin_login_on_change)
+        st.caption("Pulsa **Enter** para validar.")
+        if st.session_state[AUTH_ERROR_KEY]:
+            st.error(st.session_state[AUTH_ERROR_KEY])
+        # Opción de cancelar y volver a modo alumno sin validar
+        st.button("Cancelar", key="cancel_prof_btn", use_container_width=True,
+                  on_click=lambda: st.session_state.update({SHOW_LOGIN_FORM_KEY: False, "admin_pwd": "", AUTH_ERROR_KEY: ""}))
 
 def require_teacher():
+    """Coloca esto al inicio de pages/99_Administracion.py."""
     if not is_teacher():
         st.warning("Área exclusiva del profesorado.")
         st.stop()
