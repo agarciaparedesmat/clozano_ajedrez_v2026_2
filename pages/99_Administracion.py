@@ -23,7 +23,7 @@ from lib.ui import page_header
 import re  # necesario para re.sub en _make_backup_local
 
 # --- al inicio, junto con el resto de imports ---
-from lib/ui2 import require_teacher  # 👈 OJO: con el prefijo 'lib.'
+from lib.ui2 import require_teacher  # 👈 OJO: con el prefijo 'lib.'
 require_teacher()  # bloquea la página si no hay sesión de profesor
 
 # Asegurar BASE_DIR para rutas relativas dentro del ZIP
