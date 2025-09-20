@@ -190,6 +190,21 @@ def _logout():
     st.session_state[AUTH_ERROR_KEY] = ""
     _safe_rerun()  # ⬅️ evita tener que pulsar dos veces
 
+def _enter_prof_request():
+    # Mostrar formulario SIN cambiar a profesor
+    set_role(ROLE_ALUMNO)  # por si venimos de sesión previa
+    st.session_state[SHOW_LOGIN_FORM_KEY] = True
+    st.session_state[AUTH_ERROR_KEY] = ""
+    st.session_state["admin_pwd"] = ""
+
+def _cancel_prof_request():
+    # Cancelar y volver a Alumno siempre
+    set_role(ROLE_ALUMNO)
+    st.session_state[SHOW_LOGIN_FORM_KEY] = False
+    st.session_state[AUTH_ERROR_KEY] = ""
+    st.session_state["admin_pwd"] = ""
+    _safe_rerun()  # refresca para que desaparezca el formulario
+
 _BADGE_CSS = """
 <style>
 .badge {display:inline-flex; align-items:center; gap:.35rem; padding:.22rem .60rem;
@@ -204,34 +219,33 @@ def login_widget():
     """Coloca esto al PRINCIPIO de la sidebar en TODAS las páginas."""
     _ensure_state()
     st.markdown(_BADGE_CSS, unsafe_allow_html=True)
-
-    # Encabezado de sesión + badge
     st.markdown("#### 👥 Sesión")
 
     if is_teacher():
-        st.markdown('<span class="badge profe">👩‍🏫 Modo Profesor</span>', unsafe_allow_html=True)
+        # ---- Fila: badge Profesor + botón SALIR ----
+        col_badge, col_btn = st.columns([0.6, 0.4])
+        with col_badge:
+            st.markdown('<span class="badge profe">👩‍🏫 Modo Profesor</span>', unsafe_allow_html=True)
+        with col_btn:
+            st.button("SALIR", key="logout_btn", use_container_width=True, on_click=_logout)
         st.markdown('<hr class="sep-thin">', unsafe_allow_html=True)
-        # Botón SALIR: ahora funciona a la primera
-        st.button("SALIR", key="logout_btn", use_container_width=True, on_click=_logout)
         return
 
-    # Modo alumno (por defecto)
-    st.markdown('<span class="badge alumno">🎓 Modo Alumno</span>', unsafe_allow_html=True)
+    # ---- Fila: badge Alumno + botón PROFESOR ----
+    col_badge, col_btn = st.columns([0.6, 0.4])
+    with col_badge:
+        st.markdown('<span class="badge alumno">🎓 Modo Alumno</span>', unsafe_allow_html=True)
+    with col_btn:
+        st.button("PROFESOR", key="go_prof_btn", use_container_width=True, on_click=_enter_prof_request)
     st.markdown('<hr class="sep-thin">', unsafe_allow_html=True)
 
-    # Botón para solicitar acceso de profesor
-    if not st.session_state[SHOW_LOGIN_FORM_KEY]:
-        st.button("Modo profesor", key="go_prof_btn", use_container_width=True,
-                  on_click=lambda: st.session_state.update({SHOW_LOGIN_FORM_KEY: True, AUTH_ERROR_KEY: ""}))
-    else:
-        # Formulario de contraseña (validación al pulsar Enter)
+    # Formulario de contraseña (solo si se ha pedido "PROFESOR")
+    if st.session_state[SHOW_LOGIN_FORM_KEY]:
         st.text_input("Contraseña de profesor", type="password", key="admin_pwd", on_change=_admin_login_on_change)
         st.caption("Pulsa **Enter** para validar.")
         if st.session_state[AUTH_ERROR_KEY]:
             st.error(st.session_state[AUTH_ERROR_KEY])
-        # Cancelar → volver a modo alumno sin validar
-        st.button("Cancelar", key="cancel_prof_btn", use_container_width=True,
-                  on_click=lambda: st.session_state.update({SHOW_LOGIN_FORM_KEY: False, "admin_pwd": "", AUTH_ERROR_KEY: ""}))
+        st.button("Cancelar", key="cancel_prof_btn", use_container_width=True, on_click=_cancel_prof_request)
 
 def require_teacher():
     """Coloca esto al inicio de pages/99_Administracion.py."""
