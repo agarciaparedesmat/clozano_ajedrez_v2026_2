@@ -106,9 +106,9 @@ def get_states(n_rounds: int) -> List[Dict[str, object]]:
     """Estado para todas las rondas 1..n_rounds."""
     return [round_status(i) for i in range(1, int(n_rounds) + 1)]
 
-# --- Auth: modo Profesor/Alumno ---------------------------------------------
+
+# --- Auth: modo Profesor/Alumno (sidebar) -----------------------------------
 import os, hashlib, streamlit as st
-from tournament import load_config
 
 SESSION_ROLE_KEY = "rol_usuario"
 ROLE_ALUMNO = "Alumno"
@@ -118,15 +118,31 @@ def _sha256(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 def _admin_pass_hash() -> str:
-    # Prioridad: secrets.toml -> ENV -> config.json (fallback)
-    h = (st.secrets.get("auth", {}).get("admin_pass_sha256", "") 
-         if hasattr(st, "secrets") else "")
+    """
+    Orden de lectura:
+    1) st.secrets["auth"]["admin_pass_sha256"]  (hash)
+    2) ENV ADMIN_PASS_SHA256                     (hash)
+    3) st.secrets["ADMIN_PASS"]                 (PLAIN → se hashea aquí)
+    4) ENV ADMIN_PASS                           (PLAIN → se hashea aquí)
+    """
+    h = ""
+    try:
+        h = st.secrets.get("auth", {}).get("admin_pass_sha256", "")
+    except Exception:
+        pass
     if not h:
         h = os.environ.get("ADMIN_PASS_SHA256", "")
     if not h:
-        cfg = load_config() or {}
-        h = ((cfg.get("auth") or {}).get("admin_pass_sha256", "") 
-             if isinstance(cfg, dict) else "")
+        try:
+            plain = st.secrets.get("ADMIN_PASS", "")
+            if plain:
+                h = _sha256(plain)
+        except Exception:
+            pass
+    if not h:
+        plain = os.environ.get("ADMIN_PASS", "")
+        if plain:
+            h = _sha256(plain)
     return (h or "").strip().lower()
 
 def is_teacher() -> bool:
