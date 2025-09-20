@@ -4,50 +4,49 @@ import streamlit as st
 
 from lib.ui import hero_portada, inject_base_style, sidebar_title_and_nav
 from lib.tournament import (
-    DATA_DIR,
-    load_config,
-    list_round_files,
-    is_published,
-    round_file,
-    last_modified,
-    planned_rounds,
-    format_with_cfg,
+    DATA_DIR, load_config, list_round_files, is_published, round_file,
+    last_modified, planned_rounds, format_with_cfg,
 )
 
-st.set_page_config(page_title="Inicio", page_icon="♟️", layout="wide",initial_sidebar_state="expanded")  # o "collapsed"
-inject_base_style()  # ← NUEVO: aplica el bg_color de config.json en la raíz
+# 👇 NUEVO: helpers de auth (modo profesor/alumno)
+from lib.ui2 import login_widget, is_teacher
 
-# NAV personalizada debajo de la cabecera (título + nivel/año)
-#sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
-sidebar_title_and_nav(
-    extras=True,
-    items=[
-        ("app.py", "♟️ Inicio"),
-        ("pages/10_Rondas.py", "🧩 Rondas"),
-        ("pages/20_Clasificacion.py", "🏆 Clasificación"),
-        ("pages/99_Administracion.py", "🛠️ Administración"),
-        ("pages/30_Genially.py", "♞ Genially")
-    ]
-)
+st.set_page_config(page_title="Inicio", page_icon="♟️", layout="wide", initial_sidebar_state="expanded")
+inject_base_style()
 
-# Config y contexto
+# --- LOGIN EN LA SIDEBAR (antes de construir la navegación) ---
+with st.sidebar:
+    login_widget()
+
+# --- NAV personalizable: filtra “Administración” si no eres profesor ---
+nav_items = [
+    ("app.py", "♟️ Inicio"),
+    ("pages/10_Rondas.py", "🧩 Rondas"),
+    ("pages/20_Clasificacion.py", "🏆 Clasificación"),
+    ("pages/99_Administracion.py", "🛠️ Administración"),
+    ("pages/30_Genially.py", "♞ Genially"),
+]
+if not is_teacher():
+    nav_items = [it for it in nav_items if "99_Administracion.py" not in it[0]]
+
+sidebar_title_and_nav(extras=True, items=nav_items)
+
+# -------- Config y contexto --------
 cfg = load_config()
-titulo = cfg.get("titulo", "Ajedrez en los recreos")
-nivel = cfg.get("nivel", "Todos")
-anio = cfg.get("anio", "")
-version  = cfg.get("version", "")
+titulo  = cfg.get("titulo", "Ajedrez en los recreos")
+nivel   = cfg.get("nivel", "Todos")
+anio    = cfg.get("anio", "")
+version = cfg.get("version", "")
 JUG_PATH = f"{DATA_DIR}/jugadores.csv"
 n_plan = planned_rounds(cfg, JUG_PATH)
 
-# Portada (hero con nivel/año)
-
-
+# -------- Portada --------
 hero_portada(
     format_with_cfg("♟️ {titulo}", cfg),
-    format_with_cfg("{nivel} - Curso {anio} — Consulta rondas, resultados y clasificación en tiempo real.     {version}", cfg)
+    format_with_cfg("{nivel} - Curso {anio} — Consulta rondas, resultados y clasificación en tiempo real.     {version}", cfg),
 )
 
-# Estado (tabla 1 línea)
+# -------- Estado (tabla) --------
 round_nums = sorted(list_round_files(n_plan))
 generadas = len(round_nums)
 publicadas = [i for i in round_nums if is_published(i)]
@@ -65,35 +64,16 @@ last_mod = _last_mod_text()
 TABLE_CSS = """
 <style>
 .state-wrap { overflow-x: auto; margin: .25rem 0 1rem 0; }
-.state-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.95rem;
-}
-.state-table th, .state-table td {
-  border: 1px solid rgba(36,32,36,0.10);
-  padding: .45rem .6rem;
-  white-space: nowrap;
-  text-align: left;
-}
-.state-table thead th {
-  background: rgba(115,192,238,0.12);
-  font-weight: 700;
-}
+.state-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.state-table th, .state-table td { border: 1px solid rgba(36,32,36,0.10); padding: .45rem .6rem; white-space: nowrap; text-align: left; }
+.state-table thead th { background: rgba(115,192,238,0.12); font-weight: 700; }
 .state-table tbody td { background: #fff; }
 </style>
 """
 st.markdown(TABLE_CSS, unsafe_allow_html=True)
 
-# dentro de la siguiente tabla se pueden añadir 
-#      <th>📣 Publicadas</th>
-#      <th>🗂️ Generadas</th>
-#      <td>{pub_cnt}</td>
-#      <td>{generadas}</td>
-
 st.markdown(
     f"""
-
 <div class="state-wrap">
 <table class="state-table">
   <thead>
@@ -122,34 +102,18 @@ st.markdown(
 
 st.divider()
 
-# Tarjetas (misma pestaña, sin superposición)
+# -------- Tarjetas --------
 CARD_CSS = """
 <style>
 .stLinkButton { width: 100% !important; }
 .stLinkButton > a {
-  display: block !important;
-  width: 100% !important;
-  text-decoration: none !important;
-  color: inherit !important;
-  white-space: normal !important;
-  background: var(--panel) !important;
-  border: 1px solid rgba(36,32,36,0.08) !important;
-  border-radius: 14px !important;
-  padding: 1rem 1.1rem !important;
-  font-weight: 800 !important;
-  font-size: 1.05rem !important;
-  box-shadow: none !important;
-  transition: transform .08s ease, box-shadow .2s ease;
+  display: block !important; width: 100% !important; text-decoration: none !important; color: inherit !important;
+  background: var(--panel) !important; border: 1px solid rgba(36,32,36,0.08) !important;
+  border-radius: 14px !important; padding: 1rem 1.1rem !important; font-weight: 800 !important; font-size: 1.05rem !important;
+  box-shadow: none !important; transition: transform .08s ease, box-shadow .2s ease;
 }
-.stLinkButton > a:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(36,32,36,0.10);
-}
-.card-desc  {
-  color: var(--muted);
-  font-size: .95rem;
-  margin-top: .35rem;
-}
+.stLinkButton > a:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(36,32,36,0.10); }
+.card-desc  { color: var(--muted); font-size: .95rem; margin-top: .35rem; }
 </style>
 """
 st.markdown(CARD_CSS, unsafe_allow_html=True)
@@ -169,8 +133,9 @@ c1, c2, c3 = st.columns(3)
 with c1:
     card_page("🧩", "Rondas — {nivel}", "Emparejamientos y resultados de rondas.", "pages/10_Rondas.py", "rondas")
 with c2:
-    card_page("🏆", "Clasificación — {nivel}", "Clasificación actual del torneo .", "pages/20_Clasificacion.py", "clas")
+    card_page("🏆", "Clasificación — {nivel}", "Clasificación actual del torneo.", "pages/20_Clasificacion.py", "clas")
 with c3:
-    card_page("🛠️", "Administración — {nivel}", "Gestión de rondas (generar, publicar, despublicar, eliminar) y editar resultados.", "pages/99_Administracion.py", "admin")
-
-
+    if is_teacher():
+        card_page("🛠️", "Administración — {nivel}", "Gestión de rondas (generar, publicar, despublicar, eliminar) y editar resultados.", "pages/99_Administracion.py", "admin")
+    else:
+        st.info("🔒 Administración (solo profesorado)")

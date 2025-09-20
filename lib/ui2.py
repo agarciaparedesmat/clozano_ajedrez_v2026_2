@@ -105,3 +105,52 @@ def status_label(s: Dict[str, object]) -> str:
 def get_states(n_rounds: int) -> List[Dict[str, object]]:
     """Estado para todas las rondas 1..n_rounds."""
     return [round_status(i) for i in range(1, int(n_rounds) + 1)]
+
+# --- Auth: modo Profesor/Alumno ---------------------------------------------
+import os, hashlib, streamlit as st
+from tournament import load_config
+
+SESSION_ROLE_KEY = "rol_usuario"
+ROLE_ALUMNO = "Alumno"
+ROLE_PROFESOR = "Profesor"
+
+def _sha256(s: str) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+def _admin_pass_hash() -> str:
+    # Prioridad: secrets.toml -> ENV -> config.json (fallback)
+    h = (st.secrets.get("auth", {}).get("admin_pass_sha256", "") 
+         if hasattr(st, "secrets") else "")
+    if not h:
+        h = os.environ.get("ADMIN_PASS_SHA256", "")
+    if not h:
+        cfg = load_config() or {}
+        h = ((cfg.get("auth") or {}).get("admin_pass_sha256", "") 
+             if isinstance(cfg, dict) else "")
+    return (h or "").strip().lower()
+
+def is_teacher() -> bool:
+    return st.session_state.get(SESSION_ROLE_KEY, ROLE_ALUMNO) == ROLE_PROFESOR
+
+def set_role(role: str) -> None:
+    st.session_state[SESSION_ROLE_KEY] = role
+
+def login_widget():
+    st.markdown("#### 🔐 Acceso profesor")
+    pwd = st.text_input("Contraseña", type="password", key="admin_pwd")
+    c1, c2 = st.columns([1,1])
+    if c1.button("Entrar"):
+        if pwd and _sha256(pwd) == _admin_pass_hash():
+            set_role(ROLE_PROFESOR)
+            st.success("Sesión de profesor iniciada.")
+        else:
+            set_role(ROLE_ALUMNO)
+            st.error("Contraseña incorrecta.")
+    if is_teacher():
+        c2.button("Salir (modo alumno)", on_click=lambda: set_role(ROLE_ALUMNO))
+
+def require_teacher():
+    if not is_teacher():
+        st.warning("Área exclusiva del profesorado.")
+        st.stop()
+# ---------------------------------------------------------------------------
