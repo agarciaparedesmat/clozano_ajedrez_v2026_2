@@ -8,21 +8,32 @@ from lib.ui import sidebar_title_and_nav
 
 from streamlit.components.v1 import html
 
+from lib.ui2 import login_widget, is_teacher
+from lib.ui import sidebar_title_and_nav, inject_base_style  # ya lo tendrás
+import streamlit as st
+
 # st.set_page_config(page_title="Genially en Streamlit", layout="wide")
 # inject_base_style()
 
 # NAV personalizada debajo de la cabecera (título + nivel/año)
 #sidebar_title_and_nav(extras=True)  # autodetecta páginas automáticamente
-sidebar_title_and_nav(
-    extras=True,
-    items=[
-        ("app.py", "♟️ Inicio"),
-        ("pages/10_Rondas.py", "🧩 Rondas"),
-        ("pages/20_Clasificacion.py", "🏆 Clasificación"),
-        ("pages/99_Administracion.py", "🛠️ Administración"),
-        ("pages/30_Genially.py", "♞ Genially")
-    ]
-)
+# --- Sidebar: login + navegación filtrada ---
+with st.sidebar:
+    login_widget()
+
+nav_items = [
+    ("app.py", "♟️ Inicio"),
+    ("pages/10_Rondas.py", "🧩 Rondas"),
+    ("pages/20_Clasificacion.py", "🏆 Clasificación"),
+    ("pages/99_Administracion.py", "🛠️ Administración"),
+    ("pages/30_Genially.py", "♞ Genially"),
+]
+# Oculta Administración a alumnado
+if not is_teacher():
+    nav_items = [it for it in nav_items if "99_Administracion.py" not in it[0]]
+
+sidebar_title_and_nav(extras=True, items=nav_items)
+
 
 # Compactar el marco derecho (main) para evitar scroll por padding vertical
 st.markdown("""

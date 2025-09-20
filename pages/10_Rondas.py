@@ -20,20 +20,33 @@ from lib.tournament import (
     format_date_es,
 )
 
+from lib.ui2 import login_widget, is_teacher
+from lib.ui import sidebar_title_and_nav, inject_base_style  # ya lo tendrás
+import streamlit as st
+
 st.set_page_config(page_title="Rondas", page_icon="🧩", layout="wide")
 inject_base_style()
 
 # NAV (personalizada) bajo cabecera lateral
-sidebar_title_and_nav(
-    extras=True,
-    items=[
-        ("app.py", "♟️ Inicio"),
-        ("pages/10_Rondas.py", "🧩 Rondas"),
-        ("pages/20_Clasificacion.py", "🏆 Clasificación"),
-        ("pages/99_Administracion.py", "🛠️ Administración"),
-        ("pages/30_Genially.py", "♞ Genially")
-    ],
-)
+# --- Sidebar: login + navegación filtrada ---
+with st.sidebar:
+    login_widget()
+
+nav_items = [
+    ("app.py", "♟️ Inicio"),
+    ("pages/10_Rondas.py", "🧩 Rondas"),
+    ("pages/20_Clasificacion.py", "🏆 Clasificación"),
+    ("pages/99_Administracion.py", "🛠️ Administración"),
+    ("pages/30_Genially.py", "♞ Genially"),
+]
+# Oculta Administración a alumnado
+if not is_teacher():
+    nav_items = [it for it in nav_items if "99_Administracion.py" not in it[0]]
+
+sidebar_title_and_nav(extras=True, items=nav_items)
+
+
+
 
 cfg = load_config()
 page_header(
