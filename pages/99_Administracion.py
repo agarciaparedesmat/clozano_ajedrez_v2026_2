@@ -1177,7 +1177,7 @@ def _show_fechas():
         new_date = st.date_input(
             "Nueva fecha de celebración",
             value=default_date,
-            key=f"fecha_edit_R{sel_draft}"
+            key=f"fecha_edit_R{sel_draft}",
             format="DD/MM/YYYY",
         )
 
