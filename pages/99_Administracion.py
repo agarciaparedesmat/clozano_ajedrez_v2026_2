@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import streamlit as st
 from lib.ui import sidebar_title_and_nav, page_header
+from zoneinfo import ZoneInfo  # para horario Europe/Madrid
 
 from lib.ui2 import is_pub, set_pub, results_empty_count, round_status, status_label, get_states
 from lib.tournament import (
@@ -147,7 +148,8 @@ def _bk_dir() -> str:
 def _now_tag() -> str:
     import datetime as _dt
     # 2025-09-16_14-33-05
-    return _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return _dt.datetime.now(tz=ZoneInfo("Europe/Madrid")).strftime("%d-%m-%Y_%H-%M-%S")
+
 
 def _safe_zip_namelist(zf):
     # Evita "zip-slip" (entradas con rutas absolutas o que suben directorios)
@@ -1597,11 +1599,16 @@ def _show_archivos():
 
     # ---------- Inspector rápido de /data ----------
     st.markdown("#### 🗂️ Archivos en `data/` (inspector rápido)")
+
+    from lib.tournament import format_ts_madrid  # asegúrate de importarlo arriba
+
     def _lm(p: str) -> str:
         try:
-            return _dt.datetime.fromtimestamp(os.path.getmtime(p)).strftime("%Y-%m-%d %H:%M:%S")
+            import os
+            return format_ts_madrid(os.path.getmtime(p), with_seconds=True)
         except Exception:
             return "—"
+
 
     try:
         files = sorted(os.listdir(DATA_DIR))
@@ -2077,7 +2084,12 @@ def _debug_meta_persistencia():
 
     try:
         mt = os.path.getmtime(meta_path)
-        st.caption(f"Última modificación de meta.json: { _dt.datetime.fromtimestamp(mt) }")
+
+        st.caption(
+            f"Última modificación de meta.json: "
+            f"{_dt.datetime.fromtimestamp(mt, tz=ZoneInfo('Europe/Madrid')).strftime('%d/%m/%Y %H:%M:%S')}"
+    )
+
     except Exception:
         st.caption("meta.json aún no existe.")
 
@@ -2092,7 +2104,9 @@ def _debug_meta_persistencia():
             rounds = meta.setdefault("rounds", {})
             # 2) escribir un marcador temporal bajo rounds.__diag (no afecta a rondas reales)
             import time
-            rounds.setdefault("__diag", {})["ts"] = _dt.datetime.now().isoformat()
+            rounds.setdefault("__diag", {})["ts"] = _dt.datetime.now(tz=ZoneInfo("Europe/Madrid")).isoformat(timespec="seconds")
+            rounds.setdefault("__diag", {})["ts_es"] = _dt.datetime.now(tz=ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y %H:%M:%S")
+
             _save_meta_preserving_dates(meta)
             # 3) releer y mostrar
             st.success("Guardado OK. Releyendo…")

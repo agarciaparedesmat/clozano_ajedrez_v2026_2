@@ -4,3 +4,4 @@ qrcode[pil]>=7.4
 reportlab==4.2.2
 fpdf2>=2.7
 altair>=5
+tzdata>=2024.1

@@ -11,6 +11,24 @@ from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 
+
+# arriba, junto a imports Zona horaria y formatos de fecha
+from zoneinfo import ZoneInfo
+MADRID_TZ = ZoneInfo("Europe/Madrid")
+
+def format_ts_madrid(ts: float, with_seconds: bool = True) -> str:
+    """Convierte un timestamp (epoch) a dd/mm/yyyy HH:MM[:SS] en horario de Madrid."""
+    from datetime import datetime
+    dt = datetime.fromtimestamp(ts, tz=MADRID_TZ)
+    fmt = "%d/%m/%Y %H:%M:%S" if with_seconds else "%d/%m/%Y %H:%M"
+    return dt.strftime(fmt)
+
+def now_madrid(with_seconds: bool = True) -> str:
+    """Fecha-hora actual en Madrid, formateada dd/mm/yyyy HH:MM[:SS]."""
+    from datetime import datetime
+    fmt = "%d/%m/%Y %H:%M:%S" if with_seconds else "%d/%m/%Y %H:%M"
+    return datetime.now(tz=MADRID_TZ).strftime(fmt)
+
 # ============================================================
 # Rutas y utilidades básicas
 # ============================================================
@@ -264,12 +282,14 @@ def read_csv_safe(path: str) -> Optional[pd.DataFrame]:
         return None
 
 def last_modified(path: str) -> str:
-    """Fecha-hora de última modificación (ISO) o '—' si falla."""
+    """Fecha-hora de última modificación en horario Madrid, o '—' si falla."""
     try:
         ts = os.path.getmtime(path)
-        return datetime.fromtimestamp(ts).isoformat(sep=" ", timespec="seconds")
+        return format_ts_madrid(ts, with_seconds=True)
     except Exception:
         return "—"
+
+
 
 # ============================================================
 # Planificación de rondas (auto por log2(N) o fijo desde config)
