@@ -207,11 +207,19 @@ def _cancel_prof_request():
 
 _BADGE_CSS = """
 <style>
+/* Badges */
 .badge {display:inline-flex; align-items:center; gap:.35rem; padding:.22rem .60rem;
         border-radius:999px; font-weight:700; font-size:0.86rem; line-height:1;}
 .badge.profe {background:#e7f7ec; border:1px solid #7bd58b;}
 .badge.alumno {background:#eaf2ff; border:1px solid #8ab4ff;}
 .sep-thin {height:1px; background:rgba(0,0,0,.08); border:0; margin:.6rem 0 1rem;}
+
+/* Sidebar buttons más pequeños (solo en la sidebar) */
+[data-testid="stSidebar"] .stButton > button {
+  padding: .25rem .6rem !important;
+  font-size: .85rem !important;
+  border-radius: 999px !important;
+}
 </style>
 """
 
@@ -222,21 +230,25 @@ def login_widget():
     st.markdown("#### 👥 Sesión")
 
     if is_teacher():
+
         # ---- Fila: badge Profesor + botón SALIR ----
-        col_badge, col_btn = st.columns([0.6, 0.4])
+        col_badge, col_btn = st.columns([0.72, 0.28])  # más estrecho para el botón
         with col_badge:
             st.markdown('<span class="badge profe">👩‍🏫 Modo Profesor</span>', unsafe_allow_html=True)
         with col_btn:
-            st.button("SALIR", key="logout_btn", use_container_width=True, on_click=_logout)
+            st.button("SALIR", key="logout_btn", on_click=_logout)  # sin use_container_width
+
         st.markdown('<hr class="sep-thin">', unsafe_allow_html=True)
         return
 
+
     # ---- Fila: badge Alumno + botón PROFESOR ----
-    col_badge, col_btn = st.columns([0.6, 0.4])
+    col_badge, col_btn = st.columns([0.72, 0.28])
     with col_badge:
         st.markdown('<span class="badge alumno">🎓 Modo Alumno</span>', unsafe_allow_html=True)
     with col_btn:
-        st.button("PROFESOR", key="go_prof_btn", use_container_width=True, on_click=_enter_prof_request)
+        st.button("PROFESOR", key="go_prof_btn", on_click=_enter_prof_request)  # sin use_container_width
+        
     st.markdown('<hr class="sep-thin">', unsafe_allow_html=True)
 
     # Formulario de contraseña (solo si se ha pedido "PROFESOR")
