@@ -179,16 +179,18 @@ def _admin_login_on_change():
         st.session_state[SHOW_LOGIN_FORM_KEY] = False   # oculta formulario tras validar
         st.session_state["admin_pwd"] = ""
         st.session_state[AUTH_ERROR_KEY] = ""
-        _safe_rerun()  # refresca menú/navegación inmediatamente
+        #_safe_rerun()  # refresca menú/navegación inmediatamente  (¡¡¡¡¡inneesario!!!!)
     else:
         st.session_state[AUTH_ERROR_KEY] = "Contraseña incorrecta."
+
 
 def _logout():
     set_role(ROLE_ALUMNO)
     st.session_state[SHOW_LOGIN_FORM_KEY] = False
     st.session_state["admin_pwd"] = ""
     st.session_state[AUTH_ERROR_KEY] = ""
-    _safe_rerun()  # ⬅️ evita tener que pulsar dos veces
+    #_safe_rerun()  # refresca menú/navegación inmediatamente  (¡¡¡¡¡inneesario!!!!)
+    #_safe_rerun()  # ⬅️ evita tener que pulsar dos veces
 
 
 def _logout_and_redirect(target: str | None = None):
@@ -201,18 +203,18 @@ def _logout_and_redirect(target: str | None = None):
 
 def _enter_prof_request():
     # Mostrar formulario SIN cambiar a profesor
-    set_role(ROLE_ALUMNO)  # por si venimos de sesión previa
+    set_role(ROLE_ALUMNO)   # por si venimos de sesión previa
     st.session_state[SHOW_LOGIN_FORM_KEY] = True
     st.session_state[AUTH_ERROR_KEY] = ""
     st.session_state["admin_pwd"] = ""
 
 def _cancel_prof_request():
-    # Cancelar y volver a Alumno siempre
+    # Cancelar y volver a Alumno siempre (sin rerun explícito)
     set_role(ROLE_ALUMNO)
     st.session_state[SHOW_LOGIN_FORM_KEY] = False
     st.session_state[AUTH_ERROR_KEY] = ""
     st.session_state["admin_pwd"] = ""
-    _safe_rerun()  # refresca para que desaparezca el formulario
+
 
 _BADGE_CSS = """
 <style>
