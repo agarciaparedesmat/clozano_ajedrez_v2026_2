@@ -23,8 +23,14 @@ from lib.ui import page_header
 import re  # necesario para re.sub en _make_backup_local
 
 # --- al inicio, junto con el resto de imports ---
-from lib.ui2 import require_teacher  # 👈 OJO: con el prefijo 'lib.'
-require_teacher()  # bloquea la página si no hay sesión de profesor
+from lib.ui2 import login_widget, require_teacher  # 👈 OJO: con el prefijo 'lib.'
+
+# Sidebar: muestra modo profesor + botón SALIR que regresa a Inicio
+with st.sidebar:
+    login_widget(logout_redirect_to="app.py")
+
+# Guardia con redirección a Inicio si no eres profesor
+require_teacher(redirect_to="app.py")
 
 # Asegurar BASE_DIR para rutas relativas dentro del ZIP
 try:

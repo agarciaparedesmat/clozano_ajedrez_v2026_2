@@ -190,6 +190,15 @@ def _logout():
     st.session_state[AUTH_ERROR_KEY] = ""
     _safe_rerun()  # ⬅️ evita tener que pulsar dos veces
 
+
+def _logout_and_redirect(target: str | None = None):
+    _logout()
+    if target:
+        try:
+            st.switch_page(target)   # redirige inmediatamente si es posible
+        except Exception:
+            pass  # si no se puede, en la próxima recarga 'require_teacher' hará de escoba
+
 def _enter_prof_request():
     # Mostrar formulario SIN cambiar a profesor
     set_role(ROLE_ALUMNO)  # por si venimos de sesión previa
@@ -223,32 +232,30 @@ _BADGE_CSS = """
 </style>
 """
 
-def login_widget():
+def login_widget(logout_redirect_to: str | None = None):
     """Coloca esto al PRINCIPIO de la sidebar en TODAS las páginas."""
     _ensure_state()
     st.markdown(_BADGE_CSS, unsafe_allow_html=True)
     st.markdown("#### 👥 Sesión")
 
     if is_teacher():
-
         # ---- Fila: badge Profesor + botón SALIR ----
-        col_badge, col_btn = st.columns([0.72, 0.28])  # más estrecho para el botón
+        col_badge, col_btn = st.columns([0.72, 0.28])
         with col_badge:
             st.markdown('<span class="badge profe">👩‍🏫 Modo Profesor</span>', unsafe_allow_html=True)
         with col_btn:
-            st.button("🚪", key="logout_btn", on_click=_logout)  # sin use_container_width
-
+            st.button("🚪", key="logout_btn",
+                      on_click=_logout_and_redirect, kwargs={"target": logout_redirect_to})
         st.markdown('<hr class="sep-thin">', unsafe_allow_html=True)
         return
-
 
     # ---- Fila: badge Alumno + botón PROFESOR ----
     col_badge, col_btn = st.columns([0.72, 0.28])
     with col_badge:
         st.markdown('<span class="badge alumno">🎓 Modo Alumno</span>', unsafe_allow_html=True)
     with col_btn:
-        st.button("👩‍🏫", key="go_prof_btn", on_click=_enter_prof_request)  # sin use_container_width
-        
+        st.button("👩‍🏫", key="go_prof_btn", on_click=_enter_prof_request)
+
     st.markdown('<hr class="sep-thin">', unsafe_allow_html=True)
 
     # Formulario de contraseña (solo si se ha pedido "PROFESOR")
@@ -257,11 +264,19 @@ def login_widget():
         st.caption("Pulsa **Enter** para validar.")
         if st.session_state[AUTH_ERROR_KEY]:
             st.error(st.session_state[AUTH_ERROR_KEY])
-        st.button("Cancelar", key="cancel_prof_btn", use_container_width=True, on_click=_cancel_prof_request)
+        st.button("Cancelar", key="cancel_prof_btn", on_click=_cancel_prof_request)
 
-def require_teacher():
-    """Coloca esto al inicio de pages/99_Administracion.py."""
+
+def require_teacher(redirect_to: str | None = None):
+    """
+    Si no hay sesión de profesor:
+      - si redirect_to está definido → intenta st.switch_page(redirect_to)
+      - en cualquier caso, detiene la ejecución de esta página
+    """
     if not is_teacher():
-        st.warning("Área exclusiva del profesorado.")
+        if redirect_to:
+            try:
+                st.switch_page(redirect_to)
+            except Exception:
+                pass
         st.stop()
-# ---------------------------------------------------------------------------
