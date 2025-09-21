@@ -462,6 +462,10 @@ st.text_input("Tu nombre (registro de cambios)", key="teacher_actor_name", place
 # Valor actual para usar en logs/acciones
 actor = st.session_state["teacher_actor_name"]
 
+# Sincroniza con claves usadas por el resto de módulos
+st.session_state["actor_name"] = actor     # ← lo que leen Rondas/Clasificación/Genially
+st.session_state["actor"] = actor          # ← por si queda código antiguo que usa 'actor'
+
 
 
 # =========================
