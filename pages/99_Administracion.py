@@ -449,12 +449,15 @@ page_header("🛠️ Panel de Administración", "Gestión de rondas, publicació
 
 # Modo profesor activo (ya validado en la sidebar)
 st.success("👩‍🏫 Modo Profesor activo")
-actor = st.text_input(
-    "Tu nombre (registro de cambios)",
-    value=st.session_state.get("actor_name", "Admin"),
-    key="actor_name",
-)
-actor = st.session_state.get("actor_name", "Admin")
+
+# Solo inicializa una vez (no sobrescribe en cada rerun)
+st.session_state.setdefault("actor_name", "Admin")
+
+# Sin 'value=' → el widget usa el valor ya guardado en session_state
+st.text_input("Tu nombre (registro de cambios)", key="actor_name", placeholder="Admin")
+
+# Lee el valor actual
+actor = st.session_state["actor_name"]
 
 
 
