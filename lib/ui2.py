@@ -236,7 +236,7 @@ def login_widget():
         with col_badge:
             st.markdown('<span class="badge profe">👩‍🏫 Modo Profesor</span>', unsafe_allow_html=True)
         with col_btn:
-            st.button("SALIR", key="logout_btn", on_click=_logout)  # sin use_container_width
+            st.button("🚪", key="logout_btn", on_click=_logout)  # sin use_container_width
 
         st.markdown('<hr class="sep-thin">', unsafe_allow_html=True)
         return
