@@ -225,7 +225,7 @@ _BADGE_CSS = """
 .badge.alumno {background:#eaf2ff; border:1px solid #8ab4ff;}
 
 /* Separador fino con muy poco margen */
-.sep-thin {height:1px; background:rgba(0,0,0,.10); border:0; margin:.5rem 0 .5rem;}
+.sep-thin {height:1px; background:rgba(0,0,0,.10); border:0; margin:.15rem 0 .15rem;}
 
 /* TENSAR márgenes típicos en la sidebar */
 [data-testid="stSidebar"] h4 { margin: 0 0 .25rem !important; }    /* “#### Sesión” */
