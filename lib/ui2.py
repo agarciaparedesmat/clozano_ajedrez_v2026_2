@@ -219,7 +219,7 @@ def _cancel_prof_request():
 _BADGE_CSS = """
 <style>
 /* Badges */
-.badge {display:inline-flex; align-items:center; gap:.5rem; padding:.22rem .60rem;
+.badge {display:inline-flex; align-items:center; gap:.10rem; padding:.22rem .60rem;
         border-radius:999px; font-weight:700; font-size:0.86rem; line-height:1;}
 .badge.profe  {background:#e7f7ec; border:1px solid #7bd58b;}
 .badge.alumno {background:#eaf2ff; border:1px solid #8ab4ff;}
@@ -230,7 +230,7 @@ _BADGE_CSS = """
 /* TENSAR márgenes típicos en la sidebar */
 [data-testid="stSidebar"] h4 { margin: 0 0 .25rem !important; }    /* “#### Sesión” */
 [data-testid="stSidebar"] p  { margin: 0 0 .25rem !important; }    /* captions, etc. */
-[data-testid="stSidebar"] .stButton { margin: .5rem 0 !important; }/* botones compactos */
+[data-testid="stSidebar"] .stButton { margin: .15rem 0 !important; }/* botones compactos */
 
 /* Botones de la sidebar más pequeños y redondeados */
 [data-testid="stSidebar"] .stButton > button {
