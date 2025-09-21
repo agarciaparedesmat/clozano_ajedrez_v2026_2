@@ -1730,8 +1730,17 @@ def _show_archivos():
 
         if rows_meta:
             dfm = pd.DataFrame(rows_meta)
+
             def _row_style(r):
-                return ["background-color:#ffe5e5" if r["desviación_closed"] else "" for _ in r]
+                # Soporta el nombre nuevo y el antiguo por compatibilidad
+                flag = r.get("⚠️ Desv. closed", r.get("desviación_closed", ""))
+                bad = bool(flag)  # "🔴" -> True, cadena vacía -> False
+                return ["background-color:#ffe5e5" if bad else "" for _ in r]
+
+
+            #def _row_style(r):
+            #    return ["background-color:#ffe5e5" if r["desviación_closed"] else "" for _ in r]
+            
             st.table(dfm.style.apply(_row_style, axis=1))
 
     st.markdown("---")
