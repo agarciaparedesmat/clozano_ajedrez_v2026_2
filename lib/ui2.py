@@ -218,28 +218,38 @@ def _cancel_prof_request():
 
 _BADGE_CSS = """
 <style>
-/* Badges */
-.badge {display:inline-flex; align-items:center; gap:.10rem; padding:.22rem .60rem;
+/* 1) Compactar padding nativo de la sidebar (arriba/abajo) */
+[data-testid="stSidebar"] section[data-testid="stSidebarContent"],
+[data-testid="stSidebar"] .block-container {
+  padding-top: .18rem !important;
+  padding-bottom: .20rem !important;
+}
+
+/* 2) Título "#### Sesión" con margen muy reducido */
+[data-testid="stSidebar"] h4 { margin: .05rem 0 .18rem !important; }
+
+/* 3) Texto auxiliar (captions, párrafos) también tensado */
+[data-testid="stSidebar"] p  { margin: .05rem 0 .18rem !important; }
+
+/* 4) Badges */
+.badge {display:inline-flex; align-items:center; gap:.10rem; padding:.20rem .56rem;
         border-radius:999px; font-weight:700; font-size:0.86rem; line-height:1;}
 .badge.profe  {background:#e7f7ec; border:1px solid #7bd58b;}
 .badge.alumno {background:#eaf2ff; border:1px solid #8ab4ff;}
 
-/* Separador fino con muy poco margen */
-.sep-thin {height:1px; background:rgba(0,0,0,.10); border:0; margin:.10rem 0 .15rem;}
+/* 5) Separador súper pegado arriba y abajo */
+.sep-thin {height:1px; background:rgba(0,0,0,.12); border:0; margin:.06rem 0 .10rem;}
 
-/* TENSAR márgenes típicos en la sidebar */
-[data-testid="stSidebar"] h4 { margin: 0 0 .55rem !important; }    /* “#### Sesión” */
-[data-testid="stSidebar"] p  { margin: 0 0 .25rem !important; }    /* captions, etc. */
-[data-testid="stSidebar"] .stButton { margin: .15rem 0 !important; }/* botones compactos */
-
-/* Botones de la sidebar más pequeños y redondeados */
+/* 6) Botones de la sidebar: pequeños y con poco margen vertical */
+[data-testid="stSidebar"] .stButton { margin: .10rem 0 !important; }
 [data-testid="stSidebar"] .stButton > button {
-  padding: .22rem .6rem !important;
-  font-size: .85rem !important;
+  padding: .20rem .56rem !important;
+  font-size: .83rem !important;
   border-radius: 999px !important;
 }
 </style>
 """
+
 
 
 def login_widget(logout_redirect_to: str | None = None):
