@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import streamlit as st
 from lib.ui import sidebar_title_and_nav, page_header
+from zoneinfo import ZoneInfo  # para horario Europe/Madrid
 
 from lib.ui2 import is_pub, set_pub, results_empty_count, round_status, status_label, get_states
 from lib.tournament import (
@@ -21,6 +22,16 @@ from lib.ui import page_header
 
 # --- Fix para backups ---
 import re  # necesario para re.sub en _make_backup_local
+
+# --- al inicio, junto con el resto de imports ---
+from lib.ui2 import login_widget, require_teacher  # 👈 OJO: con el prefijo 'lib.'
+
+# Sidebar: muestra modo profesor + botón SALIR que regresa a Inicio
+with st.sidebar:
+    login_widget(logout_redirect_to="app.py")
+
+# Guardia con redirección a Inicio si no eres profesor
+require_teacher(redirect_to="app.py")
 
 # Asegurar BASE_DIR para rutas relativas dentro del ZIP
 try:
@@ -137,7 +148,8 @@ def _bk_dir() -> str:
 def _now_tag() -> str:
     import datetime as _dt
     # 2025-09-16_14-33-05
-    return _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return _dt.datetime.now(tz=ZoneInfo("Europe/Madrid")).strftime("%d-%m-%Y_%H-%M-%S")
+
 
 def _safe_zip_namelist(zf):
     # Evita "zip-slip" (entradas con rutas absolutas o que suben directorios)
@@ -442,47 +454,13 @@ page_header("🛠️ Panel de Administración", "Gestión de rondas, publicació
 # =========================
 # Acceso (contraseña) + nombre de usuario
 # =========================
-AUTH_KEY = "admin_auth_ok"
-
-if AUTH_KEY not in st.session_state:
-    st.session_state[AUTH_KEY] = False
-
-if not st.session_state[AUTH_KEY]:
-    with st.form("admin_login_form", clear_on_submit=True):
-        pwd = st.text_input("Contraseña", type="password")
-        submitted = st.form_submit_button("Entrar")
-
-    if submitted:
-        if pwd == st.secrets.get("ADMIN_PASS", ""):
-            st.session_state[AUTH_KEY] = True
-            # rerun para ocultar inmediatamente el input de contraseña
-            st.rerun()
-        else:
-            st.error("Contraseña incorrecta")
-
-    # bloquea el resto de la página hasta autenticarse
-    st.stop()
-
-# (ya autenticado)
-st.success("Acceso concedido ✅")
-
-# Nombre del actor para el registro de cambios
+st.success("Modo profesor activo ✅")
 actor = st.text_input(
     "Tu nombre (registro de cambios)",
     value=st.session_state.get("actor_name", "Admin"),
-    key="actor_name",
+    key="actor_name"
 )
-# (opcional) variable 'actor' a nivel de módulo para compatibilidad con código previo
 actor = st.session_state.get("actor_name", "Admin")
-
-# Botón "Cerrar sesión"
-
-if st.button("🔒 Cerrar sesión", key="logout_btn"):
-    # quitar claves gestionadas por widgets y flags de login
-    for k in ("admin_auth_ok", "admin_pwd", "actor_name"):
-        st.session_state.pop(k, None)
-    st.rerun()
-
 
 
 # =========================
@@ -826,7 +804,7 @@ def _show_generar():
 
         # Fecha de celebración para la nueva ronda
         default_date = _dt.date.today()
-        fecha_ronda = st.date_input(f"📅 Fecha de celebración para Ronda {next_round}", value=default_date, key=f"fecha_ronda_R{next_round}", format="DD/MM/YYYY")
+        fecha_ronda = st.date_input(f"📅 Fecha de celebración para Ronda {next_round}", value=default_date, key=f"fecha_ronda_R{next_round}")
         prev = next_round - 1
         allow_generate = True
 
@@ -1079,7 +1057,7 @@ def _resumen_fechas_panel():
     if n_conf > 0:
         with st.expander(f"⚠️ Conflictos de fecha: {n_conf}", expanded=True):
             for d, lst in conflictos:
-                st.warning(f"{d.strftime('%d/%m/%Y')} → Rondas {', '.join(map(str, lst))}")
+                st.warning(f"{d.isoformat()} → Rondas {', '.join(map(str, lst))}")
 
     # Tabla general (lectura)
     st.dataframe(
@@ -1089,7 +1067,7 @@ def _resumen_fechas_panel():
         column_config={
             "Ronda": st.column_config.NumberColumn(format="%d"),
             "Estado": st.column_config.TextColumn(),
-            "Fecha": st.column_config.DateColumn("Fecha", format="DD/MM/YYYY"),
+            "Fecha": st.column_config.DateColumn("Fecha"),
             "Días": st.column_config.NumberColumn(help="Días desde hoy (negativo = pasado)"),
             "Falta fecha": st.column_config.TextColumn(),
         },
@@ -1178,7 +1156,6 @@ def _show_fechas():
             "Nueva fecha de celebración",
             value=default_date,
             key=f"fecha_edit_R{sel_draft}"
-            format="DD/MM/YYYY",
         )
 
         c1, c2 = st.columns(2)
@@ -1189,7 +1166,7 @@ def _show_fechas():
                     try:
                         pretty = format_date_es(new_date.isoformat())
                     except Exception:
-                        pretty = new_date.strftime('%d/%m/%Y')
+                        pretty = new_date.isoformat()
                     st.success(f"Fecha guardada para Ronda {sel_draft}: {pretty}")
                     st.rerun()
                 except Exception as e:
@@ -1231,7 +1208,7 @@ def _show_fechas():
             column_config={
                 "Ronda": st.column_config.NumberColumn(format="%d"),
                 "Estado": st.column_config.TextColumn(help="Estado de la ronda: ✅ Publicada · 📝 Borrador"),
-                "Fecha": st.column_config.DateColumn("Fecha (editable)", format="DD/MM/YYYY"),
+                "Fecha": st.column_config.DateColumn("Fecha (editable)"),
             },
             disabled=["Ronda", "Estado"],  # Solo Fecha editable
             key="fechas_editor_tabla_borradores",
@@ -1271,7 +1248,7 @@ def _show_fechas():
             column_config={
                 "Ronda": st.column_config.NumberColumn(format="%d"),
                 "Estado": st.column_config.TextColumn(),
-                "Fecha": st.column_config.DateColumn("Fecha", format="DD/MM/YYYY"),
+                "Fecha": st.column_config.DateColumn("Fecha"),
             },
         )
     else:
@@ -1622,11 +1599,16 @@ def _show_archivos():
 
     # ---------- Inspector rápido de /data ----------
     st.markdown("#### 🗂️ Archivos en `data/` (inspector rápido)")
+
+    from lib.tournament import format_ts_madrid  # asegúrate de importarlo arriba
+
     def _lm(p: str) -> str:
         try:
-            return _dt.datetime.fromtimestamp(os.path.getmtime(p)).strftime("%Y-%m-%d %H:%M:%S")
+            import os
+            return format_ts_madrid(os.path.getmtime(p), with_seconds=True)
         except Exception:
             return "—"
+
 
     try:
         files = sorted(os.listdir(DATA_DIR))
@@ -1715,16 +1697,13 @@ def _show_archivos():
                 # Fecha "real": lo más fideligno que tenemos es get_round_date (guarda en meta)
                 try:
                     date_real = get_round_date(i) or ""
-                # Formatos españoles para la tabla
-                date_meta_es = _dt.date.fromisoformat(date_meta).strftime('%d/%m/%Y') if date_meta else ''
-                date_real_es = _dt.date.fromisoformat(date_real).strftime('%d/%m/%Y') if date_real else ''
                 except Exception:
                     date_real = ""
 
                 rows_meta.append({
                     "ronda": i,
-                    "date(meta)": date_meta_es,
-                    "date(real)": date_real_es,
+                    "date(meta)": date_meta,
+                    "date(real)": date_real,
                     "published(meta)": pub_meta,
                     "published(real)": pub_real,
                     "closed(meta)": closed_meta,
@@ -2105,7 +2084,12 @@ def _debug_meta_persistencia():
 
     try:
         mt = os.path.getmtime(meta_path)
-        st.caption(f"Última modificación de meta.json: { _dt.datetime.fromtimestamp(mt) }")
+
+        st.caption(
+            f"Última modificación de meta.json: "
+            f"{_dt.datetime.fromtimestamp(mt, tz=ZoneInfo('Europe/Madrid')).strftime('%d/%m/%Y %H:%M:%S')}"
+    )
+
     except Exception:
         st.caption("meta.json aún no existe.")
 
@@ -2120,7 +2104,9 @@ def _debug_meta_persistencia():
             rounds = meta.setdefault("rounds", {})
             # 2) escribir un marcador temporal bajo rounds.__diag (no afecta a rondas reales)
             import time
-            rounds.setdefault("__diag", {})["ts"] = _dt.datetime.now().isoformat()
+            rounds.setdefault("__diag", {})["ts"] = _dt.datetime.now(tz=ZoneInfo("Europe/Madrid")).isoformat(timespec="seconds")
+            rounds.setdefault("__diag", {})["ts_es"] = _dt.datetime.now(tz=ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y %H:%M:%S")
+
             _save_meta_preserving_dates(meta)
             # 3) releer y mostrar
             st.success("Guardado OK. Releyendo…")
@@ -2128,3 +2114,4 @@ def _debug_meta_persistencia():
         except Exception as e:
             st.error(f"Fallo al guardar: {e}")
   
+
