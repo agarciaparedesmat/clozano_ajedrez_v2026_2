@@ -1713,25 +1713,26 @@ def _show_archivos():
                 closed_real = bool(pub_real and (vac == 0))
 
                 # Fecha "real": lo más fideligno que tenemos es get_round_date (guarda en meta)
-                try:
-                    date_real = get_round_date(i) or ""
-                # Formatos españoles para la tabla
-                date_meta_es = _dt.date.fromisoformat(date_meta).strftime('%d/%m/%Y') if date_meta else ''
-                date_real_es = _dt.date.fromisoformat(date_real).strftime('%d/%m/%Y') if date_real else ''
-                except Exception:
-                    date_real = ""
+                   try:
+                        date_real = get_round_date(i) or ""
+                    except Exception:
+                        date_real = ""
 
-                rows_meta.append({
-                    "ronda": i,
-                    "date(meta)": date_meta_es,
-                    "date(real)": date_real_es,
-                    "published(meta)": pub_meta,
-                    "published(real)": pub_real,
-                    "closed(meta)": closed_meta,
-                    "closed(real)": closed_real,
-                    "desviación_closed": (closed_meta != closed_real),
-                    "⚠️": "🔴" if (closed_meta != closed_real) else "",
-                })
+                    # Ahora ya fuera del try/except, formateamos en español
+                    date_meta_es = _dt.date.fromisoformat(date_meta).strftime('%d/%m/%Y') if date_meta else ''
+                    date_real_es = _dt.date.fromisoformat(date_real).strftime('%d/%m/%Y') if date_real else ''
+
+                    rows_meta.append({
+                        "Ronda": i,
+                        "Fecha (meta)": date_meta_es,
+                        "Fecha (real)": date_real_es,
+                        "Publicado (meta)": "Sí" if pub_meta else "No",
+                        "Publicado (real)": "Sí" if pub_real else "No",
+                        "Cerrada (meta)": "Sí" if closed_meta else "No",
+                        "Cerrada (real)": "Sí" if closed_real else "No",
+                        "⚠️ Desv. closed": "🔴" if (closed_meta != closed_real) else "",
+                    })
+
 
         if rows_meta:
             dfm = pd.DataFrame(rows_meta)
