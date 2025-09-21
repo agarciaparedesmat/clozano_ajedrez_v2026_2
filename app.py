@@ -138,4 +138,4 @@ with c3:
     if is_teacher():
         card_page("🛠️", "Administración — {nivel}", "Gestión de rondas (generar, publicar, despublicar, eliminar) y editar resultados.", "pages/99_Administracion.py", "admin")
     else:
-        st.info("🔒 Administración (solo profesorado)")
+        st.info("🔒 Administración (👩‍🏫)")
