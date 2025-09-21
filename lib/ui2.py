@@ -228,7 +228,7 @@ _BADGE_CSS = """
 .sep-thin {height:1px; background:rgba(0,0,0,.10); border:0; margin:.10rem 0 .15rem;}
 
 /* TENSAR márgenes típicos en la sidebar */
-[data-testid="stSidebar"] h4 { margin: 0 0 .5rem !important; }    /* “#### Sesión” */
+[data-testid="stSidebar"] h4 { margin: 0 0 .55rem !important; }    /* “#### Sesión” */
 [data-testid="stSidebar"] p  { margin: 0 0 .25rem !important; }    /* captions, etc. */
 [data-testid="stSidebar"] .stButton { margin: .15rem 0 !important; }/* botones compactos */
 
