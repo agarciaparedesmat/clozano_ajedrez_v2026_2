@@ -450,14 +450,17 @@ page_header("🛠️ Panel de Administración", "Gestión de rondas, publicació
 # Modo profesor activo (ya validado en la sidebar)
 st.success("👩‍🏫 Modo Profesor activo")
 
-# Solo inicializa una vez (no sobrescribe en cada rerun)
-st.session_state.setdefault("actor_name", "Admin")
+# Clave dedicada para evitar colisiones con otras páginas
+st.session_state.setdefault(
+    "teacher_actor_name",
+    st.session_state.get("teacher_actor_name") or st.session_state.get("actor_name") or "Admin"
+)
 
-# Sin 'value=' → el widget usa el valor ya guardado en session_state
-st.text_input("Tu nombre (registro de cambios)", key="actor_name", placeholder="Admin")
+# El widget ya se liga a la clave persistente
+st.text_input("Tu nombre (registro de cambios)", key="teacher_actor_name", placeholder="Admin")
 
-# Lee el valor actual
-actor = st.session_state["actor_name"]
+# Valor actual para usar en logs/acciones
+actor = st.session_state["teacher_actor_name"]
 
 
 
@@ -776,7 +779,11 @@ def _show_semilla():
 # Generar ronda siguiente (Suizo)
 # =========================
 def _show_generar():
-    actor = (st.session_state.get("actor_name") or st.session_state.get("actor") or "admin")
+    actor = (st.session_state.get("teacher_actor_name")
+         or st.session_state.get("actor_name")
+         or st.session_state.get("actor")
+         or "admin")
+
 
     # Prefacio local para evitar NameError
     JUG_PATH = get_jug_path()
@@ -1261,7 +1268,11 @@ def _show_resultados():
     st.markdown("### ✏️ Resultados y clasificación (solo PUBLICADAS)")
 
     # Contexto local necesario para evitar NameError
-    actor = (st.session_state.get("actor_name") or st.session_state.get("actor") or "admin")
+    actor = (st.session_state.get("teacher_actor_name")
+            or st.session_state.get("actor_name")
+            or st.session_state.get("actor")
+            or "admin")
+
     try:
         _ = _log_msg
     except NameError:
@@ -1468,7 +1479,10 @@ def _show_resultados():
 def _show_eliminar():
     import os
     st.markdown("### 🗑️ Eliminar ronda")
-    actor = (st.session_state.get("actor_name") or st.session_state.get("actor") or "admin")
+    actor = (st.session_state.get("teacher_actor_name")
+            or st.session_state.get("actor_name")
+            or st.session_state.get("actor")
+            or "admin")
 
     # Fallback local por si _log_msg aún no está definido en este punto del archivo
     try:

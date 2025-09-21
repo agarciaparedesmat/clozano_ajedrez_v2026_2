@@ -189,6 +189,8 @@ def _logout():
     st.session_state[SHOW_LOGIN_FORM_KEY] = False
     st.session_state["admin_pwd"] = ""
     st.session_state[AUTH_ERROR_KEY] = ""
+    st.session_state.pop("actor_name", None)   # ← limpia el nombre al salir
+    st.session_state.pop("teacher_actor_name", None)
     #_safe_rerun()  # refresca menú/navegación inmediatamente  (¡¡¡¡¡inneesario!!!!)
     #_safe_rerun()  # ⬅️ evita tener que pulsar dos veces
 
