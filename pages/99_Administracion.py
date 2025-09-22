@@ -1,3 +1,6 @@
+# pages/99_Admin.py
+# -*- coding: utf-8 -*-
+
 from __future__ import annotations
 import os
 import pandas as pd
@@ -19,6 +22,11 @@ from lib.tournament import (
 
 from lib.ui import page_header
 
+import datetime as _dt
+
+
+import random
+
 # --- Fix para backups ---
 import re  # necesario para re.sub en _make_backup_local
 
@@ -29,6 +37,17 @@ try:
 except Exception:
     # Fallback: carpeta padre de data/
     BASE_DIR = os.path.dirname(DATA_DIR)
+
+# --- Defaults para el analizador estático (Pylance) ---
+N_ROUNDS = None  # se resuelve en tiempo de ejecución vía get_n_rounds()
+JUG_PATH = os.path.join(DATA_DIR, "jugadores.csv")
+
+def _log_msg(msg: str) -> str:
+    # Respaldo: si aún no hay cfg o formateador disponible
+    try:
+        return format_with_cfg(f"[{{nivel}}][{{anio}}] {msg}", get_cfg())
+    except Exception:
+        return str(msg)
 
 # Normaliza la serie de resultados para que None/nan/espacios queden como vacío ""
 def _normalize_result_series(s):
@@ -54,13 +73,6 @@ def published_rounds_list() -> list[int]:
             # ante cualquier problema, seguimos
             pass
     return res
-import datetime as _dt
-# pages/99_Admin.py
-# -*- coding: utf-8 -*-
-
-import random
-
-
 
 
 # Salvaguarda: si por orden de carga no existiera is_pub, define un fallback mínimo
