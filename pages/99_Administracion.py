@@ -429,6 +429,27 @@ with st.sidebar:
 # Guardia: si NO eres profe, te manda a Inicio y corta la ejecución
 require_teacher(redirect_to="app.py")
 
+st.session_state.setdefault("_meta_autofixed", False)
+
+try:
+    cfg = get_cfg()
+    do_auto = bool(cfg.get("auto_fix_meta", False))
+except Exception:
+    do_auto = False
+
+if do_auto and not st.session_state["_meta_autofixed"]:
+    from lib.tournament import diagnose_meta, repair_meta
+    d = diagnose_meta()
+    if any([d.summary["missing"], d.summary["flag_mismatch"], d.summary["closed_mismatch"], d.summary["orphan_flags"]]):
+        try:
+            # backup rápido y reparación segura
+            try: _make_backup_local(label="auto_fix", note="Auto-fix meta al entrar")
+            except Exception: pass
+            repair_meta(create_missing=True, sync_flags=True, fix_closed=True, remove_orphan_flags=True, preserve_dates=True)
+            st.session_state["_meta_autofixed"] = True
+            st.toast("Meta.json reparado automáticamente.")
+        except Exception:
+            pass  # nunca romper la carga de la página
 
 
 # NAV personalizada debajo de la cabecera (título + nivel/año)
@@ -1771,180 +1792,65 @@ def _show_archivos():
             r_sel = st.selectbox("Ronda", rondas_exist, index=len(rondas_exist) - 1, key="dl_r_sel")
             _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel), "text/csv", f"dl_r{r_sel}")
     st.markdown("---")
-    # ---------- 🛠️ Utilidades meta.json ----------
-    st.markdown("#### 🛠️ Utilidades meta.json")
-    # Detectar rondas existentes y rondas en meta
-    n_local = get_n_rounds() if 'get_n_rounds' in globals() else 0
-    rondas_exist = [i for i in range(1, n_local + 1) if os.path.exists(round_file(i))]
-    try:
-        meta_cur = load_meta()
-    except Exception:
-        meta_cur = {}
-    rounds_meta = meta_cur.get("rounds", {}) if isinstance(meta_cur, dict) else {}
-    rondas_meta = sorted([int(k) for k in rounds_meta.keys() if str(k).isdigit()])
-    # Diagnóstico
-    st.caption(f"Rondas con CSV: {rondas_exist} · Rondas en meta.json: {rondas_meta}")
-    faltan = [i for i in rondas_exist if str(i) not in rounds_meta]
-    if faltan:
-        st.warning(f"Rondas existentes sin entrada en meta.json: {faltan}")
-    # Botón: completar meta.json con entradas por defecto
-    if faltan and st.button("Completar meta.json con rondas faltantes", key="meta_fill_missing"):
-        meta_w = meta_cur if isinstance(meta_cur, dict) else {}
-        rounds_w = meta_w.setdefault("rounds", {})
-        for i in faltan:
-            rounds_w.setdefault(str(i), {"published": False, "date": "", "closed": False})
-        try:
-            # Antes de _save_meta_preserving_dates(meta_w)
-            try:
-                meta_now = load_meta() or {}
-                old_rounds = meta_now.get("rounds", {})
-                new_rounds = meta_w.get("rounds", {})
-                for k, old_r in old_rounds.items():
-                    if isinstance(old_r, dict) and "date" in old_r:
-                        new_r = new_rounds.setdefault(k, {})
-                        # si la nueva versión carece de 'date', preserva la antigua
-                        if "date" not in new_r or not new_r.get("date"):
-                            new_r["date"] = old_r["date"]
-            except Exception:
-                pass
-            # -> ahora sí:
-            _save_meta_preserving_dates(meta_w)
-            st.success("meta.json completado. Refrescando…")
-            st.rerun()
-        except Exception as e:
-            st.error(f"No se pudo guardar meta.json: {e}")
-    # Botón: sincronizar meta.json con flags de publicación
-    if st.button("Sincronizar meta.json con flags de publicación", key="meta_sync_flags"):
-        try:
-            meta_w = meta_cur if isinstance(meta_cur, dict) else {}
-            rounds_w = meta_w.setdefault("rounds", {})
-            cambios = 0
-            for i in rondas_exist:
-                r = rounds_w.setdefault(str(i), {})
-                was = bool(r.get("published", False))
-                now = os.path.exists(_pub_flag_path(i))
-                if was != now:
-                    r["published"] = now
-                    cambios += 1
-            # Antes de _save_meta_preserving_dates(meta_w)
-            try:
-                meta_now = load_meta() or {}
-                old_rounds = meta_now.get("rounds", {})
-                new_rounds = meta_w.get("rounds", {})
-                for k, old_r in old_rounds.items():
-                    if isinstance(old_r, dict) and "date" in old_r:
-                        new_r = new_rounds.setdefault(k, {})
-                        # si la nueva versión carece de 'date', preserva la antigua
-                        if "date" not in new_r or not new_r.get("date"):
-                            new_r["date"] = old_r["date"]
-            except Exception:
-                pass
-            # -> ahora sí:
-            _save_meta_preserving_dates(meta_w)
-            st.success(f"meta.json actualizado ({cambios} cambio/s).")
-            st.rerun()
-        except Exception as e:
-            st.error(f"No se pudo sincronizar meta.json: {e}")
-        else:
-            st.caption("No hay rondas generadas.")
-    else:
-        st.caption("No hay rondas planificadas.")
     
-    # Botón: recalcular 'closed' según realidad (publicada y sin vacíos)
-    if st.button("Recalcular 'closed' en meta.json", key="meta_recalc_closed"):
+    # --- Sustituir el bloque de utilidades meta.json por esto ---
+    from lib.tournament import diagnose_meta, repair_meta
+
+    st.markdown("#### 🛠️ Utilidades meta.json (compactas)")
+
+    with st.expander("Diagnóstico (clic para ver detalle)", expanded=True):
+        d = diagnose_meta()
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        c1.metric("CSV existentes", d.summary["existing"])
+        c2.metric("Rondas en meta", d.summary["in_meta"])
+        c3.metric("Faltan en meta", d.summary["missing"])
+        c4.metric("published incoh.", d.summary["flag_mismatch"])
+        c5.metric("closed incoh.", d.summary["closed_mismatch"])
+        c6.metric("flags huérfanos", d.summary["orphan_flags"])
+
+        if d.missing_in_meta: st.warning(f"Faltan en meta: {d.missing_in_meta}")
+        if d.flag_mismatch:  st.warning(f"Incoherencias 'published': {d.flag_mismatch}")
+        if d.closed_mismatch: st.warning(f"Incoherencias 'closed': {d.closed_mismatch}")
+        if d.orphan_flags: st.info(f"Flags huérfanos: {d.orphan_flags}")
+
+    # Opciones seguras (por defecto activas)
+    st.caption("Reparación segura (preserva fechas; no borra entradas de meta).")
+    colA, colB, colC, colD = st.columns(4)
+    with colA: opt_create  = st.checkbox("Crear faltantes", value=True)
+    with colB: opt_sync    = st.checkbox("Sincronizar published", value=True)
+    with colC: opt_closed  = st.checkbox("Recalcular closed", value=True)
+    with colD: opt_orphan  = st.checkbox("Eliminar flags huérfanos", value=True)
+
+    # (opcional) snapshot antes de reparar
+    pre_snap = st.checkbox("Backup antes de reparar", value=True)
+    if pre_snap and st.button("Crear backup ahora", use_container_width=True, key="meta_bk_btn"):
         try:
-            meta_w = meta_cur if isinstance(meta_cur, dict) else {}
-        except Exception:
-            meta_w = {}
-        rounds_w = meta_w.setdefault("rounds", {})
-        cambios = 0
+            out = _make_backup_local(label="auto_meta_fix", note="Backup previo a repair_meta")
+            st.success(f"Backup: {os.path.basename(out)}")
+        except Exception as e:
+            st.error(f"No se pudo crear backup: {e}")
 
-        for i in rondas_exist:
-            # Publicada real (helper + fallback a flag-file)
-            try:
-                pub = is_pub(i)
-            except Exception:
-                pub = os.path.exists(_pub_flag_path(i))
-
-            # Vacíos reales (usar DataFrame, no el número de ronda)
-            try:
-                dfp = read_csv_safe(round_file(i))
-                vacios = results_empty_count(dfp) if dfp is not None else None
-            except Exception:
-                vacios = None
-
-            closed_now = bool(pub and (vacios == 0))
-            r = rounds_w.setdefault(str(i), {})
-            if r.get("closed") != closed_now:
-                r["closed"] = closed_now
-                cambios += 1
-
+    if st.button("🧯 Reparar (seguro)", type="primary", use_container_width=True):
         try:
-            # Antes de _save_meta_preserving_dates(meta_w)
-            try:
-                meta_now = load_meta() or {}
-                old_rounds = meta_now.get("rounds", {})
-                new_rounds = meta_w.get("rounds", {})
-                for k, old_r in old_rounds.items():
-                    if isinstance(old_r, dict) and "date" in old_r:
-                        new_r = new_rounds.setdefault(k, {})
-                        # si la nueva versión carece de 'date', preserva la antigua
-                        if "date" not in new_r or not new_r.get("date"):
-                            new_r["date"] = old_r["date"]
-            except Exception:
-                pass
-            # -> ahora sí:
-            _save_meta_preserving_dates(meta_w)
-            st.success(f"Campo 'closed' actualizado para {cambios} rondas.")
+            if pre_snap:
+                try:
+                    _make_backup_local(label="auto_meta_fix", note="Backup previo a repair_meta")
+                except Exception:
+                    pass
+            res = repair_meta(
+                create_missing=opt_create,
+                sync_flags=opt_sync,
+                fix_closed=opt_closed,
+                remove_orphan_flags=opt_orphan,
+                preserve_dates=True,
+            )
+            st.success(f"OK · aplicados: {res['applied']}")
             st.rerun()
         except Exception as e:
-            st.error(f"No se pudo actualizar meta.json: {e}")
+            st.error(f"Fallo al reparar: {e}")
 
-    # Botón: Reparar meta.json (published + closed)
-    if st.button("🧯 Reparar meta.json (published + closed)", key="meta_fix_all"):
-        try:
-            meta = load_meta()
-        except Exception:
-            meta = {}
-        rounds = meta.setdefault("rounds", {})
-
-        try:
-            n_max = get_n_rounds()
-        except Exception:
-            n_max = 0
-        existing = [i for i in range(1, n_max + 1) if os.path.exists(round_file(i))]
-
-        cambios = 0
-        for i in existing:
-            r = rounds.setdefault(str(i), {})
-            # Real: publicado
-            try:
-                real_pub = is_pub(i)
-            except Exception:
-                real_pub = False
-            # Real: closed = publicado y sin resultados vacíos
-            try:
-                dfp = read_csv_safe(round_file(i))
-                vac = results_empty_count(dfp)
-            except Exception:
-                vac = None
-            real_closed = bool(real_pub and (vac == 0))
-
-            if r.get("published") != real_pub:
-                r["published"] = real_pub
-                cambios += 1
-            if r.get("closed") != real_closed:
-                r["closed"] = real_closed
-                cambios += 1
-
-        try:
-            _save_meta_preserving_dates(meta)
-            st.success(f"meta.json actualizado ({cambios} cambio/s).")
-            st.rerun()
-        except Exception as e:
-            st.error(f"No se pudo actualizar meta.json: {e}")
-
-        st.divider()
+    with st.expander("Herramientas avanzadas (con cuidado)"):
+        st.caption("Aquí podríamos añadir en el futuro acciones más agresivas (p.ej., borrar entradas de meta sin CSV). Por ahora, **no** se realizan para evitar riesgos.")
 
     # ---------- Snapshot ZIP (opcional) ----------
     with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):

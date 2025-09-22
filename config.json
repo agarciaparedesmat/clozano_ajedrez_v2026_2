@@ -17,6 +17,7 @@
   "pdf_title_size": 22,
   "pdf_round_size": 20,
   "pdf_meta_size": 13,
-  "pdf_font": "Atkinson" 
+  "pdf_font": "Atkinson",
+  "auto_fix_meta": true
 
 }

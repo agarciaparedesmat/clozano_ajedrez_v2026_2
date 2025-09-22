@@ -823,3 +823,157 @@ def format_rank_progress(rank_list: list[int]) -> str:
     if not rank_list:
         return ""
     return "→".join(str(x) for x in rank_list)
+
+
+# === Meta: diagnóstico y reparación segura ===
+from typing import NamedTuple, Optional
+import os, re
+import pandas as pd
+
+def _results_empty_count_core(df: Optional[pd.DataFrame]) -> Optional[int]:
+    if df is None or df.empty or "resultado" not in df.columns:
+        return None
+    res = (
+        df["resultado"].astype(str).str.strip()
+          .replace({"None":"", "none":"", "NaN":"", "nan":"", "N/A":"", "n/a":""})
+    )
+    return int((res == "").sum())
+
+class MetaDiag(NamedTuple):
+    existing_rounds: list[int]
+    meta_rounds: list[int]
+    missing_in_meta: list[int]
+    flag_mismatch: list[int]     # rondas donde meta['published'] != realidad
+    closed_mismatch: list[int]   # rondas donde meta['closed'] != (pub && empties==0)
+    orphan_flags: list[int]      # flags sin CSV o incoherentes
+    summary: dict                # contadores varios
+
+def diagnose_meta() -> MetaDiag:
+    meta = load_meta() or {}
+    rounds_meta = meta.get("rounds", {}) if isinstance(meta, dict) else {}
+
+    # Rondas con CSV
+    try:
+        existing = [int(re.findall(r"\d+", f)[0]) for f in os.listdir(DATA_DIR)
+                    if re.fullmatch(r"pairings_R\d+\.csv", f)]
+    except Exception:
+        existing = []
+    existing = sorted(existing)
+
+    # Rondas en meta
+    meta_rounds = sorted([int(k) for k in rounds_meta.keys() if str(k).isdigit()])
+
+    # Faltantes en meta
+    missing = [i for i in existing if str(i) not in rounds_meta]
+
+    flag_mm, closed_mm, orphan = [], [], []
+
+    for i in existing:
+        r = rounds_meta.get(str(i), {})
+        # Real publicado (lo que “vive” hoy)
+        real_pub = is_published(i)
+        meta_pub = bool(r.get("published", False))
+        if meta_pub != real_pub:
+            flag_mm.append(i)
+
+        # Vacíos reales
+        dfp = read_csv_safe(round_file(i))
+        empties = _results_empty_count_core(dfp)
+        real_closed = bool(real_pub and (empties == 0))
+        if bool(r.get("closed", False)) != real_closed:
+            closed_mm.append(i)
+
+    # Flags huérfanos o inconsistentes (no hay CSV o meta final NO debería publicarse)
+    for f in os.listdir(DATA_DIR):
+        m = re.fullmatch(r"published_R(\d+)\.flag", f)
+        if not m:
+            continue
+        i = int(m.group(1))
+        if i not in existing:
+            orphan.append(i)
+
+    return MetaDiag(
+        existing_rounds=existing,
+        meta_rounds=meta_rounds,
+        missing_in_meta=missing,
+        flag_mismatch=flag_mm,
+        closed_mismatch=closed_mm,
+        orphan_flags=sorted(orphan),
+        summary={
+            "existing": len(existing),
+            "in_meta": len(meta_rounds),
+            "missing": len(missing),
+            "flag_mismatch": len(flag_mm),
+            "closed_mismatch": len(closed_mm),
+            "orphan_flags": len(orphan),
+        }
+    )
+
+def repair_meta(
+    create_missing: bool = True,
+    sync_flags: bool = True,
+    fix_closed: bool = True,
+    remove_orphan_flags: bool = True,
+    preserve_dates: bool = True,
+) -> dict:
+    """
+    Aplica una reparación 'segura':
+      - crea entradas faltantes (si existe CSV),
+      - sincroniza published (meta + flag) con la realidad actual,
+      - recalcula 'closed',
+      - elimina flags huérfanos (sin CSV),
+      - preserva 'date' existente si faltase en la nueva versión.
+    Devuelve un resumen de cambios aplicados.
+    """
+    diag = diagnose_meta()
+    meta = load_meta() or {}
+    rounds = meta.setdefault("rounds", {})
+
+    applied = {"created": 0, "published_sync": 0, "closed_fixed": 0, "flags_removed": 0}
+
+    # 1) completar entradas
+    if create_missing:
+        for i in diag.missing_in_meta:
+            rounds.setdefault(str(i), {"published": False, "closed": False})
+            applied["created"] += 1
+
+    # 2) published/flags
+    if sync_flags:
+        for i in diag.existing_rounds:
+            real_pub = is_published(i)  # realidad actual
+            # deja published en meta + flag coherentes (usa set_published del core)
+            set_published(i, real_pub)
+            # (set_published ya guarda meta + flag)
+            applied["published_sync"] += int(i in diag.flag_mismatch)
+
+    # 3) closed
+    if fix_closed:
+        for i in diag.existing_rounds:
+            dfp = read_csv_safe(round_file(i))
+            empties = _results_empty_count_core(dfp)
+            real_pub = is_published(i)
+            real_closed = bool(real_pub and (empties == 0))
+            r = rounds.setdefault(str(i), {})
+            if r.get("closed") != real_closed:
+                r["closed"] = real_closed
+                applied["closed_fixed"] += 1
+
+    # 4) limpiar flags huérfanos
+    if remove_orphan_flags:
+        for i in diag.orphan_flags:
+            fp = os.path.join(DATA_DIR, f"published_R{i}.flag")
+            if os.path.exists(fp):
+                try:
+                    os.remove(fp)
+                    applied["flags_removed"] += 1
+                except Exception:
+                    pass
+
+    # 5) guardar meta (preservando dates si procede)
+    if preserve_dates:
+        # fusiona preservando date existente cuando no venga
+        save_meta(meta)  # save_meta ya mergea por ronda sin perder campos
+    else:
+        save_meta(meta)
+
+    return {"diag": diag._asdict(), "applied": applied}
