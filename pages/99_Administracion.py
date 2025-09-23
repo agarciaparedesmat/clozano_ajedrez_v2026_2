@@ -25,7 +25,7 @@ from lib.ui import page_header
 
 import datetime as _dt
 
-
+import re
 import random
 
 # --- Fix para backups ---
@@ -1923,10 +1923,14 @@ def _show_archivos():
 
     # c_sel, c_btn = st.columns([4, 2])
     c_sel, c_btn, _sp, _sp2= st.columns([0.25, 0.25, 0.25, 0.25], gap="small")
-    rondas = sorted([
-        int(x) for x in re.findall(r"R(\d+)", " ".join(os.listdir(DATA_DIR)))
-        if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{int(x)}.csv"))
-    ])
+
+    files = os.listdir(DATA_DIR)
+    rondas = sorted({
+        int(m.group(1))
+        for fn in files
+        if (m := re.fullmatch(r"pairings_R(\d+)\.csv", fn))
+})
+
     sel_r = c_sel.selectbox("Ronda", rondas, key="dl_ronda_sel")
 
     csv_path = os.path.join(DATA_DIR, f"pairings_R{sel_r}.csv")
