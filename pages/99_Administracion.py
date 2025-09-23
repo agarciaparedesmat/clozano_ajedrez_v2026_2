@@ -1833,22 +1833,36 @@ def _show_archivos():
     with colC: opt_closed  = st.checkbox("Recalcular closed", value=True)
     with colD: opt_orphan  = st.checkbox("Eliminar flags huérfanos", value=True)
 
-    # (opcional) snapshot antes de reparar
-    pre_snap = st.checkbox("Backup antes de reparar", value=True)
-    if pre_snap and st.button("Crear backup ahora", use_container_width=True, key="meta_bk_btn"):
+
+    # clave de sesión para recordar el último backup creado
+    st.session_state.setdefault("last_meta_backup", None)
+
+    pre_snap = st.checkbox("Backup antes de reparar", value=True, key="meta_pre_snap")
+
+    # Botón opcional (manual) para crear backup y descargar
+    if st.button("Crear backup ahora", key="meta_bk_now"):
         try:
-            out = _make_backup_local(label="auto_meta_fix", note="Backup previo a repair_meta")
-            st.success(f"Backup: {os.path.basename(out)}")
+            path = _make_backup_local(label="Snapshot_auto_meta_fix", note="Backup manual antes de reparar")
+            st.session_state["last_meta_backup"] = path
+            st.success(f"Backup: {os.path.basename(path)}")
+            with open(path, "rb") as f:
+                st.download_button("⬇️ Descargar backup", f.read(),
+                                file_name=os.path.basename(path),
+                                mime="application/zip", key="dl_meta_bk_manual")
         except Exception as e:
             st.error(f"No se pudo crear backup: {e}")
 
-    if st.button("🧯 Reparar (seguro)", type="primary", use_container_width=True):
+    # Reparación segura (con backup previo automático si está marcado)
+    if st.button("🧯 Reparar (seguro)", type="primary", key="meta_repair"):
         try:
-            if pre_snap:
+            backup_path = None
+            if pre_snap:  # checkbox “Backup antes de reparar”
                 try:
-                    _make_backup_local(label="auto_meta_fix", note="Backup previo a repair_meta")
+                    backup_path = _make_backup_local(label="Snapshot_auto_meta_fix", note="Backup previo a repair_meta")
+                    st.session_state["last_meta_backup"] = backup_path
                 except Exception:
                     pass
+
             res = repair_meta(
                 create_missing=opt_create,
                 sync_flags=opt_sync,
@@ -1857,37 +1871,24 @@ def _show_archivos():
                 preserve_dates=True,
             )
             st.success(f"OK · aplicados: {res['applied']}")
+
+            # Ofrece descarga del backup PREVIO (si se creó)
+            path = st.session_state.get("last_meta_backup")
+            if path:
+                try:
+                    with open(path, "rb") as f:
+                        st.download_button("⬇️ Descargar backup previo", f.read(),
+                                        file_name=os.path.basename(path),
+                                        mime="application/zip", key="dl_meta_bk_auto")
+                except Exception:
+                    pass
+
             st.rerun()
         except Exception as e:
             st.error(f"Fallo al reparar: {e}")
 
-    with st.expander("Herramientas avanzadas (con cuidado)"):
-        st.caption("Aquí podríamos añadir en el futuro acciones más agresivas (p.ej., borrar entradas de meta sin CSV). Por ahora, **no** se realizan para evitar riesgos.")
-
-    # ---------- Snapshot ZIP (opcional) ----------
-    with st.expander("Crear snapshot ZIP (config, jugadores, standings, meta, rondas, log)"):
-        if st.button("Crear snapshot.zip", use_container_width=True):
-            import io, zipfile
-            buf = io.BytesIO()
-            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-                for p in [_cfg_path,
-                            os.path.join(DATA_DIR, "jugadores.csv"),
-                            os.path.join(DATA_DIR, "standings.csv"),
-                            _meta_path, _log_path]:
-                    if os.path.exists(p):
-                        z.write(p, arcname=os.path.basename(p))
-                for i in range(1, n + 1):
-                    p = round_file(i)
-                    if os.path.exists(p):
-                        z.write(p, arcname=os.path.basename(p))
-            st.download_button(
-                "Descargar snapshot.zip",
-                buf.getvalue(),
-                file_name="snapshot_torneo.zip",
-                mime="application/zip",
-                key="dl_zip_all",
-                use_container_width=True,
-            )
+#    with st.expander("Herramientas avanzadas (con cuidado)"):
+#        st.caption("Aquí podríamos añadir en el futuro acciones más agresivas (p.ej., borrar entradas de meta sin CSV). Por ahora, **no** se realizan para evitar riesgos.")
 
 # =========================
 # 💾 Copias y Restauración (local)
