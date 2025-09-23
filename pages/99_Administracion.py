@@ -1813,6 +1813,21 @@ def _show_archivos():
 
     st.markdown("#### 🛠️ Utilidades meta.json (compactas)")
 
+    # Mostrar (persistente) el último backup creado antes de reparar
+    if st.session_state.get("show_backup_dl") and st.session_state.get("last_meta_backup_bytes"):
+        st.success("Backup creado antes de reparar.")
+        st.download_button(
+            "⬇️ Descargar backup previo",
+            st.session_state["last_meta_backup_bytes"],
+            file_name=st.session_state.get("last_meta_backup_name", "backup_torneo.zip"),
+            mime="application/zip",
+            key="dl_meta_bk_persist",
+        )
+        if st.button("Ocultar aviso", key="hide_backup_notice"):
+            for k in ("show_backup_dl", "last_meta_backup_bytes", "last_meta_backup_name"):
+                st.session_state.pop(k, None)
+            st.rerun()
+
     with st.expander("Diagnóstico (clic para ver detalle)", expanded=True):
         d = diagnose_meta()
         c1, c2, c3, c4, c5, c6 = st.columns(6)
@@ -1842,21 +1857,7 @@ def _show_archivos():
 
     pre_snap = st.checkbox("Backup antes de reparar", value=True, key="meta_pre_snap")
 
-    # Mostrar botón de descarga del backup previo si quedó guardado tras la reparación
-    if st.session_state.get("show_backup_dl") and st.session_state.get("last_meta_backup_bytes"):
-        st.success("Backup creado antes de reparar.")
-        st.download_button(
-            "⬇️ Descargar backup previo",
-            st.session_state["last_meta_backup_bytes"],
-            file_name=st.session_state.get("last_meta_backup_name", "backup_torneo.zip"),
-            mime="application/zip",
-            key="dl_meta_bk_persist",
-        )
-        if st.button("Ocultar aviso", key="hide_backup_notice"):
-            for k in ("show_backup_dl", "last_meta_backup_bytes", "last_meta_backup_name"):
-                st.session_state.pop(k, None)
-            st.experimental_rerun()
-
+    
     # Botón opcional (manual) para crear backup y descargar
     if st.button("Crear backup ahora", key="meta_bk_now"):
         try:
@@ -1893,17 +1894,10 @@ def _show_archivos():
 
             # Ofrece descarga del backup PREVIO (si se creó)
             path = st.session_state.get("last_meta_backup")
-            if path:
-                try:
-                    with open(path, "rb") as f:
-                        st.download_button("⬇️ Descargar backup previo", f.read(),
-                                        file_name=os.path.basename(path),
-                                        mime="application/zip", key="dl_meta_bk_auto")
-                except Exception:
-                    pass
-            # … ya hiciste repair_meta(...) y tienes backup_path si pre_snap estaba marcado …
 
-            # Guarda los bytes y el nombre para mostrarlos tras el rerun
+            # … ya hiciste repair_meta(...) y tienes backup_path si pre_snap estaba marcado ….
+
+            # Guarda bytes/nombre del backup para poder descargar tras el rerun
             if backup_path and os.path.exists(backup_path):
                 with open(backup_path, "rb") as f:
                     st.session_state["last_meta_backup_bytes"] = f.read()
@@ -1911,6 +1905,8 @@ def _show_archivos():
                 st.session_state["show_backup_dl"] = True
 
             st.rerun()
+
+
 
         except Exception as e:
             st.error(f"Fallo al reparar: {e}")
