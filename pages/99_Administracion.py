@@ -1977,11 +1977,13 @@ def _show_archivos():
    #         r_sel = st.selectbox("Ronda", rondas_exist, index=len(rondas_exist) - 1, key="dl_r_sel")
    #        _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel), "text/csv", f"dl_r{r_sel}")
 
-    
+
     # --- Sustituir el bloque de utilidades meta.json por esto ---
     from lib.tournament import diagnose_meta, repair_meta
 
+    st.markdown("<div id='meta_utils_anchor'></div>", unsafe_allow_html=True)
     st.markdown("#### 🛠️ Utilidades meta.json (compactas)")
+
 
     # Mostrar (persistente) el último backup creado antes de reparar
     if st.session_state.get("show_backup_dl") and st.session_state.get("last_meta_backup_bytes"):
@@ -1996,7 +1998,9 @@ def _show_archivos():
         if st.button("Ocultar aviso", key="hide_backup_notice"):
             for k in ("show_backup_dl", "last_meta_backup_bytes", "last_meta_backup_name"):
                 st.session_state.pop(k, None)
-            st.rerun()
+            st.session_state["scroll_to_anchor"] = "meta_utils_anchor"  # volver aquí
+            # NO llames st.rerun(): el botón ya provoca rerun automático
+
 
 
     with st.expander("Diagnóstico (clic para ver detalle)", expanded=True):
