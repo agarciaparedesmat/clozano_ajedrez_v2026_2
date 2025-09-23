@@ -1661,6 +1661,14 @@ def _show_eliminar():
 # =========================
 # Archivos (inspector + visores + descargas)
 # =========================
+
+def _hide_backup_notice_cb():
+    # limpiar estado y marcar que se oculte en este mismo run
+    for k in ("show_backup_dl", "last_meta_backup_bytes", "last_meta_backup_name"):
+        st.session_state.pop(k, None)
+    st.session_state["_hide_backup_notice_now"] = True
+    st.session_state["scroll_to_anchor"] = "meta_utils_anchor"
+
 def _toggle_cb(key: str, anchor: str | None = None):
     st.session_state[key] = not st.session_state.get(key, False)
     if anchor:
@@ -1989,19 +1997,29 @@ def _show_archivos():
     if st.session_state.get("show_backup_dl") and st.session_state.get("last_meta_backup_bytes"):
         fname = st.session_state.get("last_meta_backup_name", "backup_torneo.zip")
 
-        msg, btn = st.columns([0.7, 0.3])
-        with msg:
-            st.success(f"Backup creado antes de reparar · **{fname}**")
-        with btn:
-            st.download_button(f"⬇️ Descargar", st.session_state["last_meta_backup_bytes"], file_name=fname, mime="application/zip",key="dl_meta_bk_persist")
+        ph = st.empty()  # contenedor que podremos vaciar en este mismo run
+        with ph:
+            msg, btn = st.columns([0.7, 0.3])
+            with msg:
+                st.success(f"Backup creado antes de reparar · **{fname}**")
+            with btn:
+                st.download_button(
+                    "⬇️ Descargar",
+                    st.session_state["last_meta_backup_bytes"],
+                    file_name=fname,
+                    mime="application/zip",
+                    key="dl_meta_bk_persist",
+                )
 
-        if st.button("Ocultar aviso", key="hide_backup_notice"):
-            for k in ("show_backup_dl", "last_meta_backup_bytes", "last_meta_backup_name"):
-                st.session_state.pop(k, None)
-            st.session_state["scroll_to_anchor"] = "meta_utils_anchor"  # volver aquí
+            # botón sin rerun manual; el callback limpia el estado y marca el vaciado inmediato
+            st.button("Ocultar aviso", key="hide_backup_notice", on_click=_hide_backup_notice_cb)
+
+            # si el callback se ejecutó en este mismo run, vaciamos el contenedor ya
+            if st.session_state.pop("_hide_backup_notice_now", False):
+                ph.empty()
+            
+            # st.session_state["scroll_to_anchor"] = "meta_utils_anchor"  # volver aquí
             # NO llames st.rerun(): el botón ya provoca rerun automático
-
-
 
     with st.expander("Diagnóstico (clic para ver detalle)", expanded=True):
         d = diagnose_meta()

@@ -977,3 +977,47 @@ def repair_meta(
         save_meta(meta)
 
     return {"diag": diag._asdict(), "applied": applied}
+
+# ====== Forzar coherencia flags <-> meta (seguro) =========================
+import re, os
+
+def _pub_flag_path(i: int) -> str:
+    return os.path.join(DATA_DIR, f"published_R{i}.flag")
+
+def force_sync_flags_with_meta() -> int:
+    """
+    Asegura que para cada CSV de ronda:
+      - si meta['published']==True -> el flag existe (lo crea si falta)
+      - si meta['published']==False -> el flag NO existe (lo borra si existe)
+    Devuelve cuántos flags se han creado/borrado.
+    """
+    try:
+        meta = load_meta() or {}
+        rounds = meta.get("rounds", {}) if isinstance(meta, dict) else {}
+    except Exception:
+        rounds = {}
+
+    changed = 0
+    try:
+        files = os.listdir(DATA_DIR)
+    except Exception:
+        files = []
+
+    for fn in files:
+        m = re.fullmatch(r"pairings_R(\d+)\.csv", fn)
+        if not m:
+            continue
+        i = int(m.group(1))
+        pub_meta = bool(rounds.get(str(i), {}).get("published", False))
+        flag = _pub_flag_path(i)
+        try:
+            if pub_meta and not os.path.exists(flag):
+                open(flag, "w").close()
+                changed += 1
+            elif (not pub_meta) and os.path.exists(flag):
+                os.remove(flag)
+                changed += 1
+        except Exception:
+            pass
+    return changed
+
