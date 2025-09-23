@@ -1702,7 +1702,7 @@ def _show_archivos():
     c1, _ = st.columns([1, 6])
     lab = "👁️ Mostrar tabla" if not st.session_state.get("show_v_admin_log", False) else "🙈 Ocultar tabla"
     if c1.button(lab, key="btn_v_admin_log"):
-        _toggle("show_v_jug")
+        _toggle("show_v_admin_log")
     if st.session_state.get("show_v_admin_log"):    # admin_log.csv → tabla
         if os.path.exists(_log_path):
             st.markdown("**admin_log.csv**")
