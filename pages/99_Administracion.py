@@ -1646,29 +1646,54 @@ def _show_eliminar():
 # =========================
 # Archivos (inspector + visores + descargas)
 # =========================
+def _toggle_cb(key: str, anchor: str | None = None):
+    st.session_state[key] = not st.session_state.get(key, False)
+    if anchor:
+        st.session_state["scroll_to_anchor"] = anchor
+
 def _show_archivos():
     import os, io, zipfile, pandas as pd, datetime as _dt, json
     def _toggle(key: str):
         st.session_state[key] = not st.session_state.get(key, False)
     
+    # si hay ancla pendiente, haz scroll a ella tras el rerun del botón
+    if st.session_state.get("scroll_to_anchor"):
+        _anchor = st.session_state.pop("scroll_to_anchor")
+        st.markdown(
+            f"""
+            <script>
+            const el = document.getElementById("{_anchor}");
+            if (el) {{ el.scrollIntoView({{behavior: "instant", block: "start"}}); }}
+            </script>
+            """,
+            unsafe_allow_html=True,
+        )
+
     st.markdown("### 🗂️ Archivos")
 
     # ---------- Inspector rápido de /data ----------
-    st.markdown("########## 🗂️ Archivos en `data/` (inspector rápido)")
+
     def _lm(p: str) -> str:
         try:
             return _dt.datetime.fromtimestamp(os.path.getmtime(p)).strftime("%Y-%m-%d %H:%M:%S")
         except Exception:
             return "—"
 
+    # marcador de ancla (colócalo justo antes del título)
+    st.markdown("<div id='inspector_anchor'></div>", unsafe_allow_html=True)
+
     hdr, btn = st.columns([0.8, 0.2])
     with hdr:
-        st.markdown("#### 🗂️ Archivos en `data/` (inspector rápido)")
+        st.markdown("#### 🗂️ Archivos en `data/`")
     with btn:
-        label = "👁️ Mostrar inspector" if not st.session_state.get("show_inspector", False) else "🙈 Ocultar inspector"
-        if st.button(label, key="btn_inspector"):
-            _toggle("show_inspector")
-            st.rerun()
+        label = "🙈 Ocultar inspector" if st.session_state.get("show_inspector") else "👁️ Mostrar inspector"
+        st.button(
+            label,
+            key="btn_inspector",
+            on_click=_toggle_cb,
+            kwargs={"key": "show_inspector", "anchor": "inspector_anchor"},
+        )
+
 
     if st.session_state.get("show_inspector"):
         try:
@@ -1701,15 +1726,23 @@ def _show_archivos():
     # ---------- Visores rápidos (solo para ficheros no visualizados en otros módulos) ----------
     st.markdown("#### 👀 Visores rápidos")
 
+
+    st.markdown("<div id='adminlog_anchor'></div>", unsafe_allow_html=True)
+    
     # Visor rápido: admin_log.csv
+
     hdr, btn = st.columns([0.8, 0.2])
     with hdr:
-        st.markdown("##### 👥 Visor rápido: admin_log.csv")
+        st.markdown("   ##### 🧾 Visor rápido: admin_log.csv")
     with btn:
-        lab = "👁️ Mostrar tabla" if not st.session_state.get("show_v_admin_log", False) else "🙈 Ocultar tabla"
-        if st.button(lab, key="btn_v_admin_log"):
-            _toggle("show_v_admin_log")
-            st.rerun()
+        lab = "🙈 Ocultar tabla" if st.session_state.get("show_v_admin_log") else "👁️ Mostrar tabla"
+        st.button(
+            lab,
+            key="btn_v_admin_log",
+            on_click=_toggle_cb,
+            kwargs={"key": "show_v_admin_log", "anchor": "adminlog_anchor"},
+        )
+
 
     if st.session_state.get("show_v_admin_log"):    # admin_log.csv → tabla
         if os.path.exists(_log_path):
