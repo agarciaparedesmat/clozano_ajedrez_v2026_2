@@ -1685,7 +1685,8 @@ def _show_archivos():
 
     hdr, btn = st.columns([0.8, 0.2])
     with hdr:
-        st.markdown("#### 🧾 Visor rápido: Archivos en carpeta data")
+        st.markdown("##### 🧾 Visor rápido: Archivos en /DATA")
+        st.markdown("##### 🧾 Visor rápido: admin_log.csv")
     with btn:
         label = "🙈 Ocultar inspector" if st.session_state.get("show_inspector") else "👁️ Mostrar inspector"
         st.button(
