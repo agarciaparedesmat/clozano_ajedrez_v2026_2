@@ -1733,7 +1733,7 @@ def _show_archivos():
 
     hdr, btn = st.columns([0.8, 0.2])
     with hdr:
-        st.markdown("   ##### 🧾 Visor rápido: admin_log.csv")
+        st.markdown("   #####      🧾 Visor rápido: admin_log.csv")
     with btn:
         lab = "🙈 Ocultar tabla" if st.session_state.get("show_v_admin_log") else "👁️ Mostrar tabla"
         st.button(
