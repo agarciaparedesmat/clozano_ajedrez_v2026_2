@@ -1686,7 +1686,7 @@ def _show_archivos():
     # hdr, btn = st.columns([0.8, 0.2])
     # hdr, btn = st.columns([0.88, 0.12], gap="small")
     # DESPUÉS (botón junto al título)
-    hdr, btn, _sp = st.columns([0.62, 0.16, 0.22])
+    hdr, btn, _sp, _sp = st.columns([0.62, 0.16, 0.22])
     with hdr:
         st.markdown("##### 🧾 Visor rápido: Archivos en /DATA")
     with btn:
