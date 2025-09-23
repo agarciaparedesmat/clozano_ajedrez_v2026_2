@@ -1686,7 +1686,7 @@ def _show_archivos():
     # hdr, btn = st.columns([0.8, 0.2])
     # hdr, btn = st.columns([0.88, 0.12], gap="small")
     # DESPUÉS (botón junto al título)
-    hdr, btn, _sp, _sp2 = st.columns([0.62, 0.16, 0.22, 0.22])
+    hdr, btn, _sp, _sp2 = st.columns([0.40, 0.20, 0.20, 0.20])
     with hdr:
         st.markdown("##### 🧾 Visor rápido: Archivos en /DATA")
     with btn:
@@ -1732,7 +1732,7 @@ def _show_archivos():
 
     # hdr, btn = st.columns([0.8, 0.2])
     # hdr, btn = st.columns([0.9, 0.1], gap="small")
-    hdr, btn, _sp, _sp2 = st.columns([0.62, 0.16, 0.22, 0.22])
+    hdr, btn, _sp, _sp2 = st.columns([0.40, 0.20, 0.20, 0.20])
     
     with hdr:
         st.markdown("#####      🧾 Visor rápido: admin_log.csv")
@@ -1762,7 +1762,7 @@ def _show_archivos():
 
     # hdr, btn = st.columns([0.8, 0.2])
     # hdr, btn = st.columns([0.9, 0.1], gap="small")
-    hdr, btn, _sp, _sp2 = st.columns([0.62, 0.16, 0.22, 0.22])
+    hdr, btn, _sp, _sp2 = st.columns([0.40, 0.20, 0.20, 0.20])
     with hdr:
         st.markdown("#####      🧾 Visor rápido: meta.json")
     with btn:
@@ -1922,7 +1922,7 @@ def _show_archivos():
     st.markdown("#### ♟️ Descargar ronda (CSV)")
 
     # c_sel, c_btn = st.columns([4, 2])
-    c_sel, c_btn, _sp, _sp2= st.columns([0.40, 0.20, 0.20, 0.20], gap="small")
+    c_sel, c_btn, _sp, _sp2= st.columns([0.25, 0.25, 0.25, 0.25], gap="small")
     rondas = sorted([
         int(x) for x in re.findall(r"R(\d+)", " ".join(os.listdir(DATA_DIR)))
         if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{int(x)}.csv"))
