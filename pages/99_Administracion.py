@@ -1648,35 +1648,44 @@ def _show_eliminar():
 # =========================
 def _show_archivos():
     import os, io, zipfile, pandas as pd, datetime as _dt, json
+    def _toggle(key: str):
+        st.session_state[key] = not st.session_state.get(key, False)
+    
     st.markdown("### 🗂️ Archivos")
 
     # ---------- Inspector rápido de /data ----------
-    st.markdown("#### 🗂️ Archivos en `data/` (inspector rápido)")
+    st.markdown("########## 🗂️ Archivos en `data/` (inspector rápido)")
     def _lm(p: str) -> str:
         try:
             return _dt.datetime.fromtimestamp(os.path.getmtime(p)).strftime("%Y-%m-%d %H:%M:%S")
         except Exception:
             return "—"
 
-    try:
-        files = sorted(os.listdir(DATA_DIR))
-    except Exception as e:
-        st.error(f"No se puede listar DATA_DIR: {e}")
-        files = []
+    col_btn, _ = st.columns([1, 6])
+    label = "👁️ Mostrar inspector" if not st.session_state.get("show_inspector", False) else "🙈 Ocultar inspector"
+    if col_btn.button(label, key="btn_inspector"):
+        _toggle("show_inspector")
 
-    if files:
-        rows = []
-        for f in files:
-            p = os.path.join(DATA_DIR, f)
-            try:
-                sz = os.path.getsize(p)
-                mt = _lm(p)
-            except Exception:
-                sz, mt = 0, "—"
-            rows.append({"archivo": f, "tamaño_bytes": sz, "modificado": mt})
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-    else:
-        st.caption("No hay ficheros en `data/` o no es accesible.")
+    if st.session_state.get("show_inspector"):
+        try:
+            files = sorted(os.listdir(DATA_DIR))
+        except Exception as e:
+            st.error(f"No se puede listar DATA_DIR: {e}")
+            files = []
+
+        if files:
+            rows = []
+            for f in files:
+                p = os.path.join(DATA_DIR, f)
+                try:
+                    sz = os.path.getsize(p)
+                    mt = _lm(p)
+                except Exception:
+                    sz, mt = 0, "—"
+                rows.append({"archivo": f, "tamaño_bytes": sz, "modificado": mt})
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        else:
+            st.caption("No hay ficheros en `data/` o no es accesible.")
 
     # Rutas base que usaremos abajo
     _cfg_path = os.path.join(os.path.dirname(DATA_DIR), "config.json")  # ajusta si tu config vive en otra carpeta
@@ -1688,14 +1697,20 @@ def _show_archivos():
     # ---------- Visores rápidos (solo para ficheros no visualizados en otros módulos) ----------
     st.markdown("#### 👀 Visores rápidos")
 
-    # admin_log.csv → tabla
-    if os.path.exists(_log_path):
-        st.markdown("**admin_log.csv**")
-        try:
-            dflog = pd.read_csv(_log_path)
-            st.dataframe(dflog, use_container_width=True, hide_index=True)
-        except Exception as e:
-            st.caption(f"No se puede leer admin_log.csv: {e}")
+# Visor rápido: jugadores.csv
+    st.markdown("##### 👥 Visor rápido: admin_log.csv")
+    c1, _ = st.columns([1, 6])
+    lab = "👁️ Mostrar tabla" if not st.session_state.get("show_v_admin_log", False) else "🙈 Ocultar tabla"
+    if c1.button(lab, key="btn_v_admin_log):
+        _toggle("show_v_jug")
+    if st.session_state.get("show_v_admin_log"):    # admin_log.csv → tabla
+        if os.path.exists(_log_path):
+            st.markdown("**admin_log.csv**")
+            try:
+                dflog = pd.read_csv(_log_path)
+                st.dataframe(dflog, use_container_width=True, hide_index=True)
+            except Exception as e:
+                st.caption(f"No se puede leer admin_log.csv: {e}")
 
     # meta.json → JSON + (opcional) tabla de rondas si hay estructura 'rounds'
     if os.path.exists(_meta_path):
@@ -1789,24 +1804,64 @@ def _show_archivos():
         else:
             st.caption(f"· {os.path.basename(path)} — no existe")
 
-    st.markdown("#### 📦 Descargas directas")
-    _dl_button("Descargar config.json", _cfg_path, "application/json", "dl_cfg")
-    _dl_button("Descargar jugadores.csv", os.path.join(DATA_DIR, "jugadores.csv"), "text/csv", "dl_jug")
-    _dl_button("Descargar standings.csv", os.path.join(DATA_DIR, "standings.csv"), "text/csv", "dl_std")
-    if os.path.exists(_meta_path):
-        _dl_button("Descargar meta de publicación (meta.json)", _meta_path, "application/json", "dl_meta")
-    if os.path.exists(_log_path):
-        _dl_button("Descargar log de administración", _log_path, "text/csv", "dl_log")
+    st.markdown("########## 📦 Descargas directas")
 
+
+    # Fila 1
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        if os.path.exists(os.path.join(DATA_DIR, "config.json")):
+            with open(os.path.join(DATA_DIR, "config.json"), "rb") as f:
+                st.download_button("config.json", f.read(), file_name="config.json", mime="application/json", key="dl_cfg")
+    with c2:
+        if os.path.exists(os.path.join(DATA_DIR, "jugadores.csv")):
+            with open(os.path.join(DATA_DIR, "jugadores.csv"), "rb") as f:
+                st.download_button("jugadores.csv", f.read(), file_name="jugadores.csv", mime="text/csv", key="dl_jug")
+    with c3:
+        if os.path.exists(os.path.join(DATA_DIR, "standings.csv")):
+            with open(os.path.join(DATA_DIR, "standings.csv"), "rb") as f:
+                st.download_button("standings.csv", f.read(), file_name="standings.csv", mime="text/csv", key="dl_stand")
+    with c4:
+        if os.path.exists(os.path.join(DATA_DIR, "meta.json")):
+            with open(os.path.join(DATA_DIR, "meta.json"), "rb") as f:
+                st.download_button("meta.json", f.read(), file_name="meta.json", mime="application/json", key="dl_meta")
+
+    # Fila 2
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        if os.path.exists(os.path.join(DATA_DIR, "admin_log.csv")):
+            with open(os.path.join(DATA_DIR, "admin_log.csv"), "rb") as f:
+                st.download_button("admin_log.csv", f.read(), file_name="admin_log.csv", mime="text/csv", key="dl_log")
+    with c2:
+        # flags.zip (si lo generas en memoria)
+        if 'flags_zip_bytes' in st.session_state:
+            st.download_button("flags.zip", st.session_state['flags_zip_bytes'],
+                            file_name="flags.zip", mime="application/zip", key="dl_flags")
+    # c3, c4 libres para lo que ya tengas
+
+ 
     # ---------- Rondas ----------
-    st.markdown("#### ♟️ Rondas")
-    n = get_n_rounds() if 'get_n_rounds' in globals() else 0
-    if n > 0:
-        rondas_exist = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
-        if rondas_exist:
-            r_sel = st.selectbox("Ronda", rondas_exist, index=len(rondas_exist) - 1, key="dl_r_sel")
-            _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel), "text/csv", f"dl_r{r_sel}")
+    st.markdown("########## ♟️ Descargar ronda (CSV)Rondas")
+
+    c_sel, c_btn = st.columns([3, 2])
+    rondas = sorted([int(x) for x in re.findall(r"R(\d+)", " ".join(os.listdir(DATA_DIR))) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{int(x)}.csv"))])
+    sel_r = c_sel.selectbox("Ronda", rondas, key="dl_ronda_sel")
+    csv_path = os.path.join(DATA_DIR, f"pairings_R{sel_r}.csv")
+    if os.path.exists(csv_path):
+        with open(csv_path, "rb") as f:
+            c_btn.download_button("f"Descargar R{sel_r}.csv"", f.read(),
+                                file_name=f"pairings_R{sel_r}.csv", mime="text/csv",
+                                key="dl_ronda_btn")
+
     st.markdown("---")
+
+   # n = get_n_rounds() if 'get_n_rounds' in globals() else 0
+   # if n > 0:
+   #     rondas_exist = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
+   #     if rondas_exist:
+   #         r_sel = st.selectbox("Ronda", rondas_exist, index=len(rondas_exist) - 1, key="dl_r_sel")
+   #        _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel), "text/csv", f"dl_r{r_sel}")
+
     
     # --- Sustituir el bloque de utilidades meta.json por esto ---
     from lib.tournament import diagnose_meta, repair_meta
@@ -1815,11 +1870,13 @@ def _show_archivos():
 
     # Mostrar (persistente) el último backup creado antes de reparar
     if st.session_state.get("show_backup_dl") and st.session_state.get("last_meta_backup_bytes"):
+        fname = st.session_state.get("last_meta_backup_name", "backup_torneo.zip")
         st.success("Backup creado antes de reparar.")
+        st.caption(f"Archivo: **{fname}**")
         st.download_button(
-            "⬇️ Descargar backup previo",
+            f"⬇️ Descargar {fname}",
             st.session_state["last_meta_backup_bytes"],
-            file_name=st.session_state.get("last_meta_backup_name", "backup_torneo.zip"),
+            file_name=fname,
             mime="application/zip",
             key="dl_meta_bk_persist",
         )
@@ -1827,6 +1884,7 @@ def _show_archivos():
             for k in ("show_backup_dl", "last_meta_backup_bytes", "last_meta_backup_name"):
                 st.session_state.pop(k, None)
             st.rerun()
+
 
     with st.expander("Diagnóstico (clic para ver detalle)", expanded=True):
         d = diagnose_meta()
