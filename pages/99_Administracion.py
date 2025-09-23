@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import pandas as pd
 import streamlit as st
+from zoneinfo import ZoneInfo
 from lib.ui import sidebar_title_and_nav, page_header
 
 from lib.ui2 import is_pub, set_pub, results_empty_count, round_status, status_label, get_states
@@ -148,8 +149,10 @@ def _bk_dir() -> str:
 
 def _now_tag() -> str:
     import datetime as _dt
-    # 2025-09-16_14-33-05
-    return _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    ## 2025-09-16_14-33-05
+    #return _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # Nombre de archivo: dd-mm-aaaa_HH-MM-SS (seguro en Windows/macOS/Linux)
+    return _dt.datetime.now(tz=ZoneInfo("Europe/Madrid")).strftime("%d-%m-%Y_%H-%M-%S")
 
 def _safe_zip_namelist(zf):
     # Evita "zip-slip" (entradas con rutas absolutas o que suben directorios)
@@ -165,7 +168,7 @@ def _manifest(make: bool, label: str = "", note: str = "", extra: dict | None = 
     m = {
         "kind": "tournament-backup",
         "version": 1,
-        "created_at": _now_tag(),
+        "created_at": _dt.datetime.now(tz=ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y %H:%M:%S"),
         "label": label or "",
         "note": note or "",
     }
@@ -2068,7 +2071,8 @@ def _debug_meta_persistencia():
             rounds = meta.setdefault("rounds", {})
             # 2) escribir un marcador temporal bajo rounds.__diag (no afecta a rondas reales)
             import time
-            rounds.setdefault("__diag", {})["ts"] = _dt.datetime.now().isoformat()
+            rounds.setdefault("__diag", {})["ts_es"] = _dt.datetime.now(tz=ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y %H:%M:%S")
+
             _save_meta_preserving_dates(meta)
             # 3) releer y mostrar
             st.success("Guardado OK. Releyendo…")
