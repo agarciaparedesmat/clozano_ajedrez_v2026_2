@@ -1751,87 +1751,111 @@ def _show_archivos():
             except Exception as e:
                 st.caption(f"No se puede leer admin_log.csv: {e}")
 
-    # meta.json → JSON + (opcional) tabla de rondas si hay estructura 'rounds'
-    if os.path.exists(_meta_path):
-        # --- Visor de meta.json (seguro) ---
-        st.markdown("**meta.json**")
 
-        meta_obj = None
-        import json  # import local para evitar dependencias en cabecera
-        try:
-            with open(_meta_path, "r", encoding="utf-8") as f:
-                meta_obj = json.load(f)
-        except Exception as e:
-            st.caption(f"No se puede leer meta.json: {e}")
-        else:
-            st.json(meta_obj)
+    st.markdown("<div id='metajson_anchor'></div>", unsafe_allow_html=True)
+    
+    # Visor rápido: meta.json
 
-        # Construir la tabla comparativa solo si cargó bien el JSON
-        rows_meta = []
-        if isinstance(meta_obj, dict):
-            rounds_meta = meta_obj.get("rounds", {}) or {}
+    hdr, btn = st.columns([0.8, 0.2])
+    with hdr:
+        st.markdown("   #####      🧾 Visor rápido: meta.json")
+    with btn:
+        lab = "🙈 Ocultar tabla" if st.session_state.get("show_v_meta_json") else "👁️ Mostrar tabla"
+        st.button(
+            lab,
+            key="btn_v_meta_json",
+            on_click=_toggle_cb,
+            kwargs={"key": "show_v_meta_json", "anchor": "metajson_anchor"},
+        )
+
+
+    if st.session_state.get("show_v_meta_json"):    # meta_json → tabla
+
+
+
+
+
+        # meta.json → JSON + (opcional) tabla de rondas si hay estructura 'rounds'
+        if os.path.exists(_meta_path):
+            # --- Visor de meta.json (seguro) ---
+            st.markdown("**meta.json**")
+
+            meta_obj = None
+            import json  # import local para evitar dependencias en cabecera
             try:
-                n_max = get_n_rounds()
-            except Exception:
-                n_max = 0
+                with open(_meta_path, "r", encoding="utf-8") as f:
+                    meta_obj = json.load(f)
+            except Exception as e:
+                st.caption(f"No se puede leer meta.json: {e}")
+            else:
+                st.json(meta_obj)
 
-            existing = [i for i in range(1, n_max + 1) if os.path.exists(round_file(i))]
-            for i in existing:
-                v = rounds_meta.get(str(i), {})
-
-                # Valores desde meta (con defaults robustos)
-                pub_meta    = bool(v.get("published", False))
-                date_meta   = v.get("date") or ""
-                closed_meta = bool(v.get("closed", False))
-
-                # Estado real
+            # Construir la tabla comparativa solo si cargó bien el JSON
+            rows_meta = []
+            if isinstance(meta_obj, dict):
+                rounds_meta = meta_obj.get("rounds", {}) or {}
                 try:
-                    pub_real = is_pub(i)
+                    n_max = get_n_rounds()
                 except Exception:
-                    pub_real = False
-                try:
-                    dfp = read_csv_safe(round_file(i))
-                    vac  = results_empty_count(dfp) if dfp is not None else None
-                except Exception:
-                    vac  = None
-                closed_real = bool(pub_real and (vac == 0))
+                    n_max = 0
 
-                # Fecha "real": lo más fideligno que tenemos es get_round_date (guarda en meta)
-                try:
-                    date_real = get_round_date(i) or ""
-                except Exception:
-                    date_real = ""
+                existing = [i for i in range(1, n_max + 1) if os.path.exists(round_file(i))]
+                for i in existing:
+                    v = rounds_meta.get(str(i), {})
 
-                # Ahora ya fuera del try/except, formateamos en español
-                date_meta_es = _dt.date.fromisoformat(date_meta).strftime('%d/%m/%Y') if date_meta else ''
-                date_real_es = _dt.date.fromisoformat(date_real).strftime('%d/%m/%Y') if date_real else ''
+                    # Valores desde meta (con defaults robustos)
+                    pub_meta    = bool(v.get("published", False))
+                    date_meta   = v.get("date") or ""
+                    closed_meta = bool(v.get("closed", False))
 
-                rows_meta.append({
-                    "Ronda": i,
-                    "Fecha (meta)": date_meta_es,
-                    "Fecha (real)": date_real_es,
-                    "Publicado (meta)": "Sí" if pub_meta else "No",
-                    "Publicado (real)": "Sí" if pub_real else "No",
-                    "Cerrada (meta)": "Sí" if closed_meta else "No",
-                    "Cerrada (real)": "Sí" if closed_real else "No",
-                    "⚠️ Desv. closed": "🔴" if (closed_meta != closed_real) else "",
-                })
+                    # Estado real
+                    try:
+                        pub_real = is_pub(i)
+                    except Exception:
+                        pub_real = False
+                    try:
+                        dfp = read_csv_safe(round_file(i))
+                        vac  = results_empty_count(dfp) if dfp is not None else None
+                    except Exception:
+                        vac  = None
+                    closed_real = bool(pub_real and (vac == 0))
+
+                    # Fecha "real": lo más fideligno que tenemos es get_round_date (guarda en meta)
+                    try:
+                        date_real = get_round_date(i) or ""
+                    except Exception:
+                        date_real = ""
+
+                    # Ahora ya fuera del try/except, formateamos en español
+                    date_meta_es = _dt.date.fromisoformat(date_meta).strftime('%d/%m/%Y') if date_meta else ''
+                    date_real_es = _dt.date.fromisoformat(date_real).strftime('%d/%m/%Y') if date_real else ''
+
+                    rows_meta.append({
+                        "Ronda": i,
+                        "Fecha (meta)": date_meta_es,
+                        "Fecha (real)": date_real_es,
+                        "Publicado (meta)": "Sí" if pub_meta else "No",
+                        "Publicado (real)": "Sí" if pub_real else "No",
+                        "Cerrada (meta)": "Sí" if closed_meta else "No",
+                        "Cerrada (real)": "Sí" if closed_real else "No",
+                        "⚠️ Desv. closed": "🔴" if (closed_meta != closed_real) else "",
+                    })
 
 
-        if rows_meta:
-            dfm = pd.DataFrame(rows_meta)
+            if rows_meta:
+                dfm = pd.DataFrame(rows_meta)
 
-            def _row_style(r):
-                # Soporta el nombre nuevo y el antiguo por compatibilidad
-                flag = r.get("⚠️ Desv. closed", r.get("desviación_closed", ""))
-                bad = bool(flag)  # "🔴" -> True, cadena vacía -> False
-                return ["background-color:#ffe5e5" if bad else "" for _ in r]
+                def _row_style(r):
+                    # Soporta el nombre nuevo y el antiguo por compatibilidad
+                    flag = r.get("⚠️ Desv. closed", r.get("desviación_closed", ""))
+                    bad = bool(flag)  # "🔴" -> True, cadena vacía -> False
+                    return ["background-color:#ffe5e5" if bad else "" for _ in r]
 
 
-            #def _row_style(r):
-            #    return ["background-color:#ffe5e5" if r["desviación_closed"] else "" for _ in r]
-            
-            st.table(dfm.style.apply(_row_style, axis=1))
+                #def _row_style(r):
+                #    return ["background-color:#ffe5e5" if r["desviación_closed"] else "" for _ in r]
+                
+                st.table(dfm.style.apply(_row_style, axis=1))
 
     st.markdown("---")
 
