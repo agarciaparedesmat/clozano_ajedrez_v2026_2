@@ -1669,8 +1669,9 @@ def _show_archivos():
             unsafe_allow_html=True,
         )
 
-    st.markdown("### 🗂️ Archivos")
-
+    # ---------- Visores rápidos (solo para ficheros no visualizados en otros módulos) ----------
+    st.markdown("### 🗂️ Archivos - 👀 Visores rápidos"")
+                
     # ---------- Inspector rápido de /data ----------
 
     def _lm(p: str) -> str:
@@ -1722,9 +1723,6 @@ def _show_archivos():
     _log_path  = os.path.join(DATA_DIR, "admin_log.csv")
 
     st.markdown("---")
-
-    # ---------- Visores rápidos (solo para ficheros no visualizados en otros módulos) ----------
-    st.markdown("#### 👀 Visores rápidos")
 
 
     st.markdown("<div id='adminlog_anchor'></div>", unsafe_allow_html=True)
