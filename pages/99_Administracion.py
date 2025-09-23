@@ -1665,6 +1665,7 @@ def _show_archivos():
     label = "👁️ Mostrar inspector" if not st.session_state.get("show_inspector", False) else "🙈 Ocultar inspector"
     if col_btn.button(label, key="btn_inspector"):
         _toggle("show_inspector")
+        st.rerun()
 
     if st.session_state.get("show_inspector"):
         try:
@@ -1697,12 +1698,13 @@ def _show_archivos():
     # ---------- Visores rápidos (solo para ficheros no visualizados en otros módulos) ----------
     st.markdown("#### 👀 Visores rápidos")
 
-# Visor rápido: jugadores.csv
+    # Visor rápido: admin_log.csv
     st.markdown("##### 👥 Visor rápido: admin_log.csv")
     c1, _ = st.columns([1, 6])
     lab = "👁️ Mostrar tabla" if not st.session_state.get("show_v_admin_log", False) else "🙈 Ocultar tabla"
     if c1.button(lab, key="btn_v_admin_log"):
         _toggle("show_v_admin_log")
+        st.rerun()
     if st.session_state.get("show_v_admin_log"):    # admin_log.csv → tabla
         if os.path.exists(_log_path):
             st.markdown("**admin_log.csv**")
