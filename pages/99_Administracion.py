@@ -1849,7 +1849,7 @@ def _show_archivos():
     csv_path = os.path.join(DATA_DIR, f"pairings_R{sel_r}.csv")
     if os.path.exists(csv_path):
         with open(csv_path, "rb") as f:
-            c_btn.download_button(f"Descargar R{sel_r}.csv"", f.read(),
+            c_btn.download_button(f"Descargar R{sel_r}.csv", f.read(),
                                 file_name=f"pairings_R{sel_r}.csv", mime="text/csv",
                                 key="dl_ronda_btn")
 
