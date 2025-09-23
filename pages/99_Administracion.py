@@ -1755,7 +1755,7 @@ def _show_archivos():
 
     # hdr, btn = st.columns([0.8, 0.2])
     # hdr, btn = st.columns([0.9, 0.1], gap="small")
-    hdr, btn, _sp, _sp2 = st.columns([0.40, 0.20, 0.20, 0.20])
+    hdr, btn, _sp, _sp2 = st.columns([0.40, 0.30, 0.15, 0.15])
     
     with hdr:
         st.markdown("#####      🧾 Visor rápido: admin_log.csv")
@@ -1992,32 +1992,42 @@ def _show_archivos():
     st.markdown("<div id='meta_utils_anchor'></div>", unsafe_allow_html=True)
     st.markdown("#### 🛠️ Utilidades meta.json (compactas)")
 
-
     # --- Aviso persistente del último backup creado antes de reparar ---
     ph_bkup = st.empty()
-    if st.session_state.get("show_backup_dl") and st.session_state.get("last_meta_backup_bytes"):
-        fname = st.session_state.get("last_meta_backup_name", "backup_torneo.zip")
+
+    # Reconstruir bytes/nombre a partir de la ruta si hace falta
+    bk_bytes = st.session_state.get("last_meta_backup_bytes")
+    bk_name  = st.session_state.get("last_meta_backup_name")
+    if (not bk_bytes) and st.session_state.get("last_meta_backup"):
+        _p = st.session_state["last_meta_backup"]
+        if os.path.exists(_p):
+            with open(_p, "rb") as f:
+                bk_bytes = f.read()
+            bk_name = os.path.basename(_p)
+            st.session_state["last_meta_backup_bytes"] = bk_bytes
+            st.session_state["last_meta_backup_name"]  = bk_name
+            st.session_state["show_backup_dl"] = True
+
+    # Pintar aviso si hay algo que descargar
+    if st.session_state.get("show_backup_dl") and bk_bytes:
         with ph_bkup:
             c_msg, c_btn = st.columns([0.70, 0.30])
             with c_msg:
-                st.success(f"Backup creado antes de reparar · **{fname}**")
+                st.success(f"Backup creado antes de reparar · **{bk_name}**")
             with c_btn:
                 st.download_button(
                     "⬇️ Descargar",
-                    st.session_state["last_meta_backup_bytes"],
-                    file_name=fname,
+                    bk_bytes,
+                    file_name=bk_name,
                     mime="application/zip",
                     key="dl_meta_bk_persist",
                     use_container_width=True,
                 )
-            # Ocultar en este mismo run (sin st.rerun); además guardamos el ancla
             st.button("Ocultar aviso", key="hide_backup_notice", on_click=_hide_backup_notice_cb)
 
-    # Si el callback marcó ocultar ahora, vaciamos el contenedor ya
+    # Ocultar en este mismo run si el callback lo pidió (sin salto al inicio)
     if st.session_state.pop("_hide_backup_notice_now", False):
         ph_bkup.empty()
-
-
 
 
     with st.expander("Diagnóstico (clic para ver detalle)", expanded=True):
@@ -2098,6 +2108,7 @@ def _show_archivos():
                 st.session_state["last_meta_backup_name"] = os.path.basename(backup_path)
                 st.session_state["show_backup_dl"] = True
 
+            st.session_state["scroll_to_anchor"] = "meta_utils_anchor"
             st.rerun()
 
 
