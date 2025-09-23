@@ -2066,6 +2066,15 @@ def _show_archivos():
                 remove_orphan_flags=opt_orphan,
                 preserve_dates=True,
             )
+            # Forzar coherencia definitiva flags <-> meta (por si faltaban flags tras un reboot)
+            try:
+                from lib.tournament import force_sync_flags_with_meta
+                changed = force_sync_flags_with_meta()
+                if changed:
+                    st.info(f"Sincronizados {changed} flag(s) con meta.json.")
+            except Exception:
+                pass
+
             st.success(f"OK · aplicados: {res['applied']}")
 
             # Ofrece descarga del backup PREVIO (si se creó)

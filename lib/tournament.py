@@ -937,14 +937,12 @@ def repair_meta(
             rounds.setdefault(str(i), {"published": False, "closed": False})
             applied["created"] += 1
 
-    # 2) published/flags
+    # 2) published/flags: deja flag = meta (meta es la fuente de verdad)
     if sync_flags:
-        for i in diag.existing_rounds:
-            real_pub = is_published(i)  # realidad actual
-            # deja published en meta + flag coherentes (usa set_published del core)
-            set_published(i, real_pub)
-            # (set_published ya guarda meta + flag)
-            applied["published_sync"] += int(i in diag.flag_mismatch)
+        try:
+            force_sync_flags_with_meta()
+        except Exception:
+            pass
 
     # 3) closed
     if fix_closed:
