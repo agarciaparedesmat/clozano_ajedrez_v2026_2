@@ -60,18 +60,33 @@ def _normalize_result_series(s):
 
 
 # Lista de rondas publicadas existentes (según flags/meta)
+
 def published_rounds_list() -> list[int]:
     try:
         n = get_n_rounds()
     except Exception:
         n = 0
+
+    # Leer meta una sola vez (si está)
+    try:
+        meta = load_meta() or {}
+        rounds_meta = meta.get("rounds", {}) if isinstance(meta, dict) else {}
+    except Exception:
+        rounds_meta = {}
+
     res = []
     for i in range(1, n + 1):
         try:
-            if os.path.exists(round_file(i)) and is_pub(i):
+            # debe existir el CSV
+            if not os.path.exists(round_file(i)):
+                continue
+
+            pub_meta = bool(rounds_meta.get(str(i), {}).get("published", False))
+            pub_flag = os.path.exists(os.path.join(DATA_DIR, f"published_R{i}.flag"))
+
+            if pub_meta or pub_flag:
                 res.append(i)
         except Exception:
-            # ante cualquier problema, seguimos
             pass
     return res
 
@@ -448,7 +463,7 @@ st.session_state.setdefault("_meta_autofixed", False)
 
 try:
     cfg = get_cfg()
-    do_auto = bool(cfg.get("auto_fix_meta", False))
+    do_auto = bool(cfg.get("auto_fix_meta", True))
 except Exception:
     do_auto = False
 
@@ -1997,7 +2012,14 @@ def _show_archivos():
         c6.metric("flags huérfanos", d.summary["orphan_flags"])
 
         if d.missing_in_meta: st.warning(f"Faltan en meta: {d.missing_in_meta}")
-        if d.flag_mismatch:  st.warning(f"Incoherencias 'published': {d.flag_mismatch}")
+        
+
+        if d.flag_mismatch:
+            st.warning("Incoherencias 'published': " + str(d.flag_mismatch) +
+                    " · Suele ocurrir si tras un reinicio faltan los archivos published_R*.flag. " +
+                    "Pulsa **🧯 Reparar (seguro)** o activa `auto_fix_meta`.")
+
+        
         if d.closed_mismatch: st.warning(f"Incoherencias 'closed': {d.closed_mismatch}")
         if d.orphan_flags: st.info(f"Flags huérfanos: {d.orphan_flags}")
 
