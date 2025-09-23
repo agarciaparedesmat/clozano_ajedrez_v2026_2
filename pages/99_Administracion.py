@@ -1861,52 +1861,78 @@ def _show_archivos():
         else:
             st.caption(f"· {os.path.basename(path)} — no existe")
 
+    def _dl_csv_utf8sig(label: str, src_path: str, filename: str, key: str):
+        """Descarga CSV re-codificado como UTF-8 con BOM para que Excel lo abra con acentos correctos,
+        sin modificar el archivo en disco."""
+        if os.path.exists(src_path):
+            try:
+                with open(src_path, "r", encoding="utf-8") as f:
+                    data = f.read().encode("utf-8-sig")  # añade BOM
+            except Exception:
+                with open(src_path, "rb") as f:
+                    data = f.read()
+            st.download_button(label, data, file_name=filename, mime="text/csv", key=key)
+
     st.markdown("#### 📦 Descargas directas")
+
     # Fila 1
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        if os.path.exists(os.path.join(DATA_DIR, "config.json")):
-            with open(os.path.join(DATA_DIR, "config.json"), "rb") as f:
-                st.download_button("config.json", f.read(), file_name="config.json", mime="application/json", key="dl_cfg")
+        cfg_path = os.path.join(os.path.dirname(DATA_DIR), "config.json")
+        if os.path.exists(cfg_path):
+            with open(cfg_path, "rb") as f:
+                st.download_button("config.json", f.read(),
+                                file_name="config.json", mime="application/json", key="dl_cfg")
+
     with c2:
-        if os.path.exists(os.path.join(DATA_DIR, "jugadores.csv")):
-            with open(os.path.join(DATA_DIR, "jugadores.csv"), "rb") as f:
-                st.download_button("jugadores.csv", f.read(), file_name="jugadores.csv", mime="text/csv", key="dl_jug")
+        _dl_csv_utf8sig("jugadores.csv", os.path.join(DATA_DIR, "jugadores.csv"),
+                        "jugadores.csv", "dl_jug")
+
     with c3:
-        if os.path.exists(os.path.join(DATA_DIR, "standings.csv")):
-            with open(os.path.join(DATA_DIR, "standings.csv"), "rb") as f:
-                st.download_button("standings.csv", f.read(), file_name="standings.csv", mime="text/csv", key="dl_stand")
+        _dl_csv_utf8sig("standings.csv", os.path.join(DATA_DIR, "standings.csv"),
+                        "standings.csv", "dl_stand")
+
     with c4:
         if os.path.exists(os.path.join(DATA_DIR, "meta.json")):
             with open(os.path.join(DATA_DIR, "meta.json"), "rb") as f:
-                st.download_button("meta.json", f.read(), file_name="meta.json", mime="application/json", key="dl_meta")
+                st.download_button("meta.json", f.read(),
+                                file_name="meta.json", mime="application/json", key="dl_meta")
 
     # Fila 2
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        if os.path.exists(os.path.join(DATA_DIR, "admin_log.csv")):
-            with open(os.path.join(DATA_DIR, "admin_log.csv"), "rb") as f:
-                st.download_button("admin_log.csv", f.read(), file_name="admin_log.csv", mime="text/csv", key="dl_log")
+        _dl_csv_utf8sig("admin_log.csv", os.path.join(DATA_DIR, "admin_log.csv"),
+                        "admin_log.csv", "dl_log")
     with c2:
-        # flags.zip (si lo generas en memoria)
-        if 'flags_zip_bytes' in st.session_state:
+        if 'flags_zip_bytes' in st.session_state:  # si alguna vez generas este ZIP en memoria
             st.download_button("flags.zip", st.session_state['flags_zip_bytes'],
                             file_name="flags.zip", mime="application/zip", key="dl_flags")
-    # c3, c4 libres para lo que ya tengas
+    # c3 y c4 libres
 
  
     # ---------- Rondas ----------
-    st.markdown("########## ♟️ Descargar ronda (CSV)Rondas")
+    st.markdown("#### ♟️ Descargar ronda (CSV)")
 
-    c_sel, c_btn = st.columns([3, 2])
-    rondas = sorted([int(x) for x in re.findall(r"R(\d+)", " ".join(os.listdir(DATA_DIR))) if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{int(x)}.csv"))])
+    c_sel, c_btn = st.columns([4, 2])
+    rondas = sorted([
+        int(x) for x in re.findall(r"R(\d+)", " ".join(os.listdir(DATA_DIR)))
+        if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{int(x)}.csv"))
+    ])
     sel_r = c_sel.selectbox("Ronda", rondas, key="dl_ronda_sel")
+
     csv_path = os.path.join(DATA_DIR, f"pairings_R{sel_r}.csv")
     if os.path.exists(csv_path):
-        with open(csv_path, "rb") as f:
-            c_btn.download_button(f"Descargar R{sel_r}.csv", f.read(),
-                                file_name=f"pairings_R{sel_r}.csv", mime="text/csv",
-                                key="dl_ronda_btn")
+        # descarga Excel-friendly sin tocar el archivo en disco
+        with c_btn:
+            try:
+                with open(csv_path, "r", encoding="utf-8") as f:
+                    data = f.read().encode("utf-8-sig")
+            except Exception:
+                with open(csv_path, "rb") as f:
+                    data = f.read()
+            st.download_button(f"Descargar R{sel_r}.csv", data,
+                            file_name=f"pairings_R{sel_r}.csv", mime="text/csv",
+                            key="dl_ronda_btn")
 
     st.markdown("---")
 
