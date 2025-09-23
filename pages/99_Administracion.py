@@ -1929,23 +1929,29 @@ def _show_archivos():
         int(m.group(1))
         for fn in files
         if (m := re.fullmatch(r"pairings_R(\d+)\.csv", fn))
-})
+    })
 
-    sel_r = c_sel.selectbox("Ronda", rondas, key="dl_ronda_sel")
+    if not rondas:
+        c_sel.write("—")
+        c_btn.button("Descargar", disabled=True, key="dl_ronda_btn_disabled")
+    else:
+        
 
-    csv_path = os.path.join(DATA_DIR, f"pairings_R{sel_r}.csv")
-    if os.path.exists(csv_path):
-        # descarga Excel-friendly sin tocar el archivo en disco
-        with c_btn:
-            try:
-                with open(csv_path, "r", encoding="utf-8") as f:
-                    data = f.read().encode("utf-8-sig")
-            except Exception:
-                with open(csv_path, "rb") as f:
-                    data = f.read()
-            st.download_button(f"Descargar R{sel_r}.csv", data,
-                            file_name=f"pairings_R{sel_r}.csv", mime="text/csv",
-                            key="dl_ronda_btn")
+        sel_r = c_sel.selectbox("Ronda", rondas, key="dl_ronda_sel")
+
+        csv_path = os.path.join(DATA_DIR, f"pairings_R{sel_r}.csv")
+        if os.path.exists(csv_path):
+            # descarga Excel-friendly sin tocar el archivo en disco
+            with c_btn:
+                try:
+                    with open(csv_path, "r", encoding="utf-8") as f:
+                        data = f.read().encode("utf-8-sig")
+                except Exception:
+                    with open(csv_path, "rb") as f:
+                        data = f.read()
+                st.download_button(f"Descargar R{sel_r}.csv", data,
+                                file_name=f"pairings_R{sel_r}.csv", mime="text/csv",
+                                key="dl_ronda_btn")
 
     st.markdown("---")
 
