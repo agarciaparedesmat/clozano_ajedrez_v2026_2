@@ -1683,7 +1683,8 @@ def _show_archivos():
     # marcador de ancla (colócalo justo antes del título)
     st.markdown("<div id='inspector_anchor'></div>", unsafe_allow_html=True)
 
-    hdr, btn = st.columns([0.8, 0.2])
+    # hdr, btn = st.columns([0.8, 0.2])
+    hdr, btn = st.columns([0.88, 0.12], gap="small")
     with hdr:
         st.markdown("##### 🧾 Visor rápido: Archivos en /DATA")
     with btn:
@@ -1727,7 +1728,8 @@ def _show_archivos():
     
     # Visor rápido: admin_log.csv
 
-    hdr, btn = st.columns([0.8, 0.2])
+    # hdr, btn = st.columns([0.8, 0.2])
+    hdr, btn = st.columns([0.9, 0.1], gap="small")
     with hdr:
         st.markdown("#####      🧾 Visor rápido: admin_log.csv")
     with btn:
@@ -1754,7 +1756,8 @@ def _show_archivos():
     
     # Visor rápido: meta.json
 
-    hdr, btn = st.columns([0.8, 0.2])
+    # hdr, btn = st.columns([0.8, 0.2])
+    hdr, btn = st.columns([0.9, 0.1], gap="small")
     with hdr:
         st.markdown("#####      🧾 Visor rápido: meta.json")
     with btn:
