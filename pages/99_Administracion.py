@@ -1991,7 +1991,7 @@ def _show_archivos():
         with msg:
             st.success(f"Backup creado antes de reparar · **{fname}**")
         with btn:
-            st.download_button(f"⬇️ Descargar {fname}", st.session_state["last_meta_backup_bytes"], file_name=fname, mime="application/zip",key="dl_meta_bk_persist")
+            st.download_button(f"⬇️ Descargar", st.session_state["last_meta_backup_bytes"], file_name=fname, mime="application/zip",key="dl_meta_bk_persist")
 
         if st.button("Ocultar aviso", key="hide_backup_notice"):
             for k in ("show_backup_dl", "last_meta_backup_bytes", "last_meta_backup_name"):
