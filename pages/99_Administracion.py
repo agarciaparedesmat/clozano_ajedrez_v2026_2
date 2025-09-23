@@ -1993,21 +1993,30 @@ def _show_archivos():
     st.markdown("#### 🛠️ Utilidades meta.json (compactas)")
 
 
-    # Mostrar (persistente) el último backup creado antes de reparar
+    # --- Aviso persistente del último backup creado antes de reparar ---
+    ph_bkup = st.empty()
     if st.session_state.get("show_backup_dl") and st.session_state.get("last_meta_backup_bytes"):
         fname = st.session_state.get("last_meta_backup_name", "backup_torneo.zip")
+        with ph_bkup:
+            c_msg, c_btn = st.columns([0.70, 0.30])
+            with c_msg:
+                st.success(f"Backup creado antes de reparar · **{fname}**")
+            with c_btn:
+                st.download_button(
+                    "⬇️ Descargar",
+                    st.session_state["last_meta_backup_bytes"],
+                    file_name=fname,
+                    mime="application/zip",
+                    key="dl_meta_bk_persist",
+                    use_container_width=True,
+                )
+            # Ocultar en este mismo run (sin st.rerun); además guardamos el ancla
+            st.button("Ocultar aviso", key="hide_backup_notice", on_click=_hide_backup_notice_cb)
 
-        msg, btn = st.columns([0.7, 0.3])
-        with msg:
-            st.success(f"Backup creado antes de reparar · **{fname}**")
-        with btn:
-            st.download_button(f"⬇️ Descargar", st.session_state["last_meta_backup_bytes"], file_name=fname, mime="application/zip",key="dl_meta_bk_persist")
+    # Si el callback marcó ocultar ahora, vaciamos el contenedor ya
+    if st.session_state.pop("_hide_backup_notice_now", False):
+        ph_bkup.empty()
 
-        if st.button("Ocultar aviso", key="hide_backup_notice"):
-            for k in ("show_backup_dl", "last_meta_backup_bytes", "last_meta_backup_name"):
-                st.session_state.pop(k, None)
-            st.session_state["scroll_to_anchor"] = "meta_utils_anchor"  # volver aquí
-            # NO llames st.rerun(): el botón ya provoca rerun automático
 
 
 
