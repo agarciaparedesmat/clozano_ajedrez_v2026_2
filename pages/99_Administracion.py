@@ -1685,7 +1685,7 @@ def _show_archivos():
 
     hdr, btn = st.columns([0.8, 0.2])
     with hdr:
-        st.markdown("#### 🗂️ Archivos en `data/`")
+        st.markdown("#### 🧾 Visor rápido: Archivos en `data/`")
     with btn:
         label = "🙈 Ocultar inspector" if st.session_state.get("show_inspector") else "👁️ Mostrar inspector"
         st.button(
@@ -1722,8 +1722,6 @@ def _show_archivos():
     _meta_path = os.path.join(DATA_DIR, "meta.json")                    # cambia si tu meta tiene otro nombre
     _log_path  = os.path.join(DATA_DIR, "admin_log.csv")
 
-    st.markdown("---")
-
 
     st.markdown("<div id='adminlog_anchor'></div>", unsafe_allow_html=True)
     
@@ -1731,7 +1729,7 @@ def _show_archivos():
 
     hdr, btn = st.columns([0.8, 0.2])
     with hdr:
-        st.markdown("   #####      🧾 Visor rápido: admin_log.csv")
+        st.markdown("#####      🧾 Visor rápido: admin_log.csv")
     with btn:
         lab = "🙈 Ocultar tabla" if st.session_state.get("show_v_admin_log") else "👁️ Mostrar tabla"
         st.button(
@@ -1758,7 +1756,7 @@ def _show_archivos():
 
     hdr, btn = st.columns([0.8, 0.2])
     with hdr:
-        st.markdown("   #####      🧾 Visor rápido: meta.json")
+        st.markdown("#####      🧾 Visor rápido: meta.json")
     with btn:
         lab = "🙈 Ocultar tabla" if st.session_state.get("show_v_meta_json") else "👁️ Mostrar tabla"
         st.button(
@@ -1770,10 +1768,6 @@ def _show_archivos():
 
 
     if st.session_state.get("show_v_meta_json"):    # meta_json → tabla
-
-
-
-
 
         # meta.json → JSON + (opcional) tabla de rondas si hay estructura 'rounds'
         if os.path.exists(_meta_path):
