@@ -1857,21 +1857,7 @@ def _show_archivos():
 
     pre_snap = st.checkbox("Backup antes de reparar", value=True, key="meta_pre_snap")
 
-    
-    # Botón opcional (manual) para crear backup y descargar
-    if st.button("Crear backup ahora", key="meta_bk_now"):
-        try:
-            path = _make_backup_local(label="Snapshot_auto_meta_fix", note="Backup manual antes de reparar")
-            st.session_state["last_meta_backup"] = path
-            st.success(f"Backup: {os.path.basename(path)}")
-            with open(path, "rb") as f:
-                st.download_button("⬇️ Descargar backup", f.read(),
-                                file_name=os.path.basename(path),
-                                mime="application/zip", key="dl_meta_bk_manual")
-        except Exception as e:
-            st.error(f"No se pudo crear backup: {e}")
-
- 
+     
      # Reparación segura (con backup previo automático si está marcado)
     if st.button("🧯 Reparar (seguro)", type="primary", key="meta_repair"):
         try:
