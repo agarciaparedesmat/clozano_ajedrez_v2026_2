@@ -1666,7 +1666,7 @@ def _show_archivos():
         st.markdown("#### 🗂️ Archivos en `data/` (inspector rápido)")
     with btn:
         label = "👁️ Mostrar inspector" if not st.session_state.get("show_inspector", False) else "🙈 Ocultar inspector"
-        if col_btn.button(label, key="btn_inspector"):
+        if st.button(label, key="btn_inspector"):
             _toggle("show_inspector")
             st.rerun()
 
@@ -1707,7 +1707,7 @@ def _show_archivos():
         st.markdown("##### 👥 Visor rápido: admin_log.csv")
     with btn:
         lab = "👁️ Mostrar tabla" if not st.session_state.get("show_v_admin_log", False) else "🙈 Ocultar tabla"
-        if c1.button(lab, key="btn_v_admin_log"):
+        if st.button(lab, key="btn_v_admin_log"):
             _toggle("show_v_admin_log")
             st.rerun()
 
