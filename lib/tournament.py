@@ -869,16 +869,15 @@ def diagnose_meta() -> MetaDiag:
     flag_mm, closed_mm, orphan = [], [], []
 
     for i in existing:
-        # dentro de for i in existing:
         r = rounds_meta.get(str(i), {})
 
-        # incoherencia estricta: META vs FLAG
+        # Incoherencia estricta: meta['published'] vs existencia del flag
         meta_pub = bool(r.get("published", False))
-        has_flag = os.path.exists(_pub_flag_path(i))   # usa el flag de disco
+        has_flag = os.path.exists(os.path.join(DATA_DIR, f"published_R{i}.flag"))
         if meta_pub != has_flag:
             flag_mm.append(i)
 
-        # para 'closed', usa la realidad operativa: publicado si meta o flag
+        # 'closed' según realidad operativa (publicada si meta o flag) y sin vacíos
         real_pub_for_closed = bool(meta_pub or has_flag)
         dfp = read_csv_safe(round_file(i))
         empties = _results_empty_count_core(dfp)

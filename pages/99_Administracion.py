@@ -1992,24 +1992,27 @@ def _show_archivos():
     st.markdown("<div id='meta_utils_anchor'></div>", unsafe_allow_html=True)
     st.markdown("#### 🛠️ Utilidades meta.json (compactas)")
 
+
     # --- Aviso persistente del último backup creado antes de reparar ---
     ph_bkup = st.empty()
 
     # Reconstruir bytes/nombre a partir de la ruta si hace falta
+    bk_path  = st.session_state.get("last_meta_backup")           # ruta del ZIP (la guardas al reparar)
     bk_bytes = st.session_state.get("last_meta_backup_bytes")
     bk_name  = st.session_state.get("last_meta_backup_name")
-    if (not bk_bytes) and st.session_state.get("last_meta_backup"):
-        _p = st.session_state["last_meta_backup"]
-        if os.path.exists(_p):
-            with open(_p, "rb") as f:
-                bk_bytes = f.read()
-            bk_name = os.path.basename(_p)
-            st.session_state["last_meta_backup_bytes"] = bk_bytes
-            st.session_state["last_meta_backup_name"]  = bk_name
-            st.session_state["show_backup_dl"] = True
 
-    # Pintar aviso si hay algo que descargar
-    if st.session_state.get("show_backup_dl") and bk_bytes:
+    if (not bk_bytes) and bk_path and os.path.exists(bk_path):
+        with open(bk_path, "rb") as f:
+            bk_bytes = f.read()
+        bk_name = bk_name or os.path.basename(bk_path)
+        st.session_state["last_meta_backup_bytes"] = bk_bytes
+        st.session_state["last_meta_backup_name"]  = bk_name
+        # si había backup real, marcamos el flag por si faltaba
+        st.session_state["show_backup_dl"] = True
+
+    # Pintar aviso si hay algo que descargar.
+    # (mostramos si hay flag o, como fallback, si hay ruta válida)
+    if bk_bytes and (st.session_state.get("show_backup_dl") or bk_path):
         with ph_bkup:
             c_msg, c_btn = st.columns([0.70, 0.30])
             with c_msg:
@@ -2023,9 +2026,10 @@ def _show_archivos():
                     key="dl_meta_bk_persist",
                     use_container_width=True,
                 )
+            # Ocultar en este mismo run (sin salto arriba)
             st.button("Ocultar aviso", key="hide_backup_notice", on_click=_hide_backup_notice_cb)
 
-    # Ocultar en este mismo run si el callback lo pidió (sin salto al inicio)
+    # Si el callback lo pidió, vaciamos ya el contenedor
     if st.session_state.pop("_hide_backup_notice_now", False):
         ph_bkup.empty()
 
