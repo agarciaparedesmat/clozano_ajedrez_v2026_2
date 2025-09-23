@@ -1916,7 +1916,8 @@ def _show_archivos():
     # ---------- Rondas ----------
     st.markdown("#### ♟️ Descargar ronda (CSV)")
 
-    c_sel, c_btn = st.columns([4, 2])
+    # c_sel, c_btn = st.columns([4, 2])
+    c_sel, c_btn = st.columns([0.8, 0.2], gap="small")
     rondas = sorted([
         int(x) for x in re.findall(r"R(\d+)", " ".join(os.listdir(DATA_DIR)))
         if os.path.exists(os.path.join(DATA_DIR, f"pairings_R{int(x)}.csv"))
