@@ -1861,7 +1861,7 @@ def _show_archivos():
         else:
             st.caption(f"· {os.path.basename(path)} — no existe")
 
-    st.markdown("########## 📦 Descargas directas")
+    st.markdown("📦 Descargas directas")
 
 
     # Fila 1
