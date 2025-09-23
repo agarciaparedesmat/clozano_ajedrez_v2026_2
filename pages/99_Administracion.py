@@ -1670,7 +1670,7 @@ def _show_archivos():
         )
 
     # ---------- Visores rápidos (solo para ficheros no visualizados en otros módulos) ----------
-    st.markdown("### 🗂️ Archivos - 👀 Visores rápidos"")
+    st.markdown("### 🗂️ Archivos - 👀 Visores rápidos")
                 
     # ---------- Inspector rápido de /data ----------
 
