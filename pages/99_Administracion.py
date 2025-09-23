@@ -1986,15 +1986,13 @@ def _show_archivos():
     # Mostrar (persistente) el último backup creado antes de reparar
     if st.session_state.get("show_backup_dl") and st.session_state.get("last_meta_backup_bytes"):
         fname = st.session_state.get("last_meta_backup_name", "backup_torneo.zip")
-        st.success("Backup creado antes de reparar.")
-        st.caption(f"Archivo: **{fname}**")
-        st.download_button(
-            f"⬇️ Descargar {fname}",
-            st.session_state["last_meta_backup_bytes"],
-            file_name=fname,
-            mime="application/zip",
-            key="dl_meta_bk_persist",
-        )
+
+        msg, btn = st.columns([0.7, 0.3])
+        with msg:
+            st.success(f"Backup creado antes de reparar · **{fname}**")
+        with btn:
+            st.download_button(f"⬇️ Descargar {fname}", st.session_state["last_meta_backup_bytes"], file_name=fname, mime="application/zip",key="dl_meta_bk_persist")
+
         if st.button("Ocultar aviso", key="hide_backup_notice"):
             for k in ("show_backup_dl", "last_meta_backup_bytes", "last_meta_backup_name"):
                 st.session_state.pop(k, None)
