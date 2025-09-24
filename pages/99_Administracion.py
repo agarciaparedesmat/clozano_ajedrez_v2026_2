@@ -1990,7 +1990,9 @@ def _show_archivos():
     bk_path  = st.session_state.get("last_meta_backup_path")
     bk_bytes = st.session_state.get("last_meta_backup_bytes")
     bk_name  = st.session_state.get("last_meta_backup_name")
-    st.toast(f"Entra : {bk_path}")   
+    st.toast(f"Entra1 : {bk_path}") 
+    st.toast(f"Entra2 : {bk_bytes}") 
+    st.toast(f"Entra3 : {bk_name}")   
     # Reconstruye desde ruta si faltan bytes
     if (not bk_bytes) and bk_path and os.path.exists(bk_path):
      
