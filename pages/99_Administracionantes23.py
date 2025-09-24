@@ -1977,31 +1977,56 @@ def _show_archivos():
                                 key="dl_ronda_btn")
 
     st.markdown("---")
-# ==========================================================================
 
-    # --- Sustituir el bloque de utilidades meta.json por esto ---
     from lib.tournament import diagnose_meta, repair_meta
 
     st.markdown("<div id='meta_utils_anchor'></div>", unsafe_allow_html=True)
     st.markdown("#### 🛠️ Utilidades meta.json (compactas)")
 
 
-    # Mostrar (persistente) el último backup creado antes de reparar
-    if st.session_state.get("show_backup_dl") and st.session_state.get("last_meta_backup_bytes"):
-        fname = st.session_state.get("last_meta_backup_name", "backup_torneo.zip")
+    # --- Aviso persistente del último backup creado antes de reparar ---
+    ph_bkup = st.empty()
 
-        msg, btn = st.columns([0.7, 0.3])
-        with msg:
-            st.success(f"Backup creado antes de reparar · **{fname}**")
-        with btn:
-            st.download_button(f"⬇️ Descargar", st.session_state["last_meta_backup_bytes"], file_name=fname, mime="application/zip",key="dl_meta_bk_persist")
+    bk_path  = st.session_state.get("last_meta_backup_path")
+    bk_bytes = st.session_state.get("last_meta_backup_bytes")
+    bk_name  = st.session_state.get("last_meta_backup_name")
+    st.toast(f"Entra1 : {bk_path}") 
+    st.toast(f"Entra2 : {bk_bytes}") 
+    st.toast(f"Entra3 : {bk_name}")   
+    if (not bk_bytes):
+        st.toast(f"Entra4 : {bk_bytes}") 
+    
+    # Reconstruye desde ruta si faltan bytes
+    if (not bk_bytes) and bk_path and os.path.exists(bk_path):
+     
+        try:
+            with open(bk_path, "rb") as f:
+                bk_bytes = f.read()
+            bk_name = bk_name or os.path.basename(bk_path)
+            st.session_state["last_meta_backup_bytes"] = bk_bytes
+            st.session_state["last_meta_backup_name"]  = bk_name
+        except Exception:
+            bk_bytes = None
 
-        if st.button("Ocultar aviso", key="hide_backup_notice"):
-            for k in ("show_backup_dl", "last_meta_backup_bytes", "last_meta_backup_name"):
-                st.session_state.pop(k, None)
-            st.session_state["scroll_to_anchor"] = "meta_utils_anchor"  # volver aquí
-            # NO llames st.rerun(): el botón ya provoca rerun automático
+    # Muestra el aviso si hay bytes (no dependas de show_backup_dl)
+    if bk_bytes:
+        with ph_bkup:
+            c_msg, c_btn = st.columns([0.70, 0.30])
+            with c_msg:
+                st.success(f"Backup creado antes de reparar · **{bk_name or 'backup.zip'}**")
+            with c_btn:
+                st.download_button(
+                    "⬇️ Descargar",
+                    bk_bytes,
+                    file_name=bk_name or "backup.zip",
+                    mime="application/zip",
+                    key="dl_meta_bk_persist",
+                    use_container_width=True,
+                )
+            st.button("Ocultar aviso", key="hide_backup_notice", on_click=_hide_backup_notice_cb)
 
+    if st.session_state.pop("_hide_backup_notice_now", False):
+        ph_bkup.empty()
 
 
     with st.expander("Diagnóstico (clic para ver detalle)", expanded=True):
@@ -2036,7 +2061,7 @@ def _show_archivos():
 
 
     # clave de sesión para recordar el último backup creado
-    st.session_state.setdefault("last_meta_backup", None)
+    st.session_state.setdefault("last_meta_backup_path", None)
 
     pre_snap = st.checkbox("Backup antes de reparar", value=True, key="meta_pre_snap")
 
@@ -2047,10 +2072,20 @@ def _show_archivos():
             backup_path = None
             if pre_snap:  # checkbox “Backup antes de reparar”
                 try:
-                    backup_path = _make_backup_local(label="Snapshot_auto_meta_fix", note="Backup previo a repair_meta")
-                    st.session_state["last_meta_backup"] = backup_path
-                except Exception:
-                    pass
+                    backup_path = _make_backup_local(label="auto_meta_fix", note="Backup previo a reparar meta.json")
+
+                    st.toast(f"Backup creado en: {backup_path}")
+
+                    st.session_state["last_meta_backup_path"]  = backup_path
+                    try:
+                        with open(backup_path, "rb") as f:
+                            st.session_state["last_meta_backup_bytes"] = f.read()
+                        st.session_state["last_meta_backup_name"]  = os.path.basename(backup_path)
+                        st.session_state["show_backup_dl"] = True
+                    except Exception:
+                        pass
+                except Exception as e:
+                    st.warning(f"No se pudo crear backup previo: {e}")
 
             res = repair_meta(
                 create_missing=opt_create,
@@ -2059,10 +2094,19 @@ def _show_archivos():
                 remove_orphan_flags=opt_orphan,
                 preserve_dates=True,
             )
+            # Forzar coherencia definitiva flags <-> meta (por si faltaban flags tras un reboot)
+            try:
+                from lib.tournament import force_sync_flags_with_meta
+                changed = force_sync_flags_with_meta()
+                if changed:
+                    st.info(f"Sincronizados {changed} flag(s) con meta.json.")
+            except Exception:
+                pass
+
             st.success(f"OK · aplicados: {res['applied']}")
 
             # Ofrece descarga del backup PREVIO (si se creó)
-            path = st.session_state.get("last_meta_backup")
+            path = st.session_state.get("last_meta_backup_path")
 
             # … ya hiciste repair_meta(...) y tienes backup_path si pre_snap estaba marcado ….
 
@@ -2073,14 +2117,16 @@ def _show_archivos():
                 st.session_state["last_meta_backup_name"] = os.path.basename(backup_path)
                 st.session_state["show_backup_dl"] = True
 
-            st.rerun()
-
+            st.session_state["scroll_to_anchor"] = "meta_utils_anchor"  # volver a la sección
+            # NO llamamos a experimental_rerun(): el propio botón ya re-ejecuta el script
 
 
         except Exception as e:
             st.error(f"Fallo al reparar: {e}")
 
-#=====================================================================
+#    with st.expander("Herramientas avanzadas (con cuidado)"):
+#        st.caption("Aquí podríamos añadir en el futuro acciones más agresivas (p.ej., borrar entradas de meta sin CSV). Por ahora, **no** se realizan para evitar riesgos.")
+
 # =========================
 # 💾 Copias y Restauración (local)
 # =========================
