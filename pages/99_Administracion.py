@@ -1978,15 +1978,6 @@ def _show_archivos():
 
     st.markdown("---")
 
-   # n = get_n_rounds() if 'get_n_rounds' in globals() else 0
-   # if n > 0:
-   #     rondas_exist = [i for i in range(1, n + 1) if os.path.exists(round_file(i))]
-   #     if rondas_exist:
-   #         r_sel = st.selectbox("Ronda", rondas_exist, index=len(rondas_exist) - 1, key="dl_r_sel")
-   #        _dl_button(f"Descargar R{r_sel}.csv", round_file(r_sel), "text/csv", f"dl_r{r_sel}")
-
-
-    # --- Sustituir el bloque de utilidades meta.json por esto ---
     from lib.tournament import diagnose_meta, repair_meta
 
     st.markdown("<div id='meta_utils_anchor'></div>", unsafe_allow_html=True)
@@ -2001,7 +1992,8 @@ def _show_archivos():
     bk_name  = st.session_state.get("last_meta_backup_name")
 
     # Reconstruye desde ruta si faltan bytes
-    if (not bk_bytes) and bk_path and os.path.exists(bk_path):
+    # if (not bk_bytes) and bk_path and os.path.exists(bk_path):
+    if (bk_bytes):
         try:
             with open(bk_path, "rb") as f:
                 bk_bytes = f.read()
