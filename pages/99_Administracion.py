@@ -1993,6 +1993,9 @@ def _show_archivos():
     st.toast(f"Entra1 : {bk_path}") 
     st.toast(f"Entra2 : {bk_bytes}") 
     st.toast(f"Entra3 : {bk_name}")   
+    if (not bk_bytes):
+        st.toast(f"Entra4 : {bk_bytes}") 
+    
     # Reconstruye desde ruta si faltan bytes
     if (not bk_bytes) and bk_path and os.path.exists(bk_path):
      
