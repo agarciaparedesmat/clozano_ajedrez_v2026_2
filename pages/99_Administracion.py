@@ -2066,7 +2066,7 @@ def _show_archivos():
 
 
     # clave de sesión para recordar el último backup creado
-    st.session_state.setdefault("last_meta_backup", None)
+    st.session_state.setdefault("last_meta_backup_path", None)
 
     pre_snap = st.checkbox("Backup antes de reparar", value=True, key="meta_pre_snap")
 
@@ -2108,7 +2108,7 @@ def _show_archivos():
             st.success(f"OK · aplicados: {res['applied']}")
 
             # Ofrece descarga del backup PREVIO (si se creó)
-            path = st.session_state.get("last_meta_backup")
+            path = st.session_state.get("last_meta_backup_path")
 
             # … ya hiciste repair_meta(...) y tienes backup_path si pre_snap estaba marcado ….
 
