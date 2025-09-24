@@ -1996,11 +1996,11 @@ def _show_archivos():
     # --- Aviso persistente del último backup creado antes de reparar ---
     ph_bkup = st.empty()
 
-    # Reconstruir bytes/nombre a partir de la ruta si hace falta
     bk_path  = st.session_state.get("last_meta_backup_path")
     bk_bytes = st.session_state.get("last_meta_backup_bytes")
     bk_name  = st.session_state.get("last_meta_backup_name")
 
+    # Reconstruye desde ruta si faltan bytes
     if (not bk_bytes) and bk_path and os.path.exists(bk_path):
         try:
             with open(bk_path, "rb") as f:
@@ -2008,28 +2008,26 @@ def _show_archivos():
             bk_name = bk_name or os.path.basename(bk_path)
             st.session_state["last_meta_backup_bytes"] = bk_bytes
             st.session_state["last_meta_backup_name"]  = bk_name
-            st.session_state["show_backup_dl"] = True
         except Exception:
-            pass
+            bk_bytes = None
 
-    # Pintar aviso si hay backup válido
-    if (bk_bytes is not None) and (st.session_state.get("show_backup_dl") or bk_path):
+    # Muestra el aviso si hay bytes (no dependas de show_backup_dl)
+    if bk_bytes:
         with ph_bkup:
             c_msg, c_btn = st.columns([0.70, 0.30])
             with c_msg:
-                st.success(f"Backup creado antes de reparar · **{bk_name}**")
+                st.success(f"Backup creado antes de reparar · **{bk_name or 'backup.zip'}**")
             with c_btn:
                 st.download_button(
                     "⬇️ Descargar",
                     bk_bytes,
-                    file_name=bk_name,
+                    file_name=bk_name or "backup.zip",
                     mime="application/zip",
                     key="dl_meta_bk_persist",
                     use_container_width=True,
                 )
             st.button("Ocultar aviso", key="hide_backup_notice", on_click=_hide_backup_notice_cb)
 
-    # Vaciar el aviso en este mismo run si el callback lo pidió
     if st.session_state.pop("_hide_backup_notice_now", False):
         ph_bkup.empty()
 
@@ -2119,10 +2117,8 @@ def _show_archivos():
                 st.session_state["last_meta_backup_name"] = os.path.basename(backup_path)
                 st.session_state["show_backup_dl"] = True
 
-            st.session_state["scroll_to_anchor"] = "meta_utils_anchor"
-            st.experimental_rerun()
-
-
+            st.session_state["scroll_to_anchor"] = "meta_utils_anchor"  # volver a la sección
+            # NO llamamos a experimental_rerun(): el propio botón ya re-ejecuta el script
 
 
         except Exception as e:
