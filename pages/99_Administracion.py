@@ -450,6 +450,44 @@ def _make_backup_local(label: str = "", note: str = "") -> str:
     return out_path
 
 
+# === Helpers badge "último backup" ===
+from zoneinfo import ZoneInfo
+import os, json, zipfile, datetime as _dt
+
+def _fmt_es_from_ts(ts: float) -> str:
+    return _dt.datetime.fromtimestamp(ts, tz=ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y %H:%M:%S")
+
+def _backup_human_time(path: str) -> str:
+    """Intenta leer la fecha del manifest del ZIP; si falla, usa mtime."""
+    try:
+        with zipfile.ZipFile(path) as z:
+            if "manifest.json" in z.namelist():
+                with z.open("manifest.json") as f:
+                    created = json.load(f).get("created_at")  # ya en formato es
+                    if created:
+                        return created
+    except Exception:
+        pass
+    return _fmt_es_from_ts(os.path.getmtime(path))
+
+def _find_last_backup_path() -> tuple[str | None, str | None, str | None]:
+    """Devuelve (path, nombre, fecha_es) del último backup disponible."""
+    # 1) preferir el último creado en esta sesión
+    p = st.session_state.get("last_meta_backup_path")
+    if p and os.path.exists(p):
+        return p, os.path.basename(p), _backup_human_time(p)
+    # 2) buscar en data/backups/
+    try:
+        bdir = os.path.join(DATA_DIR, "backups")
+        zips = [os.path.join(bdir, f) for f in os.listdir(bdir) if f.endswith(".zip")]
+        if zips:
+            latest = max(zips, key=os.path.getmtime)
+            return latest, os.path.basename(latest), _backup_human_time(latest)
+    except Exception:
+        pass
+    return None, None, None
+
+
 from lib.ui2 import login_widget, require_teacher
 
 # Sidebar: muestra el modo actual y el botón SALIR (si ya eres profe)
@@ -1989,6 +2027,29 @@ def _show_archivos():
 
     st.markdown("<div id='meta_utils_anchor'></div>", unsafe_allow_html=True)
     st.markdown("#### 🛠️ Utilidades meta.json (compactas)")
+
+    # Badge "Último backup"
+    _last_path, _last_name, _last_when = _find_last_backup_path()
+    if _last_path:
+        st.markdown(
+            f"""
+            <div style="margin:-0.25rem 0 0.5rem 0;">
+            <span style="
+                background:#eef6ff; color:#0B63C6; padding:.25rem .55rem;
+                border-radius:9999px; font-size:.85rem; font-weight:600;">
+                🕒 Último backup: {_last_when}
+            </span>
+            <span style="opacity:.75; font-size:.85rem; margin-left:.4rem;">
+                ({_last_name})
+            </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption("Aún no hay backups guardados.")
+
+
 
     # Mostrar (persistente) el último backup creado antes de reparar
     # --- Aviso persistente del último backup creado antes de reparar ---
