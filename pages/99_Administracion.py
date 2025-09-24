@@ -2001,7 +2001,7 @@ def _show_archivos():
     if st.session_state.get("show_backup_dl") and st.session_state.get("last_meta_backup_bytes"):
         fname = st.session_state.get("last_meta_backup_name", "backup_torneo.zip")
 
-        c_msg, c_dl, c_hide = st.columns([0.65, 0.25, 0.10])
+        c_msg, c_dl, c_hide = st.columns([0.60, 0.25, 0.15])
         with c_msg:
             st.success(f"Backup creado antes de reparar · **{fname}**")
         with c_dl:
