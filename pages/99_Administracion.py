@@ -1997,22 +1997,23 @@ def _show_archivos():
     ph_bkup = st.empty()
 
     # Reconstruir bytes/nombre a partir de la ruta si hace falta
-    bk_path  = st.session_state.get("last_meta_backup")           # ruta del ZIP (la guardas al reparar)
+    bk_path  = st.session_state.get("last_meta_backup_path")
     bk_bytes = st.session_state.get("last_meta_backup_bytes")
     bk_name  = st.session_state.get("last_meta_backup_name")
 
     if (not bk_bytes) and bk_path and os.path.exists(bk_path):
-        with open(bk_path, "rb") as f:
-            bk_bytes = f.read()
-        bk_name = bk_name or os.path.basename(bk_path)
-        st.session_state["last_meta_backup_bytes"] = bk_bytes
-        st.session_state["last_meta_backup_name"]  = bk_name
-        # si había backup real, marcamos el flag por si faltaba
-        st.session_state["show_backup_dl"] = True
+        try:
+            with open(bk_path, "rb") as f:
+                bk_bytes = f.read()
+            bk_name = bk_name or os.path.basename(bk_path)
+            st.session_state["last_meta_backup_bytes"] = bk_bytes
+            st.session_state["last_meta_backup_name"]  = bk_name
+            st.session_state["show_backup_dl"] = True
+        except Exception:
+            pass
 
-    # Pintar aviso si hay algo que descargar.
-    # (mostramos si hay flag o, como fallback, si hay ruta válida)
-    if bk_bytes and (st.session_state.get("show_backup_dl") or bk_path):
+    # Pintar aviso si hay backup válido
+    if (bk_bytes is not None) and (st.session_state.get("show_backup_dl") or bk_path):
         with ph_bkup:
             c_msg, c_btn = st.columns([0.70, 0.30])
             with c_msg:
@@ -2026,10 +2027,9 @@ def _show_archivos():
                     key="dl_meta_bk_persist",
                     use_container_width=True,
                 )
-            # Ocultar en este mismo run (sin salto arriba)
             st.button("Ocultar aviso", key="hide_backup_notice", on_click=_hide_backup_notice_cb)
 
-    # Si el callback lo pidió, vaciamos ya el contenedor
+    # Vaciar el aviso en este mismo run si el callback lo pidió
     if st.session_state.pop("_hide_backup_notice_now", False):
         ph_bkup.empty()
 
@@ -2077,10 +2077,17 @@ def _show_archivos():
             backup_path = None
             if pre_snap:  # checkbox “Backup antes de reparar”
                 try:
-                    backup_path = _make_backup_local(label="Snapshot_auto_meta_fix", note="Backup previo a repair_meta")
-                    st.session_state["last_meta_backup"] = backup_path
-                except Exception:
-                    pass
+                    backup_path = _make_backup_local(label="auto_meta_fix", note="Backup previo a reparar meta.json")
+                    st.session_state["last_meta_backup_path"]  = backup_path
+                    try:
+                        with open(backup_path, "rb") as f:
+                            st.session_state["last_meta_backup_bytes"] = f.read()
+                        st.session_state["last_meta_backup_name"]  = os.path.basename(backup_path)
+                        st.session_state["show_backup_dl"] = True
+                    except Exception:
+                        pass
+                except Exception as e:
+                    st.warning(f"No se pudo crear backup previo: {e}")
 
             res = repair_meta(
                 create_missing=opt_create,
@@ -2113,7 +2120,8 @@ def _show_archivos():
                 st.session_state["show_backup_dl"] = True
 
             st.session_state["scroll_to_anchor"] = "meta_utils_anchor"
-            st.rerun()
+            st.experimental_rerun()
+
 
 
 
