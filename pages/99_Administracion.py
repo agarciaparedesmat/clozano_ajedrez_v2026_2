@@ -2076,6 +2076,9 @@ def _show_archivos():
             if pre_snap:  # checkbox “Backup antes de reparar”
                 try:
                     backup_path = _make_backup_local(label="auto_meta_fix", note="Backup previo a reparar meta.json")
+
+                    st.toast(f"Backup creado en: {backup_path}")
+
                     st.session_state["last_meta_backup_path"]  = backup_path
                     try:
                         with open(backup_path, "rb") as f:
